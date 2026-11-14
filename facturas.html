@@ -689,7 +689,7 @@ function pintar() {
   const columnas = [
     { title: '<input type="checkbox" id="chk_todas" title="Seleccionar todas las del listado">', field: "id", width: 44, headerSort: false, hozAlign: "center",
       formatter: (c) => `<input type="checkbox" data-id="${c.getValue()}" ${seleccion.has(c.getValue()) ? "checked" : ""}>` },
-    { title: "Nº factura", field: "numero", minWidth: 120, formatter: (c) => `<strong>${esc(c.getValue())}</strong>` },
+    { title: "Nº factura", field: "numero", minWidth: 120, sorter: (a, b) => String(a).localeCompare(String(b), "es", { numeric: true }), formatter: (c) => `<strong>${esc(c.getValue())}</strong>` },
     { title: "Acciones", field: "id", width: 440, headerSort: false, formatter: (c) => {
         const d = c.getRow().getData(), id = d.id;
         return `<button class="btn-mini" onclick="imprimirUna('${id}')">Imprimir</button> <button class="secondary btn-mini" onclick="window.open('factura_imprimir.html?ids=${id}&descargar=1','_blank')">PDF</button> <button class="secondary btn-mini" onclick="window.open('factura_imprimir.html?ids=${id}&albaranes=1&descargar=1','_blank')">PDF + albaranes</button> ` +

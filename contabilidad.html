@@ -313,7 +313,7 @@ function listaLibro(){
   const q=V.lib.q.toLowerCase();
   let F=facturas().filter(f=>(!q||(f.cli+' '+f.num+' '+fnum(f.num)+' '+f.conc).toLowerCase().includes(q))&&(!V.lib.cli||f.cli===V.lib.cli)&&(!V.lib.serie||f.serie===V.lib.serie)&&(!V.lib.trim||f.trim===V.lib.trim)&&(V.lib.est===''||(V.lib.est==='p'?f.pend>0.005:f.pend<=0.005)));
   const k=V.lib.sort,d=V.lib.dir;
-  F.sort((a,b)=>{const x=a[k],y=b[k];return (x>y?1:x<y?-1:0)*d||b.id-a.id;});
+  F.sort((a,b)=>{const x=a[k],y=b[k];const c=(typeof x==='string'&&typeof y==='string')?x.localeCompare(y,'es',{numeric:true}):(x>y?1:x<y?-1:0);return c*d||b.id-a.id;});
   return F;
 }
 function vLibro(){
