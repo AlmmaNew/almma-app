@@ -1804,7 +1804,7 @@ async function cargarLineas() {
 
   window._lineasOrden = lineas || [];
   const tbody = document.getElementById("tabla_lineas");
-  tbody.innerHTML = "<tr><th></th><th>Artículo</th><th>Cant.</th><th>Importe</th><th>%</th><th>A cobrar</th><th>Ubicación</th><th>Bultos</th><th>Peso kg</th><th>Albarán prov.</th><th>Recibido</th><th></th></tr>" +
+  tbody.innerHTML = "<tr><th></th><th>Tipo</th><th>Artículo</th><th>Cant.</th><th>Importe</th><th>%</th><th>A cobrar</th><th>Ubicación</th><th>Bultos</th><th>Peso kg</th><th>Albarán prov.</th><th>Recibido</th><th></th></tr>" +
     (lineas || []).map(l => {
       const recibida = !!l.recibido_at;
       const boton = l.tipolinea === 4 ? ""   // las líneas de importes no se reciben: no llevan botón
@@ -1816,6 +1816,7 @@ async function cargarLineas() {
       const pendiente = l.tipolinea !== 4 && !l.recibido_at && l.recibido !== "S";
       return `<tr class="${claseTipo} ${pendiente ? "lin-pendiente" : ""}">
         <td><button class="secondary btn-mini" style="color:#dc2626;" data-d="${escMont(l.descripcion || l.articulo || "")}" onclick="borrarLinea(${l.linea}, this.dataset.d)">Borrar</button></td>
+        <td>${{ 1: "Mercancía", 2: "Devolución", 3: "Texto", 4: "Servicio" }[l.tipolinea] || ""}</td>
         <td>${escMont(l.descripcion || l.articulo || "")}${l.control_stock === 'S' ? ' <span class="meta" style="color:var(--muted);font-size:11px;">(stock)</span>' : ''}</td>
         <td>${l.cantidad ?? ""}</td>
         <td>${l.importe ?? ""}</td>
