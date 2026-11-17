@@ -449,7 +449,8 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 
     <h4 style="margin-bottom:6px;">Importes y facturación</h4>
     <div class="form-grid">
-      <div class="campo"><label>Importe Total</label><input id="ch_importe_total" type="number" step="0.01" oninput="recalcularPendiente()"></div>
+      <div class="campo"><label>Importe Total</label><input id="ch_importe_total" type="number" step="0.01" oninput="recalcularPendiente()">
+        <div class="meta" id="ch_total_l4" style="font-size:11px;margin-top:2px;"></div></div>
       <div class="campo"><label>Entrega a Cuenta</label><input id="ch_entrega_a_cuenta" type="number" step="0.01" oninput="recalcularPendiente()"></div>
       <div class="campo"><label>Importe Pendiente</label><input id="ch_importe_pendiente" type="number" step="0.01"><div class="meta" id="ch_cobros_montador" style="font-size:11px;margin-top:2px;"></div></div>
       <div class="campo"><label>Forma de Cobro</label><input id="ch_tipo_cobro" placeholder="ej. Efectivo, Transferencia"></div>
@@ -511,6 +512,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
       <span style="background:#fffbeb;padding:0 5px;">Pendiente de recibir</span>
     </div>
     <table class="lineas-table" id="tabla_lineas"></table>
+    <div class="meta" id="lin_total_l4" style="margin-top:8px;font-size:13px;"></div>
 
     <div style="margin-top:14px;">
       <button id="btn_nueva_linea" onclick="mostrarNuevaLinea(true)">+ Nueva línea</button>
@@ -1830,6 +1832,16 @@ async function cargarLineas() {
 
   const totalBultos = (lineas || []).reduce((acc, l) => acc + (l.bultos || 0), 0);
   document.getElementById("ch_bultos").textContent = totalBultos;
+  // acumulado de las líneas de importes (tipo 4): valor del servicio y lo que se cobra
+  const l4 = (lineas || []).filter(l => l.tipolinea === 4);
+  const sumaImp = Math.round(l4.reduce((a, l) => a + (Number(l.importe) || 0), 0) * 100) / 100;
+  const sumaCob = Math.round(l4.reduce((a, l) => a + (Number(l.importe_cobrar) || 0), 0) * 100) / 100;
+  const eur = (n) => n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  document.getElementById("ch_total_l4").innerHTML = l4.length
+    ? `Líneas tipo 4 (${l4.length}): importe <strong>${eur(sumaImp)}</strong> · a cobrar <strong>${eur(sumaCob)}</strong>`
+    : "Sin líneas tipo 4";
+  document.getElementById("lin_total_l4").innerHTML = l4.length
+    ? `Acumulado líneas tipo 4 (${l4.length}): importe <strong>${eur(sumaImp)}</strong> · a cobrar <strong>${eur(sumaCob)}</strong>` : "";
   const totalPeso = (lineas || []).reduce((acc, l) => acc + (Number(l.peso_kg) || 0), 0);
   document.getElementById("ch_peso").textContent = Math.round(totalPeso * 100) / 100;
 }
@@ -2188,7 +2200,7 @@ async function editarIncidencia(id) {
 }
 
 async function borrarIncidencia(id) {
-  if (!confirm("¿Borrar esta incidencia?\n\nNo se puede deshacer. La orden NO cambia de estado: si ya no tiene incidencias, cámbialo a mano en Cabecera.")) return;
+  if (!confirm("¿Borrar esta incidencia?\n\nNo se puede deshacer. La orden NO cambia de estado: si ya no tiene incidencias, cámbialo a mano en Cabecera.\n\nSi era la última, se quita también la marca «con incidencias» de la orden.")) return;
   const { error } = await client.from("incidencias").delete().eq("id", id);
   if (error) {
     alert(error.message.includes("fotos_orden")
@@ -2196,6 +2208,9 @@ async function borrarIncidencia(id) {
       : "No se pudo borrar: " + error.message);
     return;
   }
+  // si ya no queda ninguna incidencia, la orden deja de salir como «con incidencias»
+  const { count } = await client.from("incidencias").select("id", { count: "exact", head: true }).eq("anyo", pedidoActivo.anyo).eq("orden", pedidoActivo.orden);
+  if (count === 0) await client.from("ordenes").update({ con_incidencia: false }).eq("anyo", pedidoActivo.anyo).eq("orden", pedidoActivo.orden);
   await cargarIncidencias();
 }
 

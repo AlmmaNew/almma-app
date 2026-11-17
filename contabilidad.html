@@ -342,10 +342,27 @@ function vCobros(){
   return cab('Registro de cobros — un apunte por cada pago','Cada vez que un cliente paga, se apunta aquí y la factura se actualiza sola.','Cobros + macro «Registrar cobro»')+
   `<div class="bar"><button data-cobrar="">+ Registrar cobro</button><div><label class="l">Buscar</label><input id="cq" value="${esc(V.cob.q)}" placeholder="cliente, nº factura…"></div><div><label class="l">Mes</label><select id="cmes"><option value="">Todos</option>${MES.map((m,i)=>`<option value="${i+1}" ${V.cob.mes==i+1?'selected':''}>${m}</option>`).join('')}</select></div></div>
   <div class="cards"><div class="card"><div class="k">${C.length} cobros</div><div class="v">${eur0(tot)}</div></div><div class="card"><div class="k">En efectivo</div><div class="v">${eur0(ef)}</div></div><div class="card"><div class="k">Por banco</div><div class="v">${eur0(tot-ef)}</div></div></div>
-  <div class="tw" style="max-height:62vh"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Nº factura</th><th class="n">Importe</th><th>Forma de pago</th><th>Observaciones</th><th></th></tr></thead><tbody>${C.slice(0,300).map(c=>`<tr><td>${fdate(c.fecha)}</td><td>${esc(c.cli)}</td><td><b>${esc(fnum(c.num))}</b></td><td class="n">${eur(c.imp)}</td><td>${esc(c.forma)}</td><td>${esc(c.obs)}</td><td><button class="rojo peq" data-delc="${c.i}" title="Anular este cobro">✕</button></td></tr>`).join('')||'<tr><td colspan="7" class="vacio">Sin cobros</td></tr>'}</tbody></table></div>
+  <div class="tw" style="max-height:62vh"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Nº factura</th><th class="n">Importe</th><th>Forma de pago</th><th>Observaciones</th><th></th></tr></thead><tbody>${C.slice(0,300).map(c=>`<tr><td>${fdate(c.fecha)}</td><td>${esc(c.cli)}</td><td><b>${esc(fnum(c.num))}</b></td><td class="n">${eur(c.imp)}</td><td>${esc(c.forma)}</td><td>${esc(c.obs)}</td><td><button class="sec peq" data-editc="${c.i}" title="Cambiar fecha o forma de pago">✎</button> <button class="rojo peq" data-delc="${c.i}" title="Anular este cobro">✕</button></td></tr>`).join('')||'<tr><td colspan="7" class="vacio">Sin cobros</td></tr>'}</tbody></table></div>
   <div class="nota az">«Registrar cobro» sustituye a la macro del Excel: aquella preguntaba todo con 5 cuadros de texto sueltos (nº de cliente, nº de facturas, importe, fecha, forma). Aquí es una sola ventana, con el reparto a la vista antes de confirmar.</div>`;
 }
 const W={cli:'',sel:new Set(),imp:'',fecha:HOYS,forma:'TRANSFERENCIA'};
+// editar un cobro ya apuntado: solo fecha, forma de pago y observaciones (el importe no se toca: para eso se anula y se vuelve a registrar)
+let EC=null;
+function abrirEditCobro(i){
+  const c=S.cobros[i];if(!c)return;EC=i;
+  const fs=['TRANSFERENCIA','EFECTIVO','TALON'];if(c.forma&&!fs.includes(c.forma))fs.push(c.forma);
+  abrir(`<h3>Editar cobro</h3>
+  <p style="color:var(--muted);font-size:13px">${esc(c.cli)} · factura <b>${esc(fnum(c.num))}</b> · ${eur(c.imp)}</p>
+  <div class="fg"><div><label class="l">Fecha del cobro</label><input id="ecfecha" type="date" value="${esc(c.fecha||'')}"></div>
+  <div><label class="l">Forma de pago</label><select id="ecforma">${fs.map(f=>`<option ${c.forma===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div></div>
+  <div style="margin-top:10px"><label class="l">Observaciones</label><input id="ecobs" value="${esc(c.obs||'')}"></div>
+  <div class="acc"><button class="sec" data-cerrar="1">Cancelar</button><button data-eok="1">Guardar</button></div>`);
+}
+async function guardarEditCobro(){
+  const c=S.cobros[EC];if(!c)return;
+  const fecha=document.getElementById('ecfecha').value||null,forma=document.getElementById('ecforma').value,obs=document.getElementById('ecobs').value.trim()||null;
+  if(await guardar(()=>dbUpd('cont_cobros',c.id,{fecha,forma_pago:forma,observaciones:obs}))){cerrar();render();}
+}
 function abrirCobro(num,cli){
   W.cli=cli||'';W.sel=new Set(num?[num]:[]);W.imp='';W.fecha=HOYS;W.forma='TRANSFERENCIA';cuerpoCobro();
 }
@@ -554,6 +571,8 @@ document.addEventListener('click',async e=>{
   if(d.wall){W.sel=new Set(pendCli(W.cli).map(f=>f.num));return cuerpoCobro();}
   if(d.wnone){W.sel=new Set();return cuerpoCobro();}
   if(d.wok)return confirmarCobro();
+  if(d.editc!==undefined)return abrirEditCobro(+d.editc);
+  if(d.eok)return guardarEditCobro();
   if(d.delc!==undefined){if(confirm('¿Anular este cobro? La factura volverá a tener ese importe pendiente.')){if(await guardar(()=>dbDel('cont_cobros',S.cobros[+d.delc].id)))render();}return;}
   if(d.addg)return formGasto();
   if(d.addo)return formOtro();

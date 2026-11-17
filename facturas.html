@@ -279,6 +279,17 @@ input,select{padding:8px 10px;border:1px solid var(--border);border-radius:6px;f
   <div style="display:flex;gap:8px;margin-top:14px;"><button id="mr_emitir" onclick="emitirRect()">Emitir</button><button class="secondary" onclick="cerrarModal()">Cancelar</button></div>
 </div></div>
 
+<!-- ventana para corregir importes de una factura del programa antiguo -->
+<div id="modal_corr" class="modal-f"><div class="caja">
+  <button class="secondary" style="float:right;" onclick="cerrarCorreccion()">✕</button>
+  <h3 id="mc_titulo" style="margin-top:0;"></h3>
+  <p class="meta">Cambia el importe de cada línea; la base, el IVA, la retención y el total de la factura se recalculan solos. Mientras no esté activo Veri*Factu se pueden corregir también las emitidas desde la web.</p>
+  <table class="lineas-table" id="mc_tabla"></table>
+  <div id="mc_totales" style="margin-top:12px;font-size:15px;"></div>
+  <p id="mc_error" class="error" style="display:none;color:#dc2626;"></p>
+  <div style="display:flex;gap:8px;margin-top:14px;"><button id="mc_guardar" onclick="guardarCorreccion()">Guardar importes</button><button class="secondary" onclick="cerrarCorreccion()">Cancelar</button></div>
+</div></div>
+
 <script>
 const client = supabase.createClient("https://uamgbtbsxbrgymhqalak.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k");
 
@@ -690,9 +701,10 @@ function pintar() {
     { title: '<input type="checkbox" id="chk_todas" title="Seleccionar todas las del listado">', field: "id", width: 44, headerSort: false, hozAlign: "center",
       formatter: (c) => `<input type="checkbox" data-id="${c.getValue()}" ${seleccion.has(c.getValue()) ? "checked" : ""}>` },
     { title: "Nº factura", field: "numero", minWidth: 120, sorter: (a, b) => String(a).localeCompare(String(b), "es", { numeric: true }), formatter: (c) => `<strong>${esc(c.getValue())}</strong>` },
-    { title: "Acciones", field: "id", width: 440, headerSort: false, formatter: (c) => {
+    { title: "Acciones", field: "id", width: 560, headerSort: false, formatter: (c) => {
         const d = c.getRow().getData(), id = d.id;
         return `<button class="btn-mini" onclick="imprimirUna('${id}')">Imprimir</button> <button class="secondary btn-mini" onclick="window.open('factura_imprimir.html?ids=${id}&descargar=1','_blank')">PDF</button> <button class="secondary btn-mini" onclick="window.open('factura_imprimir.html?ids=${id}&albaranes=1&descargar=1','_blank')">PDF + albaranes</button> ` +
+          (d.tipo_factura === "proforma" ? "" : `<button class="secondary btn-mini" onclick="abrirCorreccion('${id}')">Corregir importes</button> `) +
           (d.tipo_factura === "proforma" ? "" : `<button class="secondary btn-mini" onclick="abrirModal('${id}','rectificativa')">Rectificativa</button> <button class="secondary btn-mini" onclick="abrirModal('${id}','adicional')">Adicional</button>`);
       } },
     { title: "Fecha", field: "ffactura", width: 100, formatter: (c) => fechaES(c.getValue()), sorter: "string" },
@@ -726,6 +738,43 @@ function imprimirSeleccion() {
   if (!seleccion.size) return;
   const ids = datos.filter(d => seleccion.has(d.id)).sort((a, b) => (a.ffactura + a.serie + String(a.factura).padStart(8, "0")).localeCompare(b.ffactura + b.serie + String(b.factura).padStart(8, "0"))).map(d => d.id);
   window.open(`factura_imprimir.html?ids=${ids.join(",")}&auto=1`, "_blank");
+}
+
+// ---------------------------------------------------------------- corregir importes (facturas del programa antiguo)
+let mc = null;   // { cab, lineas: [{ linea, descripcion, ref, valor }] }
+async function abrirCorreccion(id) {
+  const cab = datos.find(d => d.id === id); if (!cab) return;
+  const { data, error } = await client.from("linfacturas").select("linea, descripcion, importecobrar, anyoord, numeroord, referencia_pedido, cliente_final")
+    .eq("anyo", cab.anyo).eq("serie", cab.serie).eq("factura", cab.factura).order("linea");
+  if (error) { alert("No se pudieron cargar las líneas: " + error.message); return; }
+  if (!(data || []).length) { alert("Esta factura no tiene líneas que corregir."); return; }
+  mc = { cab, lineas: data.map(l => ({ ...l, valor: Number(l.importecobrar || 0) })) };
+  g("mc_titulo").textContent = `Corregir importes de ${cab.numero}`;
+  g("mc_error").style.display = "none";
+  g("mc_tabla").innerHTML = `<tr><th>Orden / referencia</th><th>Descripción</th><th style="width:140px;text-align:right;">Importe (€)</th></tr>` +
+    mc.lineas.map((l, i) => `<tr class="lin-t4"><td class="meta">${l.anyoord ? l.anyoord + "/" + l.numeroord : ""} ${esc(l.referencia_pedido)} ${esc(l.cliente_final)}</td><td>${esc(l.descripcion)}</td>
+      <td style="text-align:right;"><input type="number" step="0.01" value="${l.valor}" style="width:120px;text-align:right;" oninput="mc.lineas[${i}].valor=parseFloat(this.value)||0;totalCorreccion()"></td></tr>`).join("");
+  totalCorreccion();
+  g("modal_corr").style.display = "flex";
+}
+function cerrarCorreccion() { g("modal_corr").style.display = "none"; mc = null; }
+function totalCorreccion() {
+  const base = Math.round(mc.lineas.reduce((a, l) => a + (l.valor || 0), 0) * 100) / 100;
+  const pct = Number(mc.cab.iva_pct ?? (mc.cab.impbruto ? mc.cab.impiva / mc.cab.impbruto * 100 : 21));
+  const iva = Math.round(base * pct) / 100;
+  g("mc_totales").innerHTML = `Base ${euros(base)} · IVA ${pct}% ${euros(iva)} · <strong>Total ${euros(base + iva)}</strong> <span class="meta">(la retención, si la serie lleva, se descuenta al guardar)</span>`;
+}
+async function guardarCorreccion() {
+  const caja = g("mc_error"); caja.style.display = "none";
+  if (!confirm(`¿Guardar los nuevos importes de ${mc.cab.numero}?\n\nCambia la factura y su apunte en Contabilidad. Queda anotado en las notas de la factura.`)) return;
+  g("mc_guardar").disabled = true;
+  const { error } = await client.rpc("corregir_factura_antigua", {
+    p_anyo: mc.cab.anyo, p_serie: mc.cab.serie, p_factura: mc.cab.factura,
+    p_lineas: mc.lineas.map(l => ({ linea: l.linea, importecobrar: l.valor })) });
+  g("mc_guardar").disabled = false;
+  if (error) { caja.textContent = "No se pudo guardar: " + error.message; caja.style.display = "block"; return; }
+  cerrarCorreccion();
+  await cargar();
 }
 
 // ---------------------------------------------------------------- rectificativa / adicional
