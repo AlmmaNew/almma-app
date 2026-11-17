@@ -1835,14 +1835,14 @@ async function cargarLineas() {
   document.getElementById("ch_bultos").textContent = totalBultos;
   // acumulado de las líneas de importes (tipo 4): valor del servicio y lo que se cobra
   const l4 = (lineas || []).filter(l => l.tipolinea === 4);
-  const sumaImp = Math.round(l4.reduce((a, l) => a + (Number(l.importe) || 0), 0) * 100) / 100;
+  const sumaImp = Math.round((lineas || []).filter(l => l.tipolinea !== 4).reduce((a, l) => a + (Number(l.importe) || 0), 0) * 100) / 100;   // importe de las líneas que NO son tipo 4
   const sumaCob = Math.round(l4.reduce((a, l) => a + (Number(l.importe_cobrar) || 0), 0) * 100) / 100;
   const eur = (n) => n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
   document.getElementById("ch_total_l4").innerHTML = l4.length
-    ? `Líneas tipo 4 (${l4.length}): importe <strong>${eur(sumaImp)}</strong> · a cobrar <strong>${eur(sumaCob)}</strong>`
+    ? `Importe resto de líneas: <strong>${eur(sumaImp)}</strong> · Líneas tipo 4 (${l4.length}): a cobrar <strong>${eur(sumaCob)}</strong>`
     : "Sin líneas tipo 4";
   document.getElementById("lin_total_l4").innerHTML = l4.length
-    ? `Acumulado líneas tipo 4 (${l4.length}): importe <strong>${eur(sumaImp)}</strong> · a cobrar <strong>${eur(sumaCob)}</strong>` : "";
+    ? `Importe resto de líneas: <strong>${eur(sumaImp)}</strong> · Acumulado líneas tipo 4 (${l4.length}): a cobrar <strong>${eur(sumaCob)}</strong>` : "";
   const totalPeso = (lineas || []).reduce((acc, l) => acc + (Number(l.peso_kg) || 0), 0);
   document.getElementById("ch_peso").textContent = Math.round(totalPeso * 100) / 100;
 }

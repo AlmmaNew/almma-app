@@ -18,7 +18,7 @@
       "#campana_panel{position:fixed;right:16px;bottom:78px;z-index:10000;width:min(420px,calc(100vw - 32px));max-height:70vh;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:none;flex-direction:column;font:14px -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#111827}" +
       "#campana_panel .cab{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid #e5e7eb}" +
       "#campana_panel .cab b{flex:1}#campana_panel .cab select{max-width:150px;padding:3px;font-size:12px}" +
-      "#campana_panel .cab button,#campana_panel .it button{border:1px solid #cbd5e1;background:#f8fafc;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px}" +
+      "#campana_panel .cab button,#campana_panel .it button{border:1px solid #cbd5e1;background:#f8fafc;color:#111827;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px}" +
       "#campana_lista{overflow-y:auto}" +
       "#campana_panel .it{display:flex;gap:8px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #f1f5f9}" +
       "#campana_panel .it a{color:#1e40af;font-weight:600;text-decoration:none}#campana_panel .it .m{flex:1}" +
