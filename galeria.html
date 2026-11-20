@@ -7,13 +7,16 @@
 <title>ALMMA - Galería de fotos</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="busqueda.js"></script>
+<script src="condiciones.js"></script>
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
 <style>
 /* ALMMA · Galería de fotos de las órdenes.
    Quién ve qué lo decide la seguridad de Supabase (RLS), no esta pantalla:
    - staff (oficina / administradores): todas las fotos;
    - cuentas de montador (solo_montajes): solo las de las órdenes en las que van ellos.
-   Las tiendas no entran aquí (tienen sus fotos en su propia pantalla). */
+   - tiendas (dependientes y administradores de tienda): solo las de las órdenes que ya ven en su pantalla
+     (SQL 59: la regla pasa por `ordenes`, así que respeta «vendedores ven todo» y las varias tiendas del administrador).
+   DeCA no entra. */
 :root{
   --azul:#1e3a8a;--azul2:#2563eb;--azul-claro:#eff6ff;--bg:#f1f5f9;--card:#fff;--borde:#e2e8f0;
   --txt:#0f172a;--gris:#64748b;--verde:#15803d;--verde-claro:#dcfce7;--rojo:#b91c1c;--rojo-claro:#fee2e2;
@@ -136,7 +139,7 @@ main{max-width:1300px;margin:0 auto;padding:12px 20px 40px;}
 </header>
 
 <div class="filtros" id="filtros" style="display:none">
-  <div class="buscar"><input id="q" type="search" placeholder="Buscar por nº de orden, cliente, localidad o tienda…" autocomplete="off"></div>
+  <div class="buscar"><input id="q" type="search" placeholder="Buscar por nº de orden, cliente, pedido, localidad o tienda…" autocomplete="off"></div>
   <div class="chips" id="chips">
     <button class="chip on" data-cat="">Todas</button>
     <button class="chip" data-cat="entrega_ok">✅ Entrega</button>
@@ -186,7 +189,9 @@ const CAT_TXT = { entrega_ok: "Entrega", incidencia: "Incidencia", otro: "Otra" 
 const ESTADO_TXT = { en_proceso:"En proceso", recepcionado_parcial:"Recibido parcial", recepcionado_total:"Recibido", agendado:"Agendado",
   completado:"Completado", incidencia:"Incidencia", terminado_incidencia:"Terminado con incidencia" };
 
-let esOficina = false;                // staff normal: ve todo y puede abrir la orden
+let modo = "";                        // "oficina" (ve todo), "montador" (lo suyo) o "tienda" (lo de su tienda)
+let esOficina = false;
+let variasTiendas = false;            // administrador con varias tiendas: entonces sí se ve el nombre de la tienda
 let misOrdenes = null;                // Set "anyo/orden" de las órdenes del montador (para «Solo mis montajes»)
 let grupos = [];                      // [{k, anyo, orden, fotos:[...], o:{...}}] ordenados de la más nueva a la más vieja
 let filtrados = [];
@@ -200,15 +205,31 @@ const esVideo = (p) => /\.(mp4|mov|webm|m4v|3gp)$/i.test(p || "");
 const fecha = (s) => s ? new Date(s).toLocaleDateString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric" }) : "";
 const fechaHora = (s) => s ? new Date(s).toLocaleString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
 
-function volver() { location.href = esOficina ? "inicio.html" : "mi-dia.html"; }
+function volver() { location.href = modo === "montador" ? "mi-dia.html" : "inicio.html"; }
+// Enlace a la ficha de la orden: la oficina va a Órdenes y la tienda a su ficha de pedido; el montador no tiene ficha
+function enlaceOrden(g) {
+  if (modo === "oficina") return `pedidos.html?anyo=${g.anyo}&orden=${g.orden}`;
+  if (modo === "tienda") return `orden_tienda.html?anyo=${g.anyo}&orden=${g.orden}`;
+  return "";
+}
 
 async function init() {
   const { data: { user } } = await client.auth.getUser();
   if (!user) { location.href = "login.html"; return; }
   const { data: st } = await client.from("staff").select("nombre, es_montador, solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle();
-  if (!st || st.solo_deca) { location.href = "inicio.html"; return; }   // tiendas y DeCA no entran aquí
-  esOficina = !st.solo_montajes;
-  document.getElementById("quien").textContent = st.nombre ? "· " + st.nombre : "";
+  if (st && st.solo_deca) { location.href = "deca.html"; return; }      // DeCA no entra aquí
+  if (st) {
+    modo = st.solo_montajes ? "montador" : "oficina";
+    document.getElementById("quien").textContent = st.nombre ? "· " + st.nombre : "";
+  } else {
+    const { data: dep } = await client.from("dependientes").select("nombre").eq("user_id", user.id).maybeSingle();
+    if (!dep) { await client.auth.signOut(); location.href = "login.html"; return; }
+    modo = "tienda";
+    document.getElementById("quien").textContent = dep.nombre ? "· " + dep.nombre : "";
+    // como en el resto de pantallas de tienda: antes, el acuerdo de protección de datos
+    if (typeof exigirCondiciones === "function") await exigirCondiciones(client);
+  }
+  esOficina = modo === "oficina";
 
   // Un staff que además monta puede quedarse solo con sus órdenes
   if (esOficina && st.es_montador) {
@@ -279,7 +300,9 @@ async function cargar() {
   for (const [a, lst] of Object.entries(porAnyo)) {
     for (let n = 0; n < lst.length; n += 100) {
       trabajos.push(client.from("ordenes")
-        .select("anyo, orden, nombre_cli, localidad_cli, domicilio_cli, fecha_prev_montaje, estado, tiendas(nombre), equipo:ordenes_montadores(montadores(nombre))")
+        // la tienda no lee la tabla de montadores: a ella no se le pide el equipo
+        .select("anyo, orden, nombre_cli, localidad_cli, domicilio_cli, num_pedido, fecha_prev_montaje, estado, tiendas(nombre)" +
+          (modo === "tienda" ? "" : ", equipo:ordenes_montadores(montadores(nombre))"))
         .eq("anyo", +a).in("orden", lst.slice(n, n + 100)));
     }
   }
@@ -288,10 +311,11 @@ async function cargar() {
     if (r.error) throw r.error;
     for (const o of r.data) { const g = porClave.get(o.anyo + "/" + o.orden); if (g) g.o = o; }
   }
+  variasTiendas = new Set(grupos.map(g => g.o.tiendas && g.o.tiendas.nombre).filter(Boolean)).size > 1;
   // texto para buscar
   for (const g of grupos) {
     const o = g.o;
-    g.busq = normBusqDato([g.anyo + "/" + g.orden, g.orden, o.nombre_cli, o.localidad_cli, o.domicilio_cli, o.tiendas && o.tiendas.nombre,
+    g.busq = normBusqDato([g.anyo + "/" + g.orden, g.orden, o.nombre_cli, o.num_pedido, o.localidad_cli, o.domicilio_cli, o.tiendas && o.tiendas.nombre,
       (o.equipo || []).map(e => e.montadores && e.montadores.nombre).join(" ")].join(" "));
   }
 
@@ -329,13 +353,13 @@ function filtrar() {
   const nf = filtrados.reduce((s, g) => s + g.ver.length, 0);
   document.getElementById("resumen").textContent = filtrados.length
     ? `${nf} ${nf === 1 ? "foto" : "fotos"} en ${filtrados.length} ${filtrados.length === 1 ? "orden" : "órdenes"}` +
-      (esOficina ? "" : " · solo las órdenes en las que vas tú") : "";
+      (modo === "montador" ? " · solo las órdenes en las que vas tú" : modo === "tienda" ? " · órdenes de tu tienda" : "") : "";
   pintadas = 0;
   const main = document.getElementById("main");
   if (!filtrados.length) {
     main.innerHTML = grupos.length
       ? `<div class="vacio"><div class="ico">🔎</div>No hay fotos que coincidan con la búsqueda.</div>`
-      : `<div class="vacio"><div class="ico">📷</div>Todavía no hay fotos${esOficina ? "" : " en tus montajes"}.</div>`;
+      : `<div class="vacio"><div class="ico">📷</div>Todavía no hay fotos${modo === "montador" ? " en tus montajes" : modo === "tienda" ? " de los montajes de tu tienda" : ""}.</div>`;
     return;
   }
   main.innerHTML = "";
@@ -393,7 +417,8 @@ function tarjeta(g, gi) {
   const equipo = (o.equipo || []).map(e => e.montadores && e.montadores.nombre).filter(Boolean).join(", ");
   const meta = [
     o.localidad_cli ? `📍 ${esc(o.localidad_cli)}` : "",
-    o.tiendas && o.tiendas.nombre ? `🏬 ${esc(o.tiendas.nombre)}` : "",
+    o.tiendas && o.tiendas.nombre && (modo !== "tienda" || variasTiendas) ? `🏬 ${esc(o.tiendas.nombre)}` : "",
+    o.num_pedido ? `🧾 Pedido ${esc(o.num_pedido)}` : "",
     o.fecha_prev_montaje ? `📅 Montaje ${fecha(o.fecha_prev_montaje)}` : "",
     equipo ? `🔧 ${esc(equipo)}` : "",
   ].filter(Boolean).map(s => `<span>${s}</span>`).join("");
@@ -408,7 +433,7 @@ function tarjeta(g, gi) {
       <div class="der">
         <span class="cuenta">📷 ${n} ${n === 1 ? "foto" : "fotos"}</span>
         ${o.estado ? `<span class="estado ${esc(o.estado)}">${esc(ESTADO_TXT[o.estado] || o.estado)}</span>` : ""}
-        ${esOficina ? `<a class="abrir" href="pedidos.html?anyo=${g.anyo}&orden=${g.orden}">Abrir orden →</a>` : ""}
+        ${enlaceOrden(g) ? `<a class="abrir" href="${enlaceOrden(g)}">Abrir orden →</a>` : ""}
       </div>
     </div>
     <div class="rejilla">${g.ver.map((f, i) => `
@@ -455,7 +480,7 @@ function pintarVisor(tiras) {
     ? `<video src="${u}" controls autoplay playsinline></video>` : `<img src="${u}" alt="">`;
   const bajar = document.getElementById("v_bajar"); bajar.href = u;
   const ab = document.getElementById("v_orden");
-  if (esOficina) { ab.style.display = ""; ab.href = `pedidos.html?anyo=${g.anyo}&orden=${g.orden}`; }
+  if (enlaceOrden(g)) { ab.style.display = ""; ab.href = enlaceOrden(g); }
   document.getElementById("v_pie").innerHTML =
     (f.categoria ? `<span class="cat ${esc(f.categoria)}">${esc(CAT_TXT[f.categoria] || f.categoria)}</span>` : "") +
     esc(fechaHora(f.created_at)) + (f.comentario ? ` · ${esc(f.comentario)}` : "");
