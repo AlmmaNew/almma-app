@@ -144,5 +144,20 @@ button:disabled{opacity:.6;cursor:default;}
       await entrarSegunRol();
     });
   </script>
+  <script>
+  // Botón 👁 junto a cada campo de contraseña: pulsarlo muestra u oculta lo que se está escribiendo
+  document.querySelectorAll('input[type=password]').forEach(inp => {
+    const caja = document.createElement('span');
+    caja.style.cssText = 'position:relative;display:block';
+    inp.parentNode.insertBefore(caja, inp); caja.appendChild(inp);
+    inp.style.paddingRight = '46px';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.cssText = 'position:absolute;right:4px;top:50%;transform:translateY(-50%);width:auto;margin:0;padding:6px 8px;background:transparent;color:#6b7280;border:none;font-size:18px;line-height:1;cursor:pointer';
+    const pinta = () => { const oculto = inp.type === 'password'; b.textContent = oculto ? '👁' : '🙈'; b.title = oculto ? 'Mostrar contraseña' : 'Ocultar contraseña'; b.setAttribute('aria-label', b.title); };
+    b.addEventListener('click', () => { inp.type = inp.type === 'password' ? 'text' : 'password'; pinta(); inp.focus(); });
+    pinta(); caja.appendChild(b);
+  });
+  </script>
 </body>
 </html>
