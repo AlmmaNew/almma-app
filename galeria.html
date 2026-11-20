@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e3a8a">
+<title>ALMMA - Galería de fotos</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="busqueda.js"></script>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
+<style>
+/* ALMMA · Galería de fotos de las órdenes.
+   Quién ve qué lo decide la seguridad de Supabase (RLS), no esta pantalla:
+   - staff (oficina / administradores): todas las fotos;
+   - cuentas de montador (solo_montajes): solo las de las órdenes en las que van ellos.
+   Las tiendas no entran aquí (tienen sus fotos en su propia pantalla). */
+:root{
+  --azul:#1e3a8a;--azul2:#2563eb;--azul-claro:#eff6ff;--bg:#f1f5f9;--card:#fff;--borde:#e2e8f0;
+  --txt:#0f172a;--gris:#64748b;--verde:#15803d;--verde-claro:#dcfce7;--rojo:#b91c1c;--rojo-claro:#fee2e2;
+  --ambar:#92400e;--ambar-claro:#fef3c7;--sombra:0 1px 2px rgba(15,23,42,.06),0 8px 24px -12px rgba(15,23,42,.25);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--txt);}
+button,input,select{font:inherit;}
+
+/* Cabecera */
+header{position:sticky;top:0;z-index:30;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;
+  padding:12px 20px;padding-top:calc(12px + env(safe-area-inset-top));box-shadow:0 4px 20px -8px rgba(30,58,138,.6);}
+.fila-top{display:flex;align-items:center;gap:12px;max-width:1300px;margin:0 auto;}
+.marca{font-weight:800;font-size:20px;letter-spacing:.5px;}
+.titulo{font-size:15px;opacity:.9;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.titulo b{font-weight:700;}
+.btn-h{border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap;}
+.btn-h:hover{background:rgba(255,255,255,.22);}
+
+/* Barra de filtros */
+.filtros{max-width:1300px;margin:0 auto;padding:16px 20px 6px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+.buscar{flex:1 1 280px;position:relative;}
+.buscar input{width:100%;padding:12px 14px 12px 42px;border:1px solid var(--borde);border-radius:12px;background:#fff;font-size:15px;box-shadow:var(--sombra);outline:none;}
+.buscar input:focus{border-color:var(--azul2);box-shadow:0 0 0 3px rgba(37,99,235,.18);}
+.buscar::before{content:"🔍";position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.6;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{border:1px solid var(--borde);background:#fff;color:var(--txt);border-radius:999px;padding:8px 14px;cursor:pointer;font-size:14px;font-weight:600;}
+.chip.on{background:var(--azul);border-color:var(--azul);color:#fff;}
+.sel{padding:10px 12px;border:1px solid var(--borde);border-radius:12px;background:#fff;font-size:14px;}
+.casilla{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;background:#fff;border:1px solid var(--borde);border-radius:12px;padding:9px 12px;cursor:pointer;}
+.fechas{display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:#fff;border:1px solid var(--borde);border-radius:12px;padding:4px 6px 4px 12px;font-size:14px;font-weight:600;color:var(--gris);}
+.fechas .sel{border:none;padding:6px 4px;}
+.limpiar{border:none;background:#f1f5f9;border-radius:8px;width:28px;height:28px;cursor:pointer;color:var(--gris);}
+.limpiar:hover{background:#e2e8f0;}
+.resumen{max-width:1300px;margin:0 auto;padding:4px 20px 0;color:var(--gris);font-size:13px;}
+
+/* Órdenes */
+main{max-width:1300px;margin:0 auto;padding:12px 20px 40px;}
+.orden{background:var(--card);border-radius:16px;box-shadow:var(--sombra);margin-bottom:18px;overflow:hidden;border:1px solid var(--borde);}
+.cab{display:flex;gap:14px;align-items:flex-start;padding:14px 18px;border-bottom:1px solid var(--borde);background:linear-gradient(180deg,#fff,#f8fafc);}
+.num{flex:none;background:var(--azul-claro);color:var(--azul);border:1px solid #bfdbfe;border-radius:12px;padding:8px 12px;text-align:center;min-width:92px;}
+.num small{display:block;font-size:11px;font-weight:700;letter-spacing:.6px;opacity:.75;}
+.num b{display:block;font-size:19px;font-weight:800;line-height:1.15;}
+.datos{flex:1;min-width:0;}
+.cliente{font-size:17px;font-weight:700;margin:2px 0 4px;overflow:hidden;text-overflow:ellipsis;}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--gris);font-size:13px;}
+.meta span{white-space:nowrap;}
+.der{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.cuenta{background:#0f172a;color:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;}
+.abrir{font-size:13px;color:var(--azul2);text-decoration:none;font-weight:600;}
+.abrir:hover{text-decoration:underline;}
+.estado{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;background:#e2e8f0;color:#334155;text-transform:uppercase;letter-spacing:.3px;}
+.estado.completado{background:var(--verde-claro);color:var(--verde);}
+.estado.incidencia,.estado.terminado_incidencia{background:var(--rojo-claro);color:var(--rojo);}
+.estado.agendado{background:var(--azul-claro);color:var(--azul);}
+
+.rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:14px 18px 18px;}
+.mini{position:relative;aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:#e2e8f0;cursor:zoom-in;border:none;padding:0;}
+.mini img,.mini video{width:100%;height:100%;object-fit:cover;display:block;transition:transform .25s ease;}
+.mini:hover img,.mini:hover video{transform:scale(1.05);}
+.mini::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.55));pointer-events:none;}
+.mini .etq{position:absolute;left:8px;bottom:7px;z-index:2;color:#fff;font-size:11px;font-weight:700;text-shadow:0 1px 2px #0008;text-align:left;}
+.mini .cat{position:absolute;top:7px;left:7px;z-index:2;font-size:10px;font-weight:800;border-radius:6px;padding:2px 6px;text-transform:uppercase;letter-spacing:.3px;}
+.cat.entrega_ok{background:var(--verde-claro);color:var(--verde);}
+.cat.incidencia{background:var(--rojo-claro);color:var(--rojo);}
+.cat.otro{background:var(--ambar-claro);color:var(--ambar);}
+.mini .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none;}
+.mini .play span{width:44px;height:44px;border-radius:50%;background:rgba(15,23,42,.65);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;padding-left:3px;}
+.mini.cargando{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:brillo 1.2s infinite;}
+@keyframes brillo{to{background-position:-200% 0;}}
+
+.vacio{text-align:center;padding:60px 20px;color:var(--gris);}
+.vacio .ico{font-size:48px;}
+.mas{display:block;margin:10px auto 0;padding:12px 22px;border-radius:12px;border:1px solid var(--borde);background:#fff;cursor:pointer;font-weight:700;color:var(--azul);box-shadow:var(--sombra);}
+
+/* Visor a pantalla completa */
+#visor{position:fixed;inset:0;z-index:100;background:rgba(2,6,23,.94);display:none;flex-direction:column;}
+#visor.on{display:flex;}
+.v-top{display:flex;align-items:center;gap:12px;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));color:#fff;}
+.v-top .v-tit{flex:1;min-width:0;}
+.v-tit b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.v-tit span{font-size:13px;opacity:.75;}
+.v-btn{border:none;background:rgba(255,255,255,.12);color:#fff;border-radius:10px;padding:9px 13px;cursor:pointer;font-size:14px;font-weight:600;text-decoration:none;white-space:nowrap;}
+.v-btn:hover{background:rgba(255,255,255,.24);}
+.v-centro{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;padding:0 64px;}
+.v-centro img,.v-centro video{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;box-shadow:0 20px 60px -10px #000;}
+.v-flecha{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:24px;cursor:pointer;}
+.v-flecha:hover{background:rgba(255,255,255,.28);}
+.v-flecha.izq{left:10px;} .v-flecha.der{right:10px;}
+.v-pie{color:#e2e8f0;padding:10px 16px calc(14px + env(safe-area-inset-bottom));text-align:center;font-size:14px;}
+.v-pie .cat{display:inline-block;font-size:11px;font-weight:800;border-radius:6px;padding:2px 7px;text-transform:uppercase;margin-right:8px;}
+.v-tiras{display:flex;gap:6px;justify-content:center;overflow-x:auto;padding:0 16px 10px;}
+.v-tiras button{flex:none;width:54px;height:54px;border-radius:8px;overflow:hidden;border:2px solid transparent;padding:0;background:#1e293b;cursor:pointer;opacity:.55;}
+.v-tiras button.on{border-color:#fff;opacity:1;}
+.v-tiras img{width:100%;height:100%;object-fit:cover;display:block;}
+.v-tiras .vid{color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;height:100%;}
+
+@media (max-width:640px){
+  header{padding-left:16px;padding-right:16px;}
+  .titulo{display:none;}
+  .filtros,main,.resumen{padding-left:16px;padding-right:16px;}
+  .cab{flex-wrap:wrap;padding:12px 14px;}
+  .der{flex-direction:row;align-items:center;width:100%;justify-content:space-between;}
+  .rejilla{grid-template-columns:repeat(3,1fr);gap:6px;padding:10px 12px 14px;}
+  .mini{border-radius:8px;}
+  .mini .etq{display:none;}
+  .v-centro{padding:0 8px;}
+  .v-flecha{width:40px;height:40px;font-size:20px;background:rgba(0,0,0,.45);}
+  .v-tiras{display:none;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="fila-top">
+    <span class="marca">ALMMA</span>
+    <span class="titulo">📷 <b>Galería de fotos</b> <span id="quien"></span></span>
+    <button class="btn-h" id="btn_volver" onclick="volver()">← Volver</button>
+  </div>
+</header>
+
+<div class="filtros" id="filtros" style="display:none">
+  <div class="buscar"><input id="q" type="search" placeholder="Buscar por nº de orden, cliente, localidad o tienda…" autocomplete="off"></div>
+  <div class="chips" id="chips">
+    <button class="chip on" data-cat="">Todas</button>
+    <button class="chip" data-cat="entrega_ok">✅ Entrega</button>
+    <button class="chip" data-cat="incidencia">⚠️ Incidencia</button>
+    <button class="chip" data-cat="otro">Otras</button>
+  </div>
+  <select class="sel" id="anyo"><option value="">Todos los años</option></select>
+  <div class="fechas" title="Fecha en que se hizo la foto">
+    <span>📅 Fotos del</span><input type="date" id="desde" class="sel">
+    <span>al</span><input type="date" id="hasta" class="sel">
+    <button class="limpiar" id="limpiar_f" style="display:none" title="Quitar fechas">✕</button>
+  </div>
+  <div class="chips" id="rapidas">
+    <button class="chip" data-r="hoy">Hoy</button>
+    <button class="chip" data-r="7">7 días</button>
+    <button class="chip" data-r="mes">Este mes</button>
+  </div>
+  <label class="casilla" id="solo_mias_box" style="display:none"><input type="checkbox" id="solo_mias"> Solo mis montajes</label>
+</div>
+<div class="resumen" id="resumen"></div>
+<main id="main"><div class="vacio"><div class="ico">⏳</div>Cargando fotos…</div></main>
+
+<div id="visor" role="dialog" aria-modal="true">
+  <div class="v-top">
+    <div class="v-tit"><b id="v_tit"></b><span id="v_sub"></span></div>
+    <a class="v-btn" id="v_orden" href="#" style="display:none">Abrir orden</a>
+    <a class="v-btn" id="v_bajar" href="#" target="_blank" rel="noopener">⬇ Descargar</a>
+    <button class="v-btn" onclick="cerrarVisor()" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="v-centro" id="v_centro">
+    <button class="v-flecha izq" onclick="mover(-1)" aria-label="Anterior">‹</button>
+    <div id="v_media" style="display:contents"></div>
+    <button class="v-flecha der" onclick="mover(1)" aria-label="Siguiente">›</button>
+  </div>
+  <div class="v-tiras" id="v_tiras"></div>
+  <div class="v-pie" id="v_pie"></div>
+</div>
+
+<script>
+const client = supabase.createClient(
+  "https://uamgbtbsxbrgymhqalak.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k"
+);
+const BUCKET = "ordenes-adjuntos";
+const POR_TANDA = 15;                 // órdenes que se pintan de cada vez
+const CAT_TXT = { entrega_ok: "Entrega", incidencia: "Incidencia", otro: "Otra" };
+const ESTADO_TXT = { en_proceso:"En proceso", recepcionado_parcial:"Recibido parcial", recepcionado_total:"Recibido", agendado:"Agendado",
+  completado:"Completado", incidencia:"Incidencia", terminado_incidencia:"Terminado con incidencia" };
+
+let esOficina = false;                // staff normal: ve todo y puede abrir la orden
+let misOrdenes = null;                // Set "anyo/orden" de las órdenes del montador (para «Solo mis montajes»)
+let grupos = [];                      // [{k, anyo, orden, fotos:[...], o:{...}}] ordenados de la más nueva a la más vieja
+let filtrados = [];
+let pintadas = 0;
+const urls = {};                      // storage_path -> URL firmada
+let cat = "";
+let visor = null;                     // {g, i}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const esVideo = (p) => /\.(mp4|mov|webm|m4v|3gp)$/i.test(p || "");
+const fecha = (s) => s ? new Date(s).toLocaleDateString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric" }) : "";
+const fechaHora = (s) => s ? new Date(s).toLocaleString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
+
+function volver() { location.href = esOficina ? "inicio.html" : "mi-dia.html"; }
+
+async function init() {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) { location.href = "login.html"; return; }
+  const { data: st } = await client.from("staff").select("nombre, es_montador, solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle();
+  if (!st || st.solo_deca) { location.href = "inicio.html"; return; }   // tiendas y DeCA no entran aquí
+  esOficina = !st.solo_montajes;
+  document.getElementById("quien").textContent = st.nombre ? "· " + st.nombre : "";
+
+  // Un staff que además monta puede quedarse solo con sus órdenes
+  if (esOficina && st.es_montador) {
+    try {
+      const { data: m } = await client.from("montadores").select("id").eq("staff_user_id", user.id);
+      const ids = (m || []).map(x => x.id);
+      if (ids.length) {
+        const { data: om } = await client.from("ordenes_montadores").select("anyo, orden").in("montador_id", ids);
+        misOrdenes = new Set((om || []).map(x => x.anyo + "/" + x.orden));
+        document.getElementById("solo_mias_box").style.display = "";
+      }
+    } catch (_) {}
+  }
+
+  try { await cargar(); }
+  catch (e) { document.getElementById("main").innerHTML = `<div class="vacio"><div class="ico">⚠️</div>No se han podido cargar las fotos.<br><small>${esc(e.message || e)}</small></div>`; return; }
+
+  document.getElementById("filtros").style.display = "flex";
+  // Filtros
+  let t; document.getElementById("q").addEventListener("input", () => { clearTimeout(t); t = setTimeout(filtrar, 200); });
+  document.getElementById("anyo").addEventListener("change", filtrar);
+  document.getElementById("solo_mias").addEventListener("change", filtrar);
+  document.getElementById("desde").addEventListener("change", () => { marcarRapida(null); filtrar(); });
+  document.getElementById("hasta").addEventListener("change", () => { marcarRapida(null); filtrar(); });
+  document.getElementById("limpiar_f").addEventListener("click", () => { ponerFechas("", ""); marcarRapida(null); filtrar(); });
+  document.getElementById("rapidas").addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    if (b.classList.contains("on")) { ponerFechas("", ""); marcarRapida(null); filtrar(); return; }   // segundo clic: quita el filtro
+    const hoy = new Date(), iso = (d) => d.toLocaleDateString("sv-SE");   // AAAA-MM-DD en hora local
+    if (b.dataset.r === "hoy") ponerFechas(iso(hoy), iso(hoy));
+    else if (b.dataset.r === "7") { const d = new Date(hoy); d.setDate(d.getDate() - 6); ponerFechas(iso(d), iso(hoy)); }
+    else ponerFechas(iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), iso(hoy));
+    marcarRapida(b); filtrar();
+  });
+  document.getElementById("chips").addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    cat = b.dataset.cat;
+    document.querySelectorAll("#chips .chip").forEach(x => x.classList.toggle("on", x === b));
+    filtrar();
+  });
+  filtrar();
+}
+
+async function cargar() {
+  // 1) Todas las fotos que deja ver la RLS (de 1000 en 1000)
+  const fotos = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await client.from("fotos_orden")
+      .select("id, anyo, orden, storage_path, categoria, comentario, created_at")
+      .order("anyo", { ascending: false }).order("orden", { ascending: false }).order("created_at")
+      .range(desde, desde + 999);
+    if (error) throw error;
+    fotos.push(...data);
+    if (data.length < 1000) break;
+  }
+  const porClave = new Map();
+  for (const f of fotos) {
+    const k = f.anyo + "/" + f.orden;
+    if (!porClave.has(k)) porClave.set(k, { k, anyo: f.anyo, orden: f.orden, fotos: [], o: {} });
+    porClave.get(k).fotos.push(f);
+  }
+  grupos = [...porClave.values()];
+
+  // 2) Datos de cada orden (cliente, tienda, fecha, equipo), por año y en trozos de 100
+  const porAnyo = {};
+  grupos.forEach(g => (porAnyo[g.anyo] ||= []).push(g.orden));
+  const trabajos = [];
+  for (const [a, lst] of Object.entries(porAnyo)) {
+    for (let n = 0; n < lst.length; n += 100) {
+      trabajos.push(client.from("ordenes")
+        .select("anyo, orden, nombre_cli, localidad_cli, domicilio_cli, fecha_prev_montaje, estado, tiendas(nombre), equipo:ordenes_montadores(montadores(nombre))")
+        .eq("anyo", +a).in("orden", lst.slice(n, n + 100)));
+    }
+  }
+  const res = await Promise.all(trabajos);
+  for (const r of res) {
+    if (r.error) throw r.error;
+    for (const o of r.data) { const g = porClave.get(o.anyo + "/" + o.orden); if (g) g.o = o; }
+  }
+  // texto para buscar
+  for (const g of grupos) {
+    const o = g.o;
+    g.busq = normBusqDato([g.anyo + "/" + g.orden, g.orden, o.nombre_cli, o.localidad_cli, o.domicilio_cli, o.tiendas && o.tiendas.nombre,
+      (o.equipo || []).map(e => e.montadores && e.montadores.nombre).join(" ")].join(" "));
+  }
+
+  // Selector de años
+  const sel = document.getElementById("anyo");
+  [...new Set(grupos.map(g => g.anyo))].sort((a, b) => b - a)
+    .forEach(a => sel.insertAdjacentHTML("beforeend", `<option value="${a}">${a}</option>`));
+}
+
+function ponerFechas(d, h) { document.getElementById("desde").value = d; document.getElementById("hasta").value = h; }
+function marcarRapida(b) { document.querySelectorAll("#rapidas .chip").forEach(x => x.classList.toggle("on", x === b)); }
+const diaLocal = (s) => new Date(s).toLocaleDateString("sv-SE");   // día de la foto en hora de España, AAAA-MM-DD
+
+function filtrar() {
+  let desde = document.getElementById("desde").value, hasta = document.getElementById("hasta").value;
+  if (desde && hasta && desde > hasta) [desde, hasta] = [hasta, desde];
+  document.getElementById("limpiar_f").style.display = (desde || hasta) ? "" : "none";
+  const q = normBusq(document.getElementById("q").value);
+  const toks = q ? q.split(" ") : [];
+  const a = document.getElementById("anyo").value;
+  const soloMias = misOrdenes && document.getElementById("solo_mias").checked;
+  filtrados = [];
+  for (const g of grupos) {
+    if (a && String(g.anyo) !== a) continue;
+    if (soloMias && !misOrdenes.has(g.k)) continue;
+    if (toks.length && !toks.every(t => g.busq.includes(t))) continue;
+    const fs = g.fotos.filter(f => {
+      if (cat && f.categoria !== cat) return false;
+      if (desde || hasta) { const d = diaLocal(f.created_at); if ((desde && d < desde) || (hasta && d > hasta)) return false; }
+      return true;
+    });
+    if (!fs.length) continue;
+    filtrados.push({ ...g, ver: fs });
+  }
+  const nf = filtrados.reduce((s, g) => s + g.ver.length, 0);
+  document.getElementById("resumen").textContent = filtrados.length
+    ? `${nf} ${nf === 1 ? "foto" : "fotos"} en ${filtrados.length} ${filtrados.length === 1 ? "orden" : "órdenes"}` +
+      (esOficina ? "" : " · solo las órdenes en las que vas tú") : "";
+  pintadas = 0;
+  const main = document.getElementById("main");
+  if (!filtrados.length) {
+    main.innerHTML = grupos.length
+      ? `<div class="vacio"><div class="ico">🔎</div>No hay fotos que coincidan con la búsqueda.</div>`
+      : `<div class="vacio"><div class="ico">📷</div>Todavía no hay fotos${esOficina ? "" : " en tus montajes"}.</div>`;
+    return;
+  }
+  main.innerHTML = "";
+  pintarMas();
+}
+
+async function firmar(paths) {
+  const falta = [...new Set(paths.filter(p => p && !urls[p]))];
+  for (let n = 0; n < falta.length; n += 100) {
+    const { data } = await client.storage.from(BUCKET).createSignedUrls(falta.slice(n, n + 100), 3600);
+    (data || []).forEach(s => { if (s.signedUrl) urls[s.path] = s.signedUrl; });
+  }
+}
+
+let pintando = false;
+async function pintarMas() {
+  if (pintando || pintadas >= filtrados.length) return;
+  pintando = true;
+  const main = document.getElementById("main");
+  document.getElementById("btn_mas")?.remove();
+  const tanda = filtrados.slice(pintadas, pintadas + POR_TANDA);
+  const inicio = pintadas;
+  pintadas += tanda.length;
+
+  // Se pinta primero con huecos «cargando» y luego se ponen las imágenes
+  main.insertAdjacentHTML("beforeend", tanda.map((g, j) => tarjeta(g, inicio + j)).join(""));
+  await firmar(tanda.flatMap(g => g.ver.map(f => f.storage_path)));
+  tanda.forEach((g, j) => {
+    const gi = inicio + j;
+    g.ver.forEach((f, i) => {
+      const el = document.getElementById(`m_${gi}_${i}`); if (!el) return;
+      const u = urls[f.storage_path];
+      if (!u) { el.classList.remove("cargando"); el.insertAdjacentHTML("afterbegin", `<div class="play"><span style="padding:0">?</span></div>`); return; }
+      const media = esVideo(f.storage_path)
+        ? `<video src="${u}#t=0.1" muted playsinline preload="metadata"></video><div class="play"><span>▶</span></div>`
+        : `<img src="${u}" loading="lazy" alt="">`;
+      el.insertAdjacentHTML("afterbegin", media);
+      const img = el.querySelector("img,video");
+      const fin = () => el.classList.remove("cargando");
+      img.addEventListener(esVideo(f.storage_path) ? "loadeddata" : "load", fin); img.addEventListener("error", fin);
+      setTimeout(fin, 8000);
+    });
+  });
+
+  if (pintadas < filtrados.length) {
+    main.insertAdjacentHTML("beforeend", `<button class="mas" id="btn_mas" onclick="pintarMas()">Ver más órdenes (${filtrados.length - pintadas})</button>`);
+    observador.observe(document.getElementById("btn_mas"));
+  }
+  pintando = false;
+}
+const observador = new IntersectionObserver((ent) => { if (ent.some(e => e.isIntersecting)) pintarMas(); }, { rootMargin: "600px" });
+
+function tarjeta(g, gi) {
+  const o = g.o || {};
+  const equipo = (o.equipo || []).map(e => e.montadores && e.montadores.nombre).filter(Boolean).join(", ");
+  const meta = [
+    o.localidad_cli ? `📍 ${esc(o.localidad_cli)}` : "",
+    o.tiendas && o.tiendas.nombre ? `🏬 ${esc(o.tiendas.nombre)}` : "",
+    o.fecha_prev_montaje ? `📅 Montaje ${fecha(o.fecha_prev_montaje)}` : "",
+    equipo ? `🔧 ${esc(equipo)}` : "",
+  ].filter(Boolean).map(s => `<span>${s}</span>`).join("");
+  const n = g.ver.length;
+  return `<section class="orden">
+    <div class="cab">
+      <div class="num"><small>ORDEN ${g.anyo}</small><b>${g.orden}</b></div>
+      <div class="datos">
+        <div class="cliente">${esc(o.nombre_cli || "Cliente sin nombre")}</div>
+        <div class="meta">${meta}</div>
+      </div>
+      <div class="der">
+        <span class="cuenta">📷 ${n} ${n === 1 ? "foto" : "fotos"}</span>
+        ${o.estado ? `<span class="estado ${esc(o.estado)}">${esc(ESTADO_TXT[o.estado] || o.estado)}</span>` : ""}
+        ${esOficina ? `<a class="abrir" href="pedidos.html?anyo=${g.anyo}&orden=${g.orden}">Abrir orden →</a>` : ""}
+      </div>
+    </div>
+    <div class="rejilla">${g.ver.map((f, i) => `
+      <button class="mini cargando" id="m_${gi}_${i}" onclick="abrirVisor(${gi},${i})" title="${esc(f.comentario || CAT_TXT[f.categoria] || "")}">
+        ${f.categoria ? `<span class="cat ${esc(f.categoria)}">${esc(CAT_TXT[f.categoria] || f.categoria)}</span>` : ""}
+        <span class="etq">${fecha(f.created_at)}</span>
+      </button>`).join("")}
+    </div>
+  </section>`;
+}
+
+/* ---------- Visor ---------- */
+function abrirVisor(g, i) {
+  visor = { g, i };
+  document.getElementById("visor").classList.add("on");
+  document.body.style.overflow = "hidden";
+  pintarVisor(true);
+}
+function cerrarVisor() {
+  document.getElementById("visor").classList.remove("on");
+  document.getElementById("v_media").innerHTML = "";
+  document.body.style.overflow = "";
+  visor = null;
+}
+function mover(d) {
+  if (!visor) return;
+  let { g, i } = visor;
+  i += d;
+  // al pasar del final de una orden, salta a la siguiente (o a la anterior)
+  if (i >= filtrados[g].ver.length) { if (g + 1 < pintadas) { g++; i = 0; } else i = filtrados[g].ver.length - 1; }
+  if (i < 0) { if (g > 0) { g--; i = filtrados[g].ver.length - 1; } else i = 0; }
+  const cambia = g !== visor.g;
+  if (g === visor.g && i === visor.i) return;
+  visor = { g, i };
+  pintarVisor(cambia);
+}
+function pintarVisor(tiras) {
+  const g = filtrados[visor.g], f = g.ver[visor.i], o = g.o || {};
+  const u = urls[f.storage_path] || "";
+  if (!u) { const v = visor; firmar([f.storage_path]).then(() => { if (visor === v && urls[f.storage_path]) pintarVisor(true); }); }
+  document.getElementById("v_tit").textContent = `Orden ${g.anyo}/${g.orden} · ${o.nombre_cli || "Cliente sin nombre"}`;
+  document.getElementById("v_sub").textContent = `Foto ${visor.i + 1} de ${g.ver.length}` + (o.localidad_cli ? ` · ${o.localidad_cli}` : "");
+  document.getElementById("v_media").innerHTML = esVideo(f.storage_path)
+    ? `<video src="${u}" controls autoplay playsinline></video>` : `<img src="${u}" alt="">`;
+  const bajar = document.getElementById("v_bajar"); bajar.href = u;
+  const ab = document.getElementById("v_orden");
+  if (esOficina) { ab.style.display = ""; ab.href = `pedidos.html?anyo=${g.anyo}&orden=${g.orden}`; }
+  document.getElementById("v_pie").innerHTML =
+    (f.categoria ? `<span class="cat ${esc(f.categoria)}">${esc(CAT_TXT[f.categoria] || f.categoria)}</span>` : "") +
+    esc(fechaHora(f.created_at)) + (f.comentario ? ` · ${esc(f.comentario)}` : "");
+  const tirasEl = document.getElementById("v_tiras");
+  if (tiras) {
+    tirasEl.innerHTML = g.ver.length > 1 ? g.ver.map((x, i) =>
+      `<button data-i="${i}" onclick="irA(${i})">${esVideo(x.storage_path) ? `<div class="vid">▶</div>` : `<img src="${urls[x.storage_path] || ""}" alt="">`}</button>`).join("") : "";
+  }
+  tirasEl.querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.i === visor.i));
+  tirasEl.querySelector("button.on")?.scrollIntoView({ block: "nearest", inline: "center" });
+  // la siguiente orden aún sin pintar: la preparamos para poder seguir pasando
+  if (visor.g === pintadas - 1 && visor.i === g.ver.length - 1) pintarMas();
+}
+function irA(i) { visor.i = i; pintarVisor(false); }
+
+document.addEventListener("keydown", (e) => {
+  if (!visor) return;
+  if (e.key === "Escape") cerrarVisor();
+  else if (e.key === "ArrowRight") mover(1);
+  else if (e.key === "ArrowLeft") mover(-1);
+});
+// deslizar con el dedo
+let x0 = null;
+document.getElementById("v_centro").addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+document.getElementById("v_centro").addEventListener("touchend", (e) => {
+  if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+  if (Math.abs(dx) > 50) mover(dx < 0 ? 1 : -1);
+});
+// clic en el fondo oscuro cierra
+document.getElementById("v_centro").addEventListener("click", (e) => { if (e.target.id === "v_centro") cerrarVisor(); });
+
+init();
+</script>
+</body>
+</html>
