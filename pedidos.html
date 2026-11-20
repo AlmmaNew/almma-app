@@ -44,9 +44,9 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 .estado-recepcionado_parcial{background:#fef9c3;color:#a16207;}
 .estado-recepcionado_total{background:#ffedd5;color:#c2410c;}
 .estado-agendado{background:#dbeafe;color:#1d4ed8;}
-.estado-completado{background:#dcfce7;color:#15803d;}
+.estado-completado{background:#bbf7d0;color:#166534;}
 .estado-incidencia{background:#fee2e2;color:#b91c1c;}
-.estado-terminado_incidencia,.estado-conincid{background:#dcfce7;color:#b91c1c;}
+.estado-terminado_incidencia,.estado-conincid{background:#bbf7d0;color:#b91c1c;}
 
 #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.15);z-index:30;}
 #panel_detalle{display:none;position:fixed;top:0;right:0;bottom:0;width:min(1000px,100vw);background:var(--card);border-left:1px solid var(--border);box-shadow:-10px 0 30px -20px rgba(0,0,0,.3);z-index:31;flex-direction:column;}
@@ -139,9 +139,9 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 .tabulator .tabulator-row.est-recepcionado_total .tabulator-cell:first-child{border-left-color:#f97316;}
 .tabulator .tabulator-row.est-agendado,.tabulator .tabulator-row.tabulator-row-even.est-agendado{background:#dbeafe !important;} .tabulator .tabulator-row.est-agendado:hover{background:#bfdbfe !important;}
 .tabulator .tabulator-row.est-agendado .tabulator-cell:first-child{border-left-color:#2563eb;}
-.tabulator .tabulator-row.est-completado,.tabulator .tabulator-row.tabulator-row-even.est-completado{background:#dcfce7 !important;} .tabulator .tabulator-row.est-completado:hover{background:#bbf7d0 !important;}
-.tabulator .tabulator-row.est-completado .tabulator-cell:first-child{border-left-color:#16a34a;}
-.tabulator .tabulator-row.est-conincid,.tabulator .tabulator-row.tabulator-row-even.est-conincid{background:#dcfce7 !important;} .tabulator .tabulator-row.est-conincid:hover{background:#bbf7d0 !important;}
+.tabulator .tabulator-row.est-completado,.tabulator .tabulator-row.tabulator-row-even.est-completado{background:#bbf7d0 !important;} .tabulator .tabulator-row.est-completado:hover{background:#86efac !important;}
+.tabulator .tabulator-row.est-completado .tabulator-cell:first-child{border-left-color:#15803d;}
+.tabulator .tabulator-row.est-conincid,.tabulator .tabulator-row.tabulator-row-even.est-conincid{background:#bbf7d0 !important;} .tabulator .tabulator-row.est-conincid:hover{background:#86efac !important;}
 .tabulator .tabulator-row.est-conincid .tabulator-cell:first-child{border-left-color:#dc2626;}
 .tabulator .tabulator-row.est-incidencia,.tabulator .tabulator-row.tabulator-row-even.est-incidencia{background:#fee2e2 !important;} .tabulator .tabulator-row.est-incidencia:hover{background:#fecaca !important;}
 .tabulator .tabulator-row.est-incidencia .tabulator-cell:first-child{border-left-color:#dc2626;}
@@ -2376,7 +2376,7 @@ comprobarSesion();
   const estados = [["en_proceso", "En proceso", "#94a3b8"], ["recepcionado_parcial", "Recepción parcial", "#eab308"], ["recepcionado_total", "Recepcionado", "#f97316"],                    ["agendado", "Agendado", "#2563eb"], ["completado", "Completado", "#16a34a"], ["incidencia", "Incidencia", "#dc2626"], ["terminado_incidencia", "Terminado con incidencia", "#dc2626"]];
   const pon = (id, items) => { const el = document.getElementById(id); if (el) el.innerHTML = items.map(([c, t]) => `<span style="--c:${c}">${t}</span>`).join(""); };
   const ley = document.getElementById("leyenda_estados");
-  if (ley) ley.innerHTML = [["#ffffff", "#94a3b8", "En proceso"], ["#fef9c3", "#eab308", "Recepción parcial"], ["#ffedd5", "#f97316", "Recepcionada (pendiente de montar)"],     ["#dbeafe", "#2563eb", "Agendada"], ["#dcfce7", "#16a34a", "Montada y finalizada"], ["#dcfce7", "#dc2626", "⚠ Montada con incidencias"], ["#fee2e2", "#dc2626", "Incidencia (sin montar)"]]     .map(([c, b, t]) => `<span class="sw-leyenda"><i style="background:${c};border-left:4px solid ${b}"></i>${t}</span>`).join("");
+  if (ley) ley.innerHTML = [["#ffffff", "#94a3b8", "En proceso"], ["#fef9c3", "#eab308", "Recepción parcial"], ["#ffedd5", "#f97316", "Recepcionada (pendiente de montar)"],     ["#dbeafe", "#2563eb", "Agendada"], ["#bbf7d0", "#15803d", "Montada y finalizada"], ["#bbf7d0", "#dc2626", "⚠ Montada con incidencias"], ["#fee2e2", "#dc2626", "Incidencia (sin montar)"]]     .map(([c, b, t]) => `<span class="sw-leyenda"><i style="background:${c};border-left:4px solid ${b}"></i>${t}</span>`).join("");
   pon("leyenda_recibido", [["#16a34a", "Recibido"], ["#d97706", "Pendiente de recibir"]]);
   pon("leyenda_entradas", [["#16a34a", "Enlazada con su orden (exacta)"], ["#94a3b8", "Deducida por la referencia de pedido (entrada antigua)"]]);
 })();
