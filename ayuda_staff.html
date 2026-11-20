@@ -75,6 +75,18 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 <li>Arriba, un desplegable <b>«Órdenes con servicios adicionales»</b> avisa de lo que el montador ha hecho de más (agujeros, cortes…). Desaparece al abrir la orden o pulsar <b>«Marcar visto»</b>. No genera factura solo.</li>
 <li>El <b>chat</b> con la tienda aparece en la orden; un 💬 rojo indica mensajes sin leer.</li>
 </ul>
+<h3>Colores de la lista de órdenes</h3>
+<p>Cada fila sale con el <b>color de su estado</b> (fondo y raya a la izquierda). Son los mismos colores en <b>Órdenes</b>, en la lista del <b>montador</b>, en la de las tiendas y en la etiqueta de estado de la <b>Galería de fotos</b>. Debajo de la lista hay una leyenda.</p>
+<table>
+<tr><th>Color</th><th>Estado</th></tr>
+<tr><td style="background:#fff;border-left:5px solid #94a3b8">Blanco (raya gris)</td><td>En proceso: aún no ha llegado nada.</td></tr>
+<tr><td style="background:#fef9c3;border-left:5px solid #eab308">Amarillo</td><td>Recepción parcial: ha llegado una parte.</td></tr>
+<tr><td style="background:#ffedd5;border-left:5px solid #f97316">Naranja</td><td>Recepcionada: todo en el almacén, pendiente de montar.</td></tr>
+<tr><td style="background:#dbeafe;border-left:5px solid #2563eb">Azul</td><td>Agendada: tiene fecha de montaje.</td></tr>
+<tr><td style="background:#dcfce7;border-left:5px solid #16a34a">Verde</td><td>Completada: montada y firmada.</td></tr>
+<tr><td style="background:#dcfce7;border-left:5px solid #dc2626">⚠ Verde con raya roja</td><td>Montada con incidencias: se puede facturar, pero hay algo pendiente. Las órdenes antiguas en «Terminado con incidencia» se ven igual.</td></tr>
+<tr><td style="background:#fee2e2;border-left:5px solid #dc2626">Rojo</td><td>Incidencia: hay un problema y la orden todavía no está montada.</td></tr>
+</table>
 
 <h2>4. Punteo — qué falta por llegar</h2>
 <p>Botón <b>✅ Punteo</b>. Una fila por línea de pedido, con fabricante, tienda, fechas y tick de recibido. Filtra por <b>año</b> y por texto (mercancía, fabricante, tienda, referencia). Al pulsar una fila se abre la orden. Úsalo para reclamar a los fabricantes lo pendiente.</p>

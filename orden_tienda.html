@@ -20,6 +20,8 @@ button{background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;font-weight:600
 table{width:100%;border-collapse:collapse;font-size:13px;} th{background:#dbeafe;color:#1e3a8a;text-align:left;padding:8px;} td{padding:8px;border-top:1px solid #dbeafe;}
 .muted{color:var(--muted);font-size:13px;}
 .est{display:inline-block;padding:3px 10px;border-radius:12px;background:#dbeafe;color:#1e3a8a;font-weight:600;font-size:12px;}
+.est-en_proceso{background:#f1f5f9;color:#475569;} .est-recepcionado_parcial{background:#fef9c3;color:#a16207;} .est-recepcionado_total{background:#ffedd5;color:#c2410c;} .est-agendado{background:#dbeafe;color:#1d4ed8;}
+.est-completado{background:#dcfce7;color:#15803d;} .est-incidencia{background:#fee2e2;color:#b91c1c;} .est-conincid,.est-terminado_incidencia{background:#dcfce7;color:#b91c1c;}
 
 .chat{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px;margin-bottom:10px}
 .msg{max-width:78%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
@@ -78,7 +80,7 @@ function volver(){ location.href = destino; }
   const k = (a,b) => '<div><div class="k">'+a+'</div><div class="v">'+(b || "—")+'</div></div>';
   const lineas = (li.data || []).filter(l => l.tipolinea !== 4);
   document.getElementById("cont").innerHTML =
-    '<div class="card"><div style="margin-bottom:10px"><span class="est">'+esc(o.estado === "completado" && o.con_incidencia ? "completado con incidencias" : (o.estado||"").replace(/_/g," "))+'</span></div><div class="grid">'+
+    '<div class="card"><div style="margin-bottom:10px"><span class="est est-'+(o.estado === "completado" && o.con_incidencia ? "conincid" : esc(o.estado || "en_proceso"))+'">'+esc(o.estado === "completado" && o.con_incidencia ? "⚠ completado con incidencias" : (o.estado||"").replace(/_/g," "))+'</span></div><div class="grid">'+
       k("Cliente", esc(o.nombre_cli))+k("Dirección", esc([o.domicilio_cli, o.localidad_cli].filter(Boolean).join(" - ")))+
       k("Teléfono", esc([o.telefono_cli, o.telefono2_cli].filter(Boolean).join(" / ")))+k("Referencia de pedido", esc(o.num_pedido))+k("Vendedor", esc(vend && vend.nombre))+
       k("Creada", f(o.fecha_creacion))+k("Recepción prevista", f(o.fecha_prev_recepcion))+k("Recibida en almacén", f(o.fecha_recepcion))+

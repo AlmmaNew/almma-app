@@ -67,13 +67,12 @@ input,select{padding:8px 10px;border:1px solid var(--border);border-radius:6px;f
 .tabulator .tabulator-row:hover{background:#e0efff;}
 .tabulator .tabulator-row .tabulator-cell{padding:9px 8px;border-right:1px solid #eaf2ff;}
 .tabulator .tabulator-row .tabulator-cell:first-child{border-left:5px solid #94a3b8;}
-.tabulator .tabulator-row.est-en_proceso .tabulator-cell:first-child{border-left-color:#6366f1;}
-.tabulator .tabulator-row.est-recepcionado_parcial .tabulator-cell:first-child{border-left-color:#ca8a04;}
-.tabulator .tabulator-row.est-recepcionado_total .tabulator-cell:first-child{border-left-color:#0891b2;}
-.tabulator .tabulator-row.est-agendado .tabulator-cell:first-child{border-left-color:#7c3aed;}
+.tabulator .tabulator-row.est-en_proceso .tabulator-cell:first-child{border-left-color:#94a3b8;}
+.tabulator .tabulator-row.est-recepcionado_parcial .tabulator-cell:first-child{border-left-color:#eab308;}
+.tabulator .tabulator-row.est-recepcionado_total .tabulator-cell:first-child{border-left-color:#f97316;}
+.tabulator .tabulator-row.est-agendado .tabulator-cell:first-child{border-left-color:#2563eb;}
 .tabulator .tabulator-row.est-completado .tabulator-cell:first-child{border-left-color:#16a34a;}
 .tabulator .tabulator-row.est-incidencia .tabulator-cell:first-child{border-left-color:#dc2626;}
-.tabulator .tabulator-row.est-terminado_incidencia .tabulator-cell:first-child{border-left-color:#9a3412;}
 .tabulator .tabulator-row.rec-si .tabulator-cell:first-child,.tabulator .tabulator-row.ent-exacta .tabulator-cell:first-child{border-left-color:#16a34a;}
 .tabulator .tabulator-row.rec-no .tabulator-cell:first-child{border-left-color:#d97706;background:#fffbeb;}
 .tabulator .tabulator-row.ent-deducida .tabulator-cell:first-child{border-left-color:#94a3b8;}
@@ -849,8 +848,7 @@ async function emitirRect() {
 iniciar();
 // leyendas de color de los listados
 (function () {
-  const estados = [["en_proceso", "En proceso", "#6366f1"], ["recepcionado_parcial", "Recepción parcial", "#ca8a04"], ["recepcionado_total", "Recepcionado", "#0891b2"],
-                   ["agendado", "Agendado", "#7c3aed"], ["completado", "Completado", "#16a34a"], ["incidencia", "Incidencia", "#dc2626"], ["terminado_incidencia", "Terminado con incidencia", "#9a3412"]];
+  const estados = [["en_proceso", "En proceso", "#94a3b8"], ["recepcionado_parcial", "Recepción parcial", "#eab308"], ["recepcionado_total", "Recepcionado", "#f97316"],                    ["agendado", "Agendado", "#2563eb"], ["completado", "Completado", "#16a34a"], ["incidencia", "Incidencia", "#dc2626"], ["terminado_incidencia", "Terminado con incidencia", "#dc2626"]];
   const pon = (id, items) => { const el = document.getElementById(id); if (el) el.innerHTML = items.map(([c, t]) => `<span style="--c:${c}">${t}</span>`).join(""); };
   pon("leyenda_estados", estados.map(([k, t, c]) => [c, t]));
   pon("leyenda_recibido", [["#16a34a", "Recibido"], ["#d97706", "Pendiente de recibir"]]);

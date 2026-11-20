@@ -40,12 +40,13 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 .barra > input{flex:1;min-width:220px;max-width:420px;}
 .tabla-scroll{margin:0 24px 24px;overflow-x:auto;}
 .estado-pill{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;display:inline-block;}
-.estado-en_proceso{background:#eef2ff;color:#4338ca;}
+.estado-en_proceso{background:#f1f5f9;color:#475569;}
 .estado-recepcionado_parcial{background:#fef9c3;color:#a16207;}
-.estado-recepcionado_total{background:#ecfeff;color:#0e7490;}
-.estado-agendado{background:#f5f3ff;color:#6d28d9;}
-.estado-completado{background:#f0fdf4;color:#15803d;}
-.estado-incidencia{background:#fef2f2;color:#dc2626;}
+.estado-recepcionado_total{background:#ffedd5;color:#c2410c;}
+.estado-agendado{background:#dbeafe;color:#1d4ed8;}
+.estado-completado{background:#dcfce7;color:#15803d;}
+.estado-incidencia{background:#fee2e2;color:#b91c1c;}
+.estado-terminado_incidencia,.estado-conincid{background:#dcfce7;color:#b91c1c;}
 
 #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.15);z-index:30;}
 #panel_detalle{display:none;position:fixed;top:0;right:0;bottom:0;width:min(1000px,100vw);background:var(--card);border-left:1px solid var(--border);box-shadow:-10px 0 30px -20px rgba(0,0,0,.3);z-index:31;flex-direction:column;}
@@ -129,32 +130,29 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 .tabulator .tabulator-row:hover{background:#e0efff;}
 .tabulator .tabulator-row .tabulator-cell{padding:9px 8px;border-right:1px solid #eaf2ff;}
 .tabulator .tabulator-row .tabulator-cell:first-child{border-left:5px solid #94a3b8;}
-.tabulator .tabulator-row.est-en_proceso .tabulator-cell:first-child{border-left-color:#6366f1;}
-.tabulator .tabulator-row.est-recepcionado_parcial .tabulator-cell:first-child{border-left-color:#ca8a04;}
-.tabulator .tabulator-row.est-recepcionado_total .tabulator-cell:first-child{border-left-color:#0891b2;}
-.tabulator .tabulator-row.est-agendado .tabulator-cell:first-child{border-left-color:#7c3aed;}
+/* color de cada orden según su estado (raya a la izquierda + fondo de la fila): gris en proceso, amarillo recepción parcial,
+   naranja recepcionada, azul agendada, verde montada, rojo incidencia; montada con incidencia = verde con raya roja y aviso */
+.tabulator .tabulator-row.est-en_proceso .tabulator-cell:first-child{border-left-color:#94a3b8;}
+.tabulator .tabulator-row.est-recepcionado_parcial,.tabulator .tabulator-row.tabulator-row-even.est-recepcionado_parcial{background:#fef9c3 !important;} .tabulator .tabulator-row.est-recepcionado_parcial:hover{background:#fef08a !important;}
+.tabulator .tabulator-row.est-recepcionado_parcial .tabulator-cell:first-child{border-left-color:#eab308;}
+.tabulator .tabulator-row.est-recepcionado_total,.tabulator .tabulator-row.tabulator-row-even.est-recepcionado_total{background:#ffedd5 !important;} .tabulator .tabulator-row.est-recepcionado_total:hover{background:#fed7aa !important;}
+.tabulator .tabulator-row.est-recepcionado_total .tabulator-cell:first-child{border-left-color:#f97316;}
+.tabulator .tabulator-row.est-agendado,.tabulator .tabulator-row.tabulator-row-even.est-agendado{background:#dbeafe !important;} .tabulator .tabulator-row.est-agendado:hover{background:#bfdbfe !important;}
+.tabulator .tabulator-row.est-agendado .tabulator-cell:first-child{border-left-color:#2563eb;}
+.tabulator .tabulator-row.est-completado,.tabulator .tabulator-row.tabulator-row-even.est-completado{background:#dcfce7 !important;} .tabulator .tabulator-row.est-completado:hover{background:#bbf7d0 !important;}
 .tabulator .tabulator-row.est-completado .tabulator-cell:first-child{border-left-color:#16a34a;}
+.tabulator .tabulator-row.est-conincid,.tabulator .tabulator-row.tabulator-row-even.est-conincid{background:#dcfce7 !important;} .tabulator .tabulator-row.est-conincid:hover{background:#bbf7d0 !important;}
+.tabulator .tabulator-row.est-conincid .tabulator-cell:first-child{border-left-color:#dc2626;}
+.tabulator .tabulator-row.est-incidencia,.tabulator .tabulator-row.tabulator-row-even.est-incidencia{background:#fee2e2 !important;} .tabulator .tabulator-row.est-incidencia:hover{background:#fecaca !important;}
 .tabulator .tabulator-row.est-incidencia .tabulator-cell:first-child{border-left-color:#dc2626;}
-.tabulator .tabulator-row.est-terminado_incidencia .tabulator-cell:first-child{border-left-color:#9a3412;}
+.tabulator .tabulator-row.est-conincid .tabulator-cell:first-child::before{content:"⚠ ";color:#dc2626;font-weight:700;}
 .tabulator .tabulator-row.rec-si .tabulator-cell:first-child,.tabulator .tabulator-row.ent-exacta .tabulator-cell:first-child{border-left-color:#16a34a;}
 .tabulator .tabulator-row.rec-no .tabulator-cell:first-child{border-left-color:#d97706;background:#fffbeb;}
 .tabulator .tabulator-row.ent-deducida .tabulator-cell:first-child{border-left-color:#94a3b8;}
 .leyenda-listado{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:#6b7280;padding:6px 24px 8px;}
 .leyenda-listado span{border-left:5px solid var(--c,#94a3b8);padding-left:6px;}
 .mini-list .item{border-left:5px solid #2563eb;background:#f9fbff;border-color:#bfdbfe;border-left-color:#2563eb;}
-.estado-terminado_incidencia{background:#fff7ed;color:#9a3412;}
-/* color de toda la fila según el estado: verde suave = montada y finalizada, naranja suave = completa sin montar, blanco = en proceso */
 #tabla_pedidos .tabulator-row.tabulator-row-even,#tabla_montajes .tabulator-row.tabulator-row-even{background:#fff;}
-.tabulator .tabulator-row.fila-finalizada,.tabulator .tabulator-row.tabulator-row-even.fila-finalizada{background:#dcfce7 !important;}
-.tabulator .tabulator-row.fila-finalizada:hover{background:#bbf7d0 !important;}
-/* completada pero con una incidencia en el montaje: rojo fuerte, distinto del marrón de "Terminado con incidencia" */
-.tabulator .tabulator-row.fila-conincid,.tabulator .tabulator-row.tabulator-row-even.fila-conincid{background:#fecaca !important;}
-.tabulator .tabulator-row.fila-conincid:hover{background:#fca5a5 !important;}
-.tabulator .tabulator-row.fila-conincid .tabulator-cell:first-child{border-left-color:#991b1b;}
-.tabulator .tabulator-row.fila-completa,.tabulator .tabulator-row.tabulator-row-even.fila-completa{background:#ffeedd !important;}
-.tabulator .tabulator-row.fila-completa:hover{background:#ffe0c2 !important;}
-.tabulator .tabulator-row.fila-agendada,.tabulator .tabulator-row.tabulator-row-even.fila-agendada{background:#fef9c3 !important;}
-.tabulator .tabulator-row.fila-agendada:hover{background:#fef08a !important;}
 .leyenda-listado .sw-leyenda{display:inline-flex;align-items:center;gap:6px;border-left:none;padding-left:0;}
 .leyenda-listado .sw-leyenda i{display:inline-block;width:16px;height:12px;border:1px solid #cbd5e1;border-radius:2px;}
 .item-pendiente{border-left:5px solid #d97706 !important;background:#fffbeb !important;}
@@ -1368,7 +1366,7 @@ async function cargarPedidos() {
 
   if (!tabla) {
     tabla = new Tabulator("#tabla_pedidos", {
-      data, columns: columnas, layout: "fitColumns", height: "calc(100vh - 240px)", rowFormatter: (row) => { const e = row.getData().estado; if (e === "completado" && row.getData().con_incidencia) row.getElement().classList.add("fila-conincid"); else if (e === "completado") row.getElement().classList.add("fila-finalizada"); else if (e === "recepcionado_total") row.getElement().classList.add("fila-completa"); else if (e === "agendado") row.getElement().classList.add("fila-agendada"); },
+      data, columns: columnas, layout: "fitColumns", height: "calc(100vh - 240px)", rowFormatter: (row) => { const d = row.getData(), el = row.getElement(); el.className = el.className.replace(/\best-\S+/g, "").trim(); el.classList.add("est-" + ((d.estado === "terminado_incidencia" || (d.estado === "completado" && d.con_incidencia)) ? "conincid" : (d.estado || "en_proceso"))); }, 
     });
     // no usamos la opcion rowClick de Tabulator: bloquea el callback si detecta
     // cualquier seleccion de texto activa en la pagina (falso positivo frecuente
@@ -2375,12 +2373,10 @@ async function registrarLlamada() {
 comprobarSesion();
 // leyendas de color de los listados
 (function () {
-  const estados = [["en_proceso", "En proceso", "#6366f1"], ["recepcionado_parcial", "Recepción parcial", "#ca8a04"], ["recepcionado_total", "Recepcionado", "#0891b2"],
-                   ["agendado", "Agendado", "#7c3aed"], ["completado", "Completado", "#16a34a"], ["incidencia", "Incidencia", "#dc2626"], ["terminado_incidencia", "Terminado con incidencia", "#9a3412"]];
+  const estados = [["en_proceso", "En proceso", "#94a3b8"], ["recepcionado_parcial", "Recepción parcial", "#eab308"], ["recepcionado_total", "Recepcionado", "#f97316"],                    ["agendado", "Agendado", "#2563eb"], ["completado", "Completado", "#16a34a"], ["incidencia", "Incidencia", "#dc2626"], ["terminado_incidencia", "Terminado con incidencia", "#dc2626"]];
   const pon = (id, items) => { const el = document.getElementById(id); if (el) el.innerHTML = items.map(([c, t]) => `<span style="--c:${c}">${t}</span>`).join(""); };
   const ley = document.getElementById("leyenda_estados");
-  if (ley) ley.innerHTML = [["#dcfce7", "Montada y finalizada"], ["#fecaca", "Completada con incidencias"], ["#ffeedd", "Completa (pendiente de montar)"], ["#ffffff", "En proceso"]]
-    .map(([c, t]) => `<span class="sw-leyenda"><i style="background:${c}"></i>${t}</span>`).join("");
+  if (ley) ley.innerHTML = [["#ffffff", "#94a3b8", "En proceso"], ["#fef9c3", "#eab308", "Recepción parcial"], ["#ffedd5", "#f97316", "Recepcionada (pendiente de montar)"],     ["#dbeafe", "#2563eb", "Agendada"], ["#dcfce7", "#16a34a", "Montada y finalizada"], ["#dcfce7", "#dc2626", "⚠ Montada con incidencias"], ["#fee2e2", "#dc2626", "Incidencia (sin montar)"]]     .map(([c, b, t]) => `<span class="sw-leyenda"><i style="background:${c};border-left:4px solid ${b}"></i>${t}</span>`).join("");
   pon("leyenda_recibido", [["#16a34a", "Recibido"], ["#d97706", "Pendiente de recibir"]]);
   pon("leyenda_entradas", [["#16a34a", "Enlazada con su orden (exacta)"], ["#94a3b8", "Deducida por la referencia de pedido (entrada antigua)"]]);
 })();

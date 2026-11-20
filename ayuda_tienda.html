@@ -33,15 +33,16 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 <div class="ok"><b>Consejo:</b> la lectura automática puede equivocarse. Mira siempre sobre todo el teléfono, la dirección y las cantidades antes de crear. Si salen avisos en amarillo, léelos.</div>
 
 <h2>3. Ver tus pedidos</h2>
-<p>En <b>Mis pedidos</b> (o <b>Órdenes</b> si eres administrador) tienes la lista. Cada pedido tiene un <b>estado</b>:</p>
+<p>En <b>Mis pedidos</b> (o <b>Órdenes</b> si eres administrador) tienes la lista. Cada pedido tiene un <b>estado</b>, y en la lista de <b>Mis pedidos</b> cada fila sale con su <b>color</b> (fondo y raya a la izquierda) para verlo de un vistazo. La etiqueta del estado en la ficha del pedido y en las fotos lleva el mismo color:</p>
 <table>
-<tr><th>Estado</th><th>Qué significa</th></tr>
-<tr><td>En proceso</td><td>Pedido recibido; aún no ha llegado la mercancía al almacén.</td></tr>
-<tr><td>Recepcionado parcial</td><td>Ha llegado una parte de la mercancía.</td></tr>
-<tr><td>Recepcionado total</td><td>Ya está todo en el almacén, falta fijar el montaje.</td></tr>
-<tr><td>Agendado</td><td>Tiene fecha de montaje.</td></tr>
-<tr><td>Completado</td><td>Montado y firmado por el cliente. Si hubo problemas aparece como «Completado con incidencias».</td></tr>
-<tr><td>Incidencia</td><td>Hay un problema (pieza dañada, falta algo…). La oficina lo está gestionando.</td></tr>
+<tr><th>Color</th><th>Estado</th><th>Qué significa</th></tr>
+<tr><td style="background:#fff;border-left:5px solid #94a3b8">Blanco</td><td>En proceso</td><td>Pedido recibido; aún no ha llegado la mercancía al almacén.</td></tr>
+<tr><td style="background:#fef9c3;border-left:5px solid #eab308">Amarillo</td><td>Recepcionado parcial</td><td>Ha llegado una parte de la mercancía.</td></tr>
+<tr><td style="background:#ffedd5;border-left:5px solid #f97316">Naranja</td><td>Recepcionado total</td><td>Ya está todo en el almacén, falta fijar el montaje.</td></tr>
+<tr><td style="background:#dbeafe;border-left:5px solid #2563eb">Azul</td><td>Agendado</td><td>Tiene fecha de montaje.</td></tr>
+<tr><td style="background:#dcfce7;border-left:5px solid #16a34a">Verde</td><td>Completado</td><td>Montado y firmado por el cliente.</td></tr>
+<tr><td style="background:#dcfce7;border-left:5px solid #dc2626">⚠ Verde con raya roja</td><td>Completado con incidencias</td><td>Montado, pero hubo algún problema que la oficina está resolviendo.</td></tr>
+<tr><td style="background:#fee2e2;border-left:5px solid #dc2626">Rojo</td><td>Incidencia</td><td>Hay un problema (pieza dañada, falta algo…). La oficina lo está gestionando.</td></tr>
 </table>
 <p>Pulsa un pedido para abrir su <b>ficha</b>: ves las líneas, qué se ha <b>recibido</b> y cuándo.</p>
 

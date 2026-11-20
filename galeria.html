@@ -69,9 +69,10 @@ main{max-width:1300px;margin:0 auto;padding:12px 20px 40px;}
 .abrir{font-size:13px;color:var(--azul2);text-decoration:none;font-weight:600;}
 .abrir:hover{text-decoration:underline;}
 .estado{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;background:#e2e8f0;color:#334155;text-transform:uppercase;letter-spacing:.3px;}
-.estado.completado{background:var(--verde-claro);color:var(--verde);}
-.estado.incidencia,.estado.terminado_incidencia{background:var(--rojo-claro);color:var(--rojo);}
-.estado.agendado{background:var(--azul-claro);color:var(--azul);}
+.estado.en_proceso{background:#f1f5f9;color:#475569;} .estado.recepcionado_parcial{background:#fef9c3;color:#a16207;} .estado.recepcionado_total{background:#ffedd5;color:#c2410c;}
+.estado.completado{background:#dcfce7;color:#15803d;}
+.estado.incidencia{background:#fee2e2;color:#b91c1c;} .estado.terminado_incidencia,.estado.conincid{background:#dcfce7;color:#b91c1c;}
+.estado.agendado{background:#dbeafe;color:#1d4ed8;}
 
 .rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:14px 18px 18px;}
 .mini{position:relative;aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:#e2e8f0;cursor:zoom-in;border:none;padding:0;}
@@ -301,7 +302,7 @@ async function cargar() {
     for (let n = 0; n < lst.length; n += 100) {
       trabajos.push(client.from("ordenes")
         // la tienda no lee la tabla de montadores: a ella no se le pide el equipo
-        .select("anyo, orden, nombre_cli, localidad_cli, domicilio_cli, num_pedido, fecha_prev_montaje, estado, tiendas(nombre)" +
+        .select("anyo, orden, nombre_cli, localidad_cli, domicilio_cli, num_pedido, fecha_prev_montaje, estado, con_incidencia, tiendas(nombre)" +
           (modo === "tienda" ? "" : ", equipo:ordenes_montadores(montadores(nombre))"))
         .eq("anyo", +a).in("orden", lst.slice(n, n + 100)));
     }
@@ -432,7 +433,7 @@ function tarjeta(g, gi) {
       </div>
       <div class="der">
         <span class="cuenta">📷 ${n} ${n === 1 ? "foto" : "fotos"}</span>
-        ${o.estado ? `<span class="estado ${esc(o.estado)}">${esc(ESTADO_TXT[o.estado] || o.estado)}</span>` : ""}
+        ${o.estado ? (o.estado === "completado" && o.con_incidencia ? `<span class="estado conincid">⚠ Completado con incidencias</span>` : `<span class="estado ${esc(o.estado)}">${esc(ESTADO_TXT[o.estado] || o.estado)}</span>`) : ""}
         ${enlaceOrden(g) ? `<a class="abrir" href="${enlaceOrden(g)}">Abrir orden →</a>` : ""}
       </div>
     </div>
