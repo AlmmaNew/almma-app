@@ -56,6 +56,13 @@ tr.ops td{padding:0 8px 10px;border-top:none;}
 .espera{font-size:11.5px;padding:1px 7px;border-radius:10px;background:#f1f5f9;white-space:nowrap;}
 .espera.mucho{background:#fee2e2;color:#b91c1c;font-weight:600;}
 .km{font-size:11.5px;color:#1e40af;margin-top:2px;} .sinkm{color:#94a3b8;font-style:italic;}
+#selbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;font-size:13px;}
+#selbar .cuenta{background:#eef2ff;color:#1e3a8a;border-radius:6px;padding:4px 10px;font-weight:600;}
+.marca{width:16px;height:16px;vertical-align:middle;margin:0 4px 0 0;cursor:pointer;}
+.bsacar{background:none;border:none;color:#9ca3af;cursor:pointer;padding:2px;font-size:13px;}
+.bsacar:hover{color:#b91c1c;}
+.sacada-info{font-size:12px;color:#b91c1c;margin-top:3px;}
+tr.fila.sacada td:first-child{border-left-color:#9ca3af;}
 .tbtn{background:#fff;color:#1e3a8a;border:1px solid #93c5fd;padding:4px 8px;font-size:12px;white-space:nowrap;font-weight:600;}
 .tbtn.vacio{background:#fffbeb;border-color:#f59e0b;color:#b45309;}
 .apr{color:#166534;font-size:11px;} .nuevo{color:#b45309;font-size:11px;} .med{color:#6d28d9;font-size:11px;font-weight:600;}
@@ -169,15 +176,17 @@ svg text{font-family:inherit;}
 <div class="barra">
   <input id="buscar" placeholder="Buscar nº, cliente, población, tienda…" style="min-width:250px" oninput="filtro=normBusq(this.value);pintarDiferido()">
   <label>Tienda <select id="f_tienda" onchange="pintar()"><option value="">Todas</option></select></label>
-  <label>Recibidas <select id="f_meses" onchange="pintar();situarEnMapa()"><option value="3">últimos 3 meses</option><option value="6" selected>últimos 6 meses</option><option value="12">último año</option><option value="0">todas (incluye antiguas)</option></select></label>
+  <label>Recibidas <select id="f_meses" onchange="pintar();situarEnMapa()"><option value="3">últimos 3 meses</option><option value="6" selected>últimos 6 meses</option><option value="12">último año</option><option value="0">todas (incluye antiguas)</option><option value="-6">solo antiguas (más de 6 meses)</option><option value="-12">solo antiguas (más de 1 año)</option></select></label>
   <label>Orden <select id="f_orden" onchange="pintar()"><option value="dist">Por cercanía a la nave</option><option value="espera">Por días esperando</option></select></label>
   <label><input type="checkbox" id="solo_sin" onchange="pintar()"> Solo sin tiempo de montaje</label>
+  <label title="Órdenes que se sacaron de la lista porque no se van a montar"><input type="checkbox" id="ver_sacadas" onchange="marcadas.clear();pintar()"> Ver las sacadas de la lista <span id="n_sacadas"></span></label>
 </div>
 <div id="progreso"></div>
 
 <div class="cuerpo">
   <div>
-    <div class="col-tit">🟠 Sin agendar</div>
+    <div class="col-tit" id="tit_lista">🟠 Sin agendar</div>
+    <div id="selbar"></div>
     <div id="lista"><span class="muted">Cargando…</span></div>
   </div>
   <div class="panel">
@@ -258,6 +267,8 @@ let pend = [], agenda = [], citasAbiertas = [], citasConf = {}, ordenesCita = {}
 let agendaDesde = null, agendaHasta = null;
 let filtro = "", vista = "tabla", lunes = lunesDe(HOY), mes = HOY.slice(0,7), sel = null, editando = null;
 const abiertoOps = new Set(), zonasCerradas = new Set();
+let sacadas = {}, haySacadas = true;   // órdenes sacadas de la lista (SQL 127), por "anyo/orden"
+const marcadas = new Set();             // órdenes con la casilla marcada, para sacar o devolver varias a la vez
 const pseudo = {};   // equipos que no están dados de alta (órdenes agendadas desde Órdenes/Rutas con otros montadores)
 
 /* ======================= arranque ======================= */
@@ -311,6 +322,7 @@ async function cargarTodo(){
     const raw = await todo(() => client.from("ordenes").select(ORD_SEL).eq("estado", "recepcionado_total")
       .or("fecha_prev_montaje.is.null,fecha_prev_montaje.gte." + HOY).order("anyo").order("orden"), 300);
     pend = raw.map(normOrden);
+    await cargarSacadas();
     await cargarCitas();
     await cargarAgenda(true);
     await cargarFabricantes();
@@ -319,6 +331,12 @@ async function cargarTodo(){
   }
   document.getElementById("progreso").style.display = "none";
   rellenarFiltros(); pintar();
+}
+async function cargarSacadas(){
+  try {
+    const data = await todo(() => client.from("planificar_sacadas").select("anyo, orden, motivo, sacada_at"));
+    sacadas = Object.fromEntries(data.map(s => [s.anyo + "/" + s.orden, s])); haySacadas = true;
+  } catch (e) { sacadas = {}; haySacadas = false; }   // sin el SQL 127 la pantalla sigue funcionando, sin poder sacar órdenes
 }
 async function cargarCitas(){
   const { data, error } = await client.from("citas_montaje").select("id, anyo, orden, fecha_hora, hora, equipo_id, estado, avisado_at").in("estado", ["propuesta", "avisada"]);
@@ -556,10 +574,12 @@ let tPintar = null;
 function pintarDiferido(){ clearTimeout(tPintar); tPintar = setTimeout(pintar, 250); }
 function pendientesVisibles(){
   const meses = +document.getElementById("f_meses").value, ft = document.getElementById("f_tienda").value, soloSin = document.getElementById("solo_sin").checked;
-  const lim = meses ? iso(new Date(new Date().setMonth(new Date().getMonth() - meses))) : null;
+  const lim = meses ? iso(new Date(new Date().setMonth(new Date().getMonth() - Math.abs(meses)))) : null;
   const conCita = new Set(citasAbiertas.map(c => c.anyo + "/" + c.orden));
+  const verSac = document.getElementById("ver_sacadas").checked;
   return pend.filter(o => !conCita.has(o.n)
-    && (!lim || (o.ultRec && o.ultRec >= lim))
+    && !!sacadas[o.n] === verSac
+    && (!lim || (meses > 0 ? (o.ultRec && o.ultRec >= lim) : (!o.ultRec || o.ultRec < lim)))
     && (!ft || o.tiendaId === ft)
     && (!soloSin || tiempoOrden(o).t == null)
     && (!filtro || normBusq(o.n + " " + o.cli + " " + o.loc + " " + nomTienda(o.tiendaId) + " " + o.dir).includes(filtro)));
@@ -576,6 +596,7 @@ function pintar(){
     '<div class="tarjeta"><div class="n">' + proximas + '</div><div class="t">agendadas desde hoy (' + fdia(HOY) + ' en adelante)</div></div>' +
     '<div class="tarjeta amb"><div class="n">' + vis.filter(o => tiempoOrden(o).t == null).length + '</div><div class="t">sin tiempo de montaje completo</div></div>';
   document.getElementById("n_avisos").textContent = (nP + nA) ? "(" + (nP + nA) + ")" : "";
+  pintarSeleccion(vis);
   pintarLista(vis);
   ["tabla", "avisos", "cal"].forEach(v => document.getElementById("b_" + v).classList.toggle("on", vista === v));
   document.getElementById("derecha").innerHTML = vista === "tabla" ? tabla() : vista === "avisos" ? avisos() : calendario();
@@ -603,8 +624,56 @@ function pintarLista(vis){
     }
     h += '<div class="zona ' + (zonasCerradas.has(z) ? "cerrada" : "") + '"><div class="zona-cab" onclick="plegar(this)" data-z="' + esc(z) + '"><b>' + esc(z) + '</b><span class="dato">' + ords.length + ' órdenes</span><span class="dato">⏱ ' + hm(mz) + ' h</span><span class="muted" style="margin-left:auto">' + (zonasCerradas.has(z) ? "▸ abrir" : "▾ plegar") + '</span></div><div class="zona-cuerpo">' + cuerpo + '</div></div>';
   }
-  document.getElementById("lista").innerHTML = h || '<div class="ya-cita">No hay órdenes pendientes de agendar con estos filtros. 🎉</div>';
+  document.getElementById("lista").innerHTML = h || (document.getElementById("ver_sacadas").checked
+    ? '<div class="ya-cita">No hay órdenes sacadas de la lista con estos filtros (mira también «Recibidas: todas»).</div>'
+    : '<div class="ya-cita">No hay órdenes pendientes de agendar con estos filtros. 🎉</div>');
 }
+/* ---------- sacar de la lista las que no se van a montar (SQL 127) ---------- */
+function pintarSeleccion(vis){
+  const verSac = document.getElementById("ver_sacadas").checked, nSac = Object.keys(sacadas).length;
+  document.getElementById("n_sacadas").textContent = nSac ? "(" + nSac + ")" : "";
+  document.getElementById("tit_lista").textContent = verSac ? "🚫 Sacadas de la lista (no se van a montar)" : "🟠 Sin agendar";
+  const bar = document.getElementById("selbar");
+  if (!haySacadas) { bar.innerHTML = ""; return; }
+  const visN = new Set(vis.map(o => o.n)), n = [...marcadas].filter(x => visN.has(x)).length;
+  bar.innerHTML = (vis.length ? '<button class="secondary peq" onclick="marcarTodas()">☑ Marcar todas (' + vis.length + ')</button>' : "") +
+    (n ? '<span class="cuenta">' + n + ' marcada' + (n > 1 ? "s" : "") + '</span>' +
+      (verSac ? '<button class="peq" onclick="devolverMarcadas()">↩ Devolver a la lista</button>'
+              : '<button class="peq rojo" onclick="sacarMarcadas()">🚫 Sacar de la lista</button>') +
+      '<button class="secondary peq" onclick="marcadas.clear();pintar()">Desmarcar</button>' : "") +
+    (!verSac && !n ? '<span class="muted">¿Órdenes que no se van a montar nunca? Márcalas (☐) y sácalas de la lista. Con «Recibidas: solo antiguas» salen las viejas.</span>' : "");
+}
+function marcar(n, on){ on ? marcadas.add(n) : marcadas.delete(n); pintarSeleccion(pendientesVisibles()); }
+function marcarTodas(){ pendientesVisibles().forEach(o => marcadas.add(o.n)); pintar(); }
+function marcadasVisibles(){ const v = new Set(pendientesVisibles().map(o => o.n)); return [...marcadas].filter(x => v.has(x)); }
+async function sacar(lista){
+  if (!lista.length) return;
+  const motivo = prompt((lista.length === 1 ? "Sacar la orden " + lista[0] : "Sacar " + lista.length + " órdenes") +
+    " de la lista.\n\nLa orden NO cambia (ni estado ni fechas): solo deja de salir aquí. Se puede devolver con «Ver las sacadas de la lista».\n\nMotivo (opcional):", "No se va a montar");
+  if (motivo === null) return;
+  const filas = lista.map(n => { const [a, o] = n.split("/"); return { anyo: +a, orden: +o, motivo: motivo.trim() || null }; });
+  for (let i = 0; i < filas.length; i += 500) {
+    const { error } = await client.from("planificar_sacadas").upsert(filas.slice(i, i + 500));
+    if (error) { alert("No se han podido sacar: " + error.message); break; }
+  }
+  lista.forEach(n => marcadas.delete(n));
+  await cargarSacadas(); pintar();
+  toast(lista.length === 1 ? "Orden " + lista[0] + " sacada de la lista." : lista.length + " órdenes sacadas de la lista.");
+}
+async function devolver(lista){
+  if (!lista.length) return;
+  for (let i = 0; i < lista.length; i += 200) {
+    const trozo = lista.slice(i, i + 200);
+    const { error } = await client.from("planificar_sacadas").delete().or(trozo.map(n => { const [a, o] = n.split("/"); return "and(anyo.eq." + a + ",orden.eq." + o + ")"; }).join(","));
+    if (error) { alert("No se han podido devolver: " + error.message); break; }
+  }
+  lista.forEach(n => marcadas.delete(n));
+  await cargarSacadas(); pintar();
+  toast(lista.length === 1 ? "Orden " + lista[0] + " devuelta a la lista." : lista.length + " órdenes devueltas a la lista.");
+}
+const sacarMarcadas = () => sacar(marcadasVisibles());
+const devolverMarcadas = () => devolver(marcadasVisibles());
+
 function plegar(el){ const z = el.dataset.z; zonasCerradas.has(z) ? zonasCerradas.delete(z) : zonasCerradas.add(z); pintar(); }
 const diasDesde = f => f ? Math.round((Date.now() - D(f)) / 864e5) : null;
 function filaPendiente(o){
@@ -618,9 +687,15 @@ function filaPendiente(o){
     '<button class="' + (x.tipo === "lleno" ? "rojo" : "") + '" onclick="proponer(' + o.anyo + ',' + o.orden + ',\'' + x.e + '\',\'' + x.f + '\',\'' + x.h + '\')">' + (x.tipo === "lleno" ? "Usar igual" : "Usar") + '</button></div>';
   const kmTxt = km.sin ? '<span class="sinkm">Sin kilometraje (' + esc(nomTienda(o.tiendaId)) + ')</span>' : km.km != null ? "🚗 " + (km.exacto ? "" : "≈ ") + km.km + " km desde la tienda" : "";
   const tTxt = T.sinLineas ? "Sin artículos" : T.t != null ? hm(T.t) + " h" : T.parcial ? hm(T.parcial) + " h + ?" : "Poner tiempo";
-  return '<tr class="fila"><td style="width:84px" rowspan="2"><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a>' +
-      (d != null ? '<div><span class="espera ' + (d >= 10 ? "mucho" : "") + '" title="Días desde que llegó la última mercancía">' + d + ' días</span></div>' : "") + '</td>' +
-    '<td>' + esc(o.cli) + '<div class="muted">' + esc(o.dir) + '</div><div class="km">' + kmTxt + '</div></td>' +
+  const sac = sacadas[o.n];
+  return '<tr class="fila' + (sac ? " sacada" : "") + '"><td style="width:96px" rowspan="2">' +
+      (haySacadas ? '<input type="checkbox" class="marca" title="Marcar" ' + (marcadas.has(o.n) ? "checked" : "") + ' onchange="marcar(\'' + o.n + '\', this.checked)">' : "") +
+      '<a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a>' +
+      (d != null ? '<div><span class="espera ' + (d >= 10 ? "mucho" : "") + '" title="Días desde que llegó la última mercancía">' + d + ' días</span></div>' : "") +
+      (haySacadas ? '<div>' + (sac ? '<button class="bsacar" style="color:#1e40af" title="Devolver a la lista" onclick="devolver([\'' + o.n + '\'])">↩ Devolver</button>'
+                                   : '<button class="bsacar" title="Sacar de la lista: no se va a montar" onclick="sacar([\'' + o.n + '\'])">🚫 Sacar</button>') + '</div>' : "") + '</td>' +
+    '<td>' + esc(o.cli) + '<div class="muted">' + esc(o.dir) + '</div><div class="km">' + kmTxt + '</div>' +
+      (sac ? '<div class="sacada-info">🚫 Sacada el ' + fdia(String(sac.sacada_at).slice(0, 10)) + (sac.motivo ? ": " + esc(sac.motivo) : "") + '</div>' : "") + '</td>' +
     '<td>' + esc(o.lineas.map(l => capFrase(l.desc)).slice(0, 3).join(" + ") + (o.lineas.length > 3 ? " …" : "")) + '<div class="muted">' + esc(nomTienda(o.tiendaId)) + (o.bultos ? " · " + o.bultos + " bultos" : "") + '</div></td>' +
     '<td><button class="tbtn ' + (T.t == null ? "vacio" : "") + '" onclick="abrirTiempo(' + o.anyo + ',' + o.orden + ')" title="Tiempo de montaje por artículo">⏱ ' + tTxt + '</button>' +
       (T.med ? '<div class="med">📏 medido</div>' : T.auto ? '<div class="apr">⚡ automático</div>' : "") + (T.falta && T.parcial ? '<div class="nuevo">' + T.falta + ' artículo' + (T.falta > 1 ? "s" : "") + ' sin tiempo</div>' : "") + '</td>' +
