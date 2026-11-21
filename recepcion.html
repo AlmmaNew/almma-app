@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALMMA - Recepción de mercancía</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="tiendas_activas.js"></script>
 <script src="busqueda.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/js/tabulator.min.js"></script>
@@ -377,8 +378,7 @@ async function iniciarAlbaranesTienda() {
   if (!atTiendas) {
     const { data } = await client.from("tiendas").select("id, nombre, email").order("nombre");
     atTiendas = data || [];
-    let act = null;   // solo tiendas con pedidos en los últimos 2 años (SQL 103; sin él se ven todas)
-    try { const r = await client.rpc("tiendas_activas", { p_anyo_desde: new Date().getFullYear() - 1 }); if (!r.error) act = new Set((r.data || []).map(x => x.id)); } catch (_) {}
+    const act = await idsTiendasActivas(client);   // solo tiendas activas (tiendas_activas.js; si falla, todas)
     document.getElementById("at_tienda").innerHTML = '<option value="">Todas las tiendas</option>' + atTiendas.filter(t => !act || act.has(t.id)).map(t => `<option value="${t.id}">${escAlb(t.nombre)}</option>`).join("");
     const d = new Date(), h = hoyLocal(); d.setDate(1);
     document.getElementById("at_desde").value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; document.getElementById("at_hasta").value = h;

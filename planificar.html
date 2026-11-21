@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALMMA - Planificar montajes</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="tiendas_activas.js"></script>
 <style>
 :root{--primary:#2563eb;--bg:#f5f6fa;--card:#fff;--border:#e2e4eb;--text:#1f2430;--muted:#6b7280;}
 *{box-sizing:border-box;}
@@ -109,6 +110,10 @@ table.ag tr.libre td{color:#15803d;}
 .ordag.propuesta{border-left-color:#94a3b8;background:#f8fafc;}
 .ordag.avisada{border-left-color:#f59e0b;background:#fffbeb;}
 .ordag.confirmada{border-left-color:#2563eb;background:#eff6ff;}
+/* ya montadas e incidencias: mismos colores que en el resto de la web (completado verde, con incidencia raya roja, incidencia rojo) */
+.ordag.realizada{border-left-color:#15803d;background:#bbf7d0;}
+.ordag.realizada.inc{border-left-color:#dc2626;}
+.ordag.incidencia{border-left-color:#dc2626;background:#fee2e2;}
 .ordag .hora{font-weight:700;color:#1e3a8a;min-width:38px;}
 .ordag .acc{margin-left:auto;display:flex;gap:3px;align-items:center;}
 .ordag .acc button{padding:2px 7px;font-size:11px;}
@@ -116,6 +121,7 @@ table.ag tr.libre td{color:#15803d;}
 .ordag .acc button.ic:hover{color:#1e3a8a;}
 .est{font-size:10.5px;font-weight:700;border-radius:9px;padding:1px 7px;white-space:nowrap;}
 .est.propuesta{background:#e2e8f0;color:#475569;} .est.avisada{background:#fef3c7;color:#92400e;} .est.confirmada{background:#dbeafe;color:#1e40af;}
+.est.realizada{background:#15803d;color:#fff;} .est.realizada.inc{background:#dc2626;} .est.incidencia{background:#dc2626;color:#fff;}
 .mini{display:flex;align-items:center;gap:4px;margin-top:3px;}
 .mini .bh{flex:1;height:7px;background:#e5e7eb;border-radius:4px;overflow:hidden;display:flex;}
 .mini .bh i{display:block;height:100%;}
@@ -206,7 +212,7 @@ svg text{font-family:inherit;}
       <button class="secondary peq" id="b_cal" onclick="cambiarVista('cal')">🗓 Calendario</button>
       <select class="pq" id="f_eq" onchange="pintar()"><option value="">Todos los equipos</option></select>
     </div>
-    <div class="leyenda"><span><i style="background:#94a3b8"></i>Propuesta (sin avisar)</span><span><i style="background:#f59e0b"></i>Avisada, esperando respuesta</span><span><i style="background:#2563eb"></i>Confirmada (agendada)</span></div>
+    <div class="leyenda"><span><i style="background:#94a3b8"></i>Propuesta (sin avisar)</span><span><i style="background:#f59e0b"></i>Avisada, esperando respuesta</span><span><i style="background:#2563eb"></i>Confirmada (agendada)</span><span><i style="background:#15803d"></i>Montada</span><span><i style="background:#bbf7d0;border-left:3px solid #dc2626"></i>⚠ Montada con incidencia</span><span><i style="background:#dc2626"></i>Incidencia</span></div>
     <div id="derecha"></div>
   </div>
 </div>
@@ -276,7 +282,8 @@ let pend = [], agenda = [], citasAbiertas = [], citasConf = {}, ordenesCita = {}
 let agendaDesde = null, agendaHasta = null;
 let filtro = "", vista = "tabla", lunes = lunesDe(HOY), mes = HOY.slice(0,7), sel = null, editando = null;
 const abiertoOps = new Set(), zonasCerradas = new Set();
-let docs = {};                          // documentos que ha adjuntado la tienda (pedido, planos, fotos), por "anyo/orden"
+let tiendasFacturadas = null;           // ids de tiendas activas (tiendas_activas.js; null = no se pudo saber: salen todas)
+let docs = {};                       // documentos que ha adjuntado la tienda (pedido, planos, fotos), por "anyo/orden"
 let sacadas = {}, haySacadas = true;   // órdenes sacadas de la lista (SQL 127), por "anyo/orden"
 const marcadas = new Set();             // órdenes con la casilla marcada, para sacar o devolver varias a la vez
 const pseudo = {};   // equipos que no están dados de alta (órdenes agendadas desde Órdenes/Rutas con otros montadores)
@@ -312,13 +319,13 @@ async function cargarTiendas(){
 async function cargarTiempos(){ const data = await todo(() => client.from("tiempos_montaje").select("*")); tiempos = Object.fromEntries(data.map(t => [t.fabricante + "|" + t.articulo, t])); }
 async function cargarGeo(){ const data = await todo(() => client.from("geo_lugares").select("*")); geo = Object.fromEntries(data.map(g => [g.clave, g])); }
 
-const ORD_SEL = "anyo, orden, nombre_cli, domicilio_cli, localidad_cli, telefono_cli, telefono2_cli, tienda_id, estado, fecha_recepcion, fecha_prev_montaje, horamont, bultos, linorden(tipolinea, proveedor, descripcion, cantidad, recibido_at), ordenes_montadores(montador_id)";
+const ORD_SEL = "anyo, orden, nombre_cli, domicilio_cli, localidad_cli, telefono_cli, telefono2_cli, tienda_id, estado, con_incidencia, fecha_recepcion, fecha_prev_montaje, horamont, bultos, linorden(tipolinea, proveedor, descripcion, cantidad, recibido_at), ordenes_montadores(montador_id)";
 function normOrden(r){
   const lin = r.linorden || [];
   const rec = [r.fecha_recepcion, ...lin.map(l => l.recibido_at)].filter(Boolean).map(x => String(x).slice(0,10)).sort();
   return {
     anyo: r.anyo, orden: r.orden, n: r.anyo + "/" + r.orden, cli: r.nombre_cli || "", dir: r.domicilio_cli || "", loc: (r.localidad_cli || "").trim(),
-    tel: r.telefono_cli || "", tel2: r.telefono2_cli || "", tiendaId: r.tienda_id, estado: r.estado, bultos: r.bultos,
+    tel: r.telefono_cli || "", tel2: r.telefono2_cli || "", tiendaId: r.tienda_id, estado: r.estado, conInc: !!r.con_incidencia, bultos: r.bultos,
     ultRec: rec.length ? rec[rec.length-1] : null,
     fprev: r.fecha_prev_montaje ? String(r.fecha_prev_montaje).slice(0,10) : null, hora: r.horamont || "",
     mont: (r.ordenes_montadores || []).map(a => a.montador_id),
@@ -332,7 +339,7 @@ async function cargarTodo(){
     const raw = await todo(() => client.from("ordenes").select(ORD_SEL).eq("estado", "recepcionado_total")
       .or("fecha_prev_montaje.is.null,fecha_prev_montaje.gte." + HOY).order("anyo").order("orden"), 300);
     pend = raw.map(normOrden);
-    await Promise.all([cargarSacadas(), cargarDocs()]);
+    await Promise.all([cargarSacadas(), cargarDocs(), cargarTiendasFacturadas()]);
     await cargarCitas();
     await cargarAgenda(true);
     await cargarFabricantes();
@@ -347,6 +354,9 @@ async function cargarSacadas(){
     const data = await todo(() => client.from("planificar_sacadas").select("anyo, orden, motivo, sacada_at"));
     sacadas = Object.fromEntries(data.map(s => [s.anyo + "/" + s.orden, s])); haySacadas = true;
   } catch (e) { sacadas = {}; haySacadas = false; }   // sin el SQL 127 la pantalla sigue funcionando, sin poder sacar órdenes
+}
+async function cargarTiendasFacturadas(){
+  tiendasFacturadas = await idsTiendasActivas(client);   // regla común de tiendas_activas.js
 }
 async function cargarDocs(){
   try {
@@ -392,7 +402,10 @@ const nomFab = c => c ? (fabs[c] || "Fabricante " + c) : "Sin fabricante";
 const nomTienda = id => { const t = tiendas[id]; return t ? (t.nombre_comercial || t.nombre) : "Sin tienda"; };
 function rellenarFiltros(){
   const ft = document.getElementById("f_tienda"), ant = ft.value;
-  const ids = [...new Set(pend.map(o => o.tiendaId).filter(Boolean))].sort((a, b) => nomTienda(a).localeCompare(nomTienda(b)));
+  // Solo tiendas activas (tiendas_activas.js: órdenes en los últimos 3 meses o alta reciente) que tengan órdenes en la lista
+  const ids = [...new Set(pend.map(o => o.tiendaId).filter(Boolean))]
+    .filter(id => !tiendasFacturadas || tiendasFacturadas.has(id) || id === ant)
+    .sort((a, b) => nomTienda(a).localeCompare(nomTienda(b)));
   ft.innerHTML = '<option value="">Todas</option>' + ids.map(id => '<option value="' + id + '">' + esc(nomTienda(id)) + '</option>').join("");
   if (ids.includes(ant)) ft.value = ant;
   const fe = document.getElementById("f_eq"), antE = fe.value;
@@ -518,7 +531,14 @@ let paradas = {};
 function construirParadas(){
   paradas = {};
   const add = (eq, f, p) => (paradas[eq + "|" + f] ||= []).push(p);
-  agenda.forEach(o => { if (!o.fprev) return; const c = citasConf[o.n]; add(equipoDeOrden(o), o.fprev, { o, estado: "confirmada", hora: o.hora, cita: c || null, sinCita: !c }); });
+  agenda.forEach(o => {
+    if (!o.fprev) return;
+    const c = citasConf[o.n];
+    // ya montadas (completado; también el estado antiguo terminado_incidencia) e incidencias, con sus colores
+    const hecha = o.estado === "completado" || o.estado === "terminado_incidencia";
+    const estado = hecha ? "realizada" : o.estado === "incidencia" ? "incidencia" : "confirmada";
+    add(equipoDeOrden(o), o.fprev, { o, estado, inc: hecha && (o.conInc || o.estado === "terminado_incidencia"), hora: o.hora, cita: c || null, sinCita: !c });
+  });
   citasAbiertas.forEach(c => {
     const o = pend.find(x => x.anyo === c.anyo && x.orden === c.orden) || ordenesCita[c.anyo + "/" + c.orden] || agenda.find(x => x.anyo === c.anyo && x.orden === c.orden);
     if (o) add(c.equipo_id, c.fecha, { o, estado: c.estado, hora: c.hora, cita: c });
@@ -783,7 +803,7 @@ function tabla(){
   if (sel && dias.includes(sel.f) && eqs.includes(sel.e)) h += detalle(sel.e, sel.f);
   return h;
 }
-const ESTX = { propuesta: "Propuesta", avisada: "Avisada", confirmada: "Confirmada" };
+const ESTX = { propuesta: "Propuesta", avisada: "Avisada", confirmada: "Confirmada", realizada: "✔ Montada", incidencia: "Incidencia" };
 function paradaHtml(s, e, f){
   const o = s.o, idp = (s.cita ? s.cita.id : "o" + o.anyo + "_" + o.orden);
   if (editando === idp) return '<div class="ordag ' + s.estado + '"><b>' + o.n + '</b>' +
@@ -795,13 +815,17 @@ function paradaHtml(s, e, f){
   let bts = "";
   if (s.estado === "propuesta") bts = '<button class="ambar" onclick="abrirAviso(\'' + s.cita.id + '\')">📲 Avisar</button>';
   else if (s.estado === "avisada") bts = '<button class="verde" onclick="confirmar(\'' + s.cita.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + s.cita.id + '\')" title="Al cliente no le va bien">✖</button>';
-  return '<div class="ordag ' + s.estado + '"><span class="hora">' + esc(s.hora || "—") + '</span>' +
+  const hecha = s.estado === "realizada", inc = hecha && s.inc;
+  const etiqueta = inc ? "⚠ Montada con incidencia" : ESTX[s.estado] + (s.sinCita && !hecha && s.estado !== "incidencia" ? "*" : "");
+  const titulo = hecha ? "Ya montada y firmada por el cliente" : s.estado === "incidencia" ? "La orden tiene una incidencia" : s.sinCita ? "Agendada desde Órdenes / Rutas (sin cita en esta pantalla)" : "";
+  return '<div class="ordag ' + s.estado + (inc ? " inc" : "") + '"><span class="hora">' + esc(s.hora || "—") + '</span>' +
     '<a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> ' + esc(o.loc) +
     ' <span class="muted">· ' + esc((o.cli || "").split(" ")[0]) + ' · ' + (T.t != null ? txtT(T.t) : "⏱ ?") + '</span>' +
-    '<span class="est ' + s.estado + '" title="' + (s.sinCita ? "Agendada desde Órdenes / Rutas (sin cita en esta pantalla)" : "") + '">' + ESTX[s.estado] + (s.sinCita ? "*" : "") + '</span>' +
+    '<span class="est ' + s.estado + (inc ? " inc" : "") + '" title="' + titulo + '">' + etiqueta + '</span>' +
     '<span class="acc">' + bts + ((docs[o.n] || []).length ? '<button class="ic" title="Pedido y planos que ha enviado la tienda (' + docs[o.n].length + ')" onclick="verDocs(' + o.anyo + ',' + o.orden + ')">📎</button>' : "") +
+    (hecha ? "" :   // una orden ya montada no se cambia de día ni se quita
     '<button class="ic" title="Cambiar fecha, hora o equipo" onclick="editando=\'' + idp + '\';pintar()">✎</button>' +
-    '<button class="ic" title="Quitar de este día" onclick="quitar(' + o.anyo + ',' + o.orden + ',\'' + (s.cita ? s.cita.id : "") + '\',\'' + s.estado + '\')">🗑</button></span></div>';
+    '<button class="ic" title="Quitar de este día" onclick="quitar(' + o.anyo + ',' + o.orden + ',\'' + (s.cita ? s.cita.id : "") + '\',\'' + s.estado + '\')">🗑</button>') + '</span></div>';
 }
 function detalle(e, f){
   const p = dia(e, f), nave = NAVE();
@@ -814,7 +838,7 @@ function detalle(e, f){
     const ruta = [nave, ...p.ps.map(s => posOrden(s.o)), nave].filter(Boolean);
     svg += '<polyline points="' + ruta.map(x => X(x) + "," + Y(x)).join(" ") + '" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="4 3"/>';
     if (nave) svg += '<circle cx="' + X(nave) + '" cy="' + Y(nave) + '" r="7" fill="#1e3a8a"/><text x="' + (X(nave) + 9) + '" y="' + (Y(nave) + 4) + '" font-size="10" fill="#1e3a8a">Nave</text>';
-    p.ps.forEach((s, i) => { const q = posOrden(s.o); if (!q) return; const col = s.estado === "confirmada" ? "#2563eb" : s.estado === "avisada" ? "#f59e0b" : "#94a3b8";
+    p.ps.forEach((s, i) => { const q = posOrden(s.o); if (!q) return; const col = s.estado === "realizada" ? (s.inc ? "#dc2626" : "#15803d") : s.estado === "incidencia" ? "#dc2626" : s.estado === "confirmada" ? "#2563eb" : s.estado === "avisada" ? "#f59e0b" : "#94a3b8";
       svg += '<circle cx="' + X(q) + '" cy="' + Y(q) + '" r="8" fill="' + col + '"/><text x="' + X(q) + '" y="' + (Y(q) + 3.5) + '" font-size="9" fill="#fff" text-anchor="middle">' + (i + 1) + '</text><text x="' + (X(q) + 10) + '" y="' + (Y(q) - 6) + '" font-size="8" fill="#64748b">' + esc(s.o.loc) + '</text>'; });
   }
   return '<div class="detalle"><b>🗺 Ruta · ' + esc(nomEq(e)) + ' · ' + fdia(f) + '</b><div class="muted">' + p.km + ' km · ' + hm(p.mont) + ' h montaje + ' + hm(p.viaje) + ' h viaje = <b>' + hm(p.total) + ' h</b> ' + marcaCarga(p) +
@@ -852,7 +876,7 @@ function calendario(){
     if (fuera) { h += '<div class="c fuera"><div class="d">' + d.getDate() + '</div></div>'; continue; }
     let barras = "", n = 0, sinConf = 0;
     for (const e of eqs) {
-      const p = dia(e, f); n += p.ps.length; sinConf += p.ps.filter(s => s.estado !== "confirmada").length;
+      const p = dia(e, f); n += p.ps.length; sinConf += p.ps.filter(s => s.estado === "propuesta" || s.estado === "avisada").length;
       if (finde && !p.ps.length) continue;
       const libre = JORNADA() - p.total, col = !p.ps.length ? "#e5e7eb" : libre < 0 ? "#dc2626" : libre < 120 ? "#f59e0b" : "#16a34a";
       barras += '<div class="eqb" title="' + esc(nomEq(e)) + ': ' + (p.ps.length ? hm(p.total) + " h (" + esc([...new Set(p.ps.map(s => s.o.loc))].join(", ")) + ")" : "libre") + '"><span>' + esc(corto(e)) + '</span><i><b style="width:' + (p.ps.length ? Math.min(100, p.total / JORNADA() * 100) : 0) + '%;background:' + col + '"></b></i></div>';

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALMMA - Facturas emitidas</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="tiendas_activas.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/js/tabulator.min.js"></script>
 <style>
@@ -332,7 +333,7 @@ async function comprobarSesionStaff() {
 }
 
 
-let tiendasLista = [];
+let tiendasLista = [], tiendasActivasFact = null;
 let tabla = null, seriePorCodigo = {}, datos = [], seleccion = new Set(), debounce = null, origenActual = "web";
 const g = (id) => document.getElementById(id);
 const sinAcentos = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -344,6 +345,7 @@ async function iniciar() {
   const series = await cargarSeries(false);
   const activas = series.filter(s => s.activa);
   tiendasLista = (await client.from("tiendas").select("id, codigo, nombre, nombre_comercial, cif, direccion, cp, localidad, provincia, forma_pago").order("nombre")).data || [];
+  tiendasActivasFact = await idsTiendasActivas(client);   // para las sugerencias de tienda (tiendas_activas.js)
   seriePorCodigo = Object.fromEntries(series.map(s => [s.codigo, s]));
   g("ff_serie").innerHTML = '<option value="">Todas</option>' + series.map(s => `<option value="${s.codigo}">${s.codigo} — ${esc(s.emisor_nombre || s.descripcion)}</option>`).join("");
   g("fp_serie").innerHTML = '<option value="">-- elige la serie --</option>' + activas.map(s =>
@@ -531,7 +533,7 @@ const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 function abrirLibre() {
   g("fl_serie").innerHTML = '<option value="">-- elige la serie --</option>' + Object.values(seriePorCodigo).filter(s => s.activa).map(s =>
     `<option value="${s.codigo}">${s.codigo} · ${s.es_proforma ? "PROFORMA (sin IVA)" : esc(s.emisor_nombre || s.descripcion)}${s.codigo === 2 ? " (almacenaje)" : ""}</option>`).join("");
-  g("fl_tiendas").innerHTML = tiendasLista.map(t => `<option value="${esc((t.codigo ? t.codigo + " · " : "") + t.nombre)}"></option>`).join("");
+  g("fl_tiendas").innerHTML = soloTiendasActivas(tiendasLista, tiendasActivasFact).map(t => `<option value="${esc((t.codigo ? t.codigo + " · " : "") + t.nombre)}"></option>`).join("");
   g("fl_tienda").value = ""; g("fl_forma").value = ""; g("fl_notas").value = ""; g("fl_error").style.display = "none";
   conceptos = [{ descripcion: "", cantidad: 1, precio: "" }];
   pintarConceptos(); g("modal_libre").style.display = "flex";

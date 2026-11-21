@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALMMA - Gestión de Devoluciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="tiendas_activas.js"></script>
 <script src="imprimir_movil.js"></script>
 <style>
 
@@ -153,11 +154,10 @@ async function iniciar() {
     TIENDAS = await paginar(() => client.from("tiendas").select("id, nombre").order("nombre"));
     FABS = await paginar(() => client.from("fabricantes").select("codigo, nombre").order("nombre"));
   } catch (e) { $("aviso").textContent = "Error cargando catálogos: " + e.message; }
-  // solo tiendas y fabricantes con pedidos en los últimos 2 años (SQL 103; sin él se ven todos)
+  // tiendas: solo las activas (tiendas_activas.js); fabricantes: con pedidos en los últimos 2 años (SQL 103; sin él se ven todos)
+  T_ACT = await idsTiendasActivas(client);
   try {
-    const desde = new Date().getFullYear() - 1;
-    const [rt, rf] = await Promise.all([client.rpc("tiendas_activas", { p_anyo_desde: desde }), client.rpc("fabricantes_activos", { p_anyo_desde: desde })]);
-    if (!rt.error) T_ACT = new Set((rt.data || []).map(x => x.id));
+    const rf = await client.rpc("fabricantes_activos", { p_anyo_desde: new Date().getFullYear() - 1 });
     if (!rf.error) F_ACT = new Set((rf.data || []).map(x => x.codigo));
   } catch (_) {}
   $("f_tienda").innerHTML = '<option value="">Todas</option>' + TIENDAS.filter(t => !T_ACT || T_ACT.has(t.id)).map(t => '<option value="' + t.id + '">' + esc(t.nombre) + '</option>').join("");

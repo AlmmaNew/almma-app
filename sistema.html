@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALMMA - Sistema</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="tiendas_activas.js"></script>
 <script src="busqueda.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/js/tabulator.min.js"></script>
@@ -143,7 +144,7 @@ input,select{padding:8px 10px;border:1px solid var(--border);border-radius:6px;f
 
 <div class="barra">
   <input id="buscador" type="text" placeholder="Buscar..." oninput="buscarEnCatalogo()">
-  <label id="lbl_antiguos" style="display:none;font-size:13px;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="chk_antiguos" onchange="cargarCatalogo()" style="width:auto;"> Ver antiguos (no usados en los últimos 3 años)</label>
+  <label id="lbl_antiguos" style="display:none;font-size:13px;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="chk_antiguos" onchange="cargarCatalogo()" style="width:auto;"> <span id="txt_antiguos">Ver antiguos (no usados en los últimos 3 años)</span></label>
   <div class="spacer" style="flex:1;"></div>
   <button id="btn_nuevo" onclick="abrirNuevo()">+ Nuevo</button>
 </div>
@@ -333,6 +334,7 @@ function cambiarCatalogo(cat) {
   if (esArticulos) prepararFiltrosArticulos();
   document.getElementById("lbl_antiguos").style.display = (cat === "fabricantes" || cat === "dependientes" || cat === "tiendas") ? "inline-flex" : "none";
   document.getElementById("chk_antiguos").checked = false;
+  document.getElementById("txt_antiguos").textContent = cat === "tiendas" ? "Ver antiguas (sin órdenes en los últimos 3 meses)" : "Ver antiguos (no usados en los últimos 3 años)";
   cargarCatalogo();
 }
 
@@ -362,7 +364,11 @@ async function cargarCatalogo() {
   ocultosAntiguos = 0;
   if (["fabricantes", "dependientes", "tiendas"].includes(catalogoActivo) && !document.getElementById("chk_antiguos").checked) {
     const rpc = { fabricantes: "fabricantes_recientes", dependientes: "dependientes_recientes", tiendas: "tiendas_recientes" }[catalogoActivo];
-    const { data: usados, error: eU } = await client.rpc(rpc);
+    let usados, eU;
+    if (catalogoActivo === "tiendas") {   // tiendas: la regla común de tiendas_activas.js (órdenes en los últimos 3 meses…)
+      const act = await idsTiendasActivas(client);
+      usados = act ? [...act] : null; eU = act ? null : { message: "no se han podido calcular las tiendas activas" };
+    } else ({ data: usados, error: eU } = await client.rpc(rpc));
     if (!eU && Array.isArray(usados)) {
       const set = new Set(usados);
       const clave = catalogoActivo === "fabricantes" ? "codigo" : "id";   // fabricantes por código; tiendas y vendedores por id
@@ -417,8 +423,8 @@ let tiendasArticulosListas = false;
 let tiendasNombres = [];
 async function prepararFiltrosArticulos() {
   if (tiendasArticulosListas) return;
-  const { data } = await client.from("tiendas").select("codigo, nombre").not("codigo", "is", null).order("nombre");
-  document.getElementById("dl_tiendas_art").innerHTML = (data || [])
+  const { data } = await client.from("tiendas").select("id, codigo, nombre").not("codigo", "is", null).order("nombre");
+  document.getElementById("dl_tiendas_art").innerHTML = soloTiendasActivas(data, await idsTiendasActivas(client))   // solo activas (tiendas_activas.js)
     .map(t => `<option value="${t.codigo} · ${(t.nombre || "").replace(/"/g, "&quot;")}">`).join("");
   tiendasArticulosListas = true;
 }
@@ -547,7 +553,7 @@ async function renderFormulario(cfg, registro) {
     } else if (campo.tipo === "checkbox") {
       html += `<div class="campo"><label><input type="checkbox" id="f_${campo.id}" ${valor ? "checked" : ""} style="width:auto;"> ${campo.label}</label></div>`;
     } else if (campo.tipo === "select-tienda") {
-      const tiendas = await cargarTiendas();
+      const tiendas = soloTiendasActivas(await cargarTiendas(), await idsTiendasActivas(client), valor);   // activas + la que ya tiene
       html += `<div class="campo"><label>${campo.label}</label><select id="f_${campo.id}">
         <option value="">-- sin asignar --</option>
         ${tiendas.map(t => `<option value="${t.id}" ${t.id === valor ? "selected" : ""}>${t.nombre}</option>`).join("")}

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALMMA - Administración</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="tiendas_activas.js"></script>
 <script src="busqueda.js"></script>
 <script src="condiciones.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -263,7 +264,7 @@ async function cargarTarifas(){
   const el = document.getElementById("tf_tabla");
   if (a.error) { el.innerHTML = '<span class="muted">Falta ejecutar el SQL 88 en Supabase.</span>'; return; }
   tfLista = a.data || []; tfAsign = b.data || [];
-  if (!tfTiendas) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tfTiendas = data || []; }
+  if (!tfTiendas) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tfTiendas = data || []; tiendasActAdmin = await idsTiendasActivas(client); }
   if (!tfLista.length) { el.innerHTML = '<span class="muted">Todavía no hay tarifas. Sube la primera arriba.</span>'; return; }
   el.innerHTML = '<table><tr><th>Tarifa</th><th>Tiendas</th><th></th></tr>' + tfLista.map(t =>
     '<tr><td><b>'+esc(t.nombre)+'</b></td><td>'+listaTiendasTarifa(t.id)+'</td><td>'
@@ -320,7 +321,7 @@ async function borrarTarifa(id){
 }
 async function editarTarifa(id){
   tfAbierta = id;
-  if (!tfTiendas) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tfTiendas = data || []; }
+  if (!tfTiendas) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tfTiendas = data || []; tiendasActAdmin = await idsTiendasActivas(client); }
   pintarEditorTarifa();
 }
 function pintarEditorTarifa(){
@@ -337,7 +338,7 @@ function pintarEditorTarifa(){
 }
 function buscarTiendaTarifa(){
   const q = norm(document.getElementById("tf_buscar").value).split(" ").filter(Boolean), res = document.getElementById("tf_res");
-  const l = tfTiendas.filter(s => q.every(p => norm(s.nombre).includes(p)));
+  const l = preferirActivas(tfTiendas.filter(s => q.every(p => norm(s.nombre).includes(p))));
   res.style.display = "block";
   res.innerHTML = l.map(s => {
     const a = tfAsign.find(x => x.tienda_id === s.id), otra = a && a.tarifa_id !== tfAbierta ? tfLista.find(x => x.id === a.tarifa_id) : null;
@@ -537,6 +538,9 @@ async function cambiarPass(id){
 }
 async function abrirNuevo(){ document.getElementById("u_nuevo").style.display = "block"; cambiaTipo(); }
 let tiendasCache = null;
+// Buscadores de tienda: solo tiendas activas (tiendas_activas.js); si ninguna activa coincide, se enseñan todas las que coinciden
+let tiendasActAdmin = null;
+function preferirActivas(l){ const a = soloTiendasActivas(l, tiendasActAdmin); return a.length ? a : l; }
 const norm = t => String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
 async function cambiaTipo(){
   const t = document.getElementById("n_tipo").value, sel = document.getElementById("n_vinculo"), esTienda = (t === "dependiente" || t === "admin_tienda");
@@ -550,11 +554,11 @@ async function cambiaTipo(){
   }
 }
 async function filtrarTiendas(){
-  if (!tiendasCache) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tiendasCache = data || []; }
+  if (!tiendasCache) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tiendasCache = data || []; tiendasActAdmin = await idsTiendasActivas(client); }
   const inp = document.getElementById("n_tienda_buscar"), res = document.getElementById("n_tienda_res");
   document.getElementById("n_tienda").value = ""; inp.style.borderColor = "";
   const q = norm(inp.value).split(" ").filter(Boolean);
-  const l = tiendasCache.filter(x => q.every(p => norm(x.nombre).includes(p)));
+  const l = preferirActivas(tiendasCache.filter(x => q.every(p => norm(x.nombre).includes(p))));
   res.innerHTML = l.slice(0, 40).map(x => '<div class="opt" data-id="'+x.id+'" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #eaf2ff">'+esc(x.nombre)+'</div>').join("")
     + (l.length > 40 ? '<div class="muted" style="padding:6px 10px">Hay '+l.length+' coincidencias; escribe más para afinar.</div>' : "")
     + (!l.length ? '<div class="muted" style="padding:8px 10px">Ninguna tienda coincide.</div>' : "");
@@ -625,18 +629,18 @@ function pintarExtras(){
   c.innerHTML = edExtras.length ? edExtras.map((t,i) => '<span class="chip">'+esc(t.nombre)+'<button title="Quitar" onclick="edExtras.splice('+i+',1);pintarExtras()">×</button></span>').join("") : '<span class="muted">Ninguna.</span>';
 }
 async function filtrarExtra(){
-  if (!tiendasCache) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tiendasCache = data || []; }
+  if (!tiendasCache) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tiendasCache = data || []; tiendasActAdmin = await idsTiendasActivas(client); }
   const inp = document.getElementById("ed_extra_buscar"), res = document.getElementById("ed_extra_res");
-  const q = norm(inp.value).split(" ").filter(Boolean), l = tiendasCache.filter(x => q.every(p => norm(x.nombre).includes(p)) && !edExtras.some(e => e.id === x.id));
+  const q = norm(inp.value).split(" ").filter(Boolean), l = preferirActivas(tiendasCache.filter(x => q.every(p => norm(x.nombre).includes(p)) && !edExtras.some(e => e.id === x.id)));
   res.innerHTML = l.slice(0,40).map(x => '<div class="opt" data-id="'+x.id+'" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #eaf2ff">'+esc(x.nombre)+'</div>').join("") + (!l.length ? '<div class="muted" style="padding:8px">Ninguna coincide.</div>' : "");
   res.style.display = "block";
   res.querySelectorAll(".opt").forEach(d => d.onmousedown = () => { edExtras.push({ id:d.dataset.id, nombre:d.textContent }); inp.value = ""; res.style.display = "none"; pintarExtras(); });
 }
 async function filtrarTiendasEd(){
-  if (!tiendasCache) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tiendasCache = data || []; }
+  if (!tiendasCache) { const { data } = await client.from("tiendas").select("id, nombre").order("nombre"); tiendasCache = data || []; tiendasActAdmin = await idsTiendasActivas(client); }
   const inp = document.getElementById("ed_tienda_buscar"), res = document.getElementById("ed_tienda_res");
   document.getElementById("ed_tienda").value = ""; inp.style.borderColor = "";
-  const q = norm(inp.value).split(" ").filter(Boolean), l = tiendasCache.filter(x => q.every(p => norm(x.nombre).includes(p)));
+  const q = norm(inp.value).split(" ").filter(Boolean), l = preferirActivas(tiendasCache.filter(x => q.every(p => norm(x.nombre).includes(p))));
   res.innerHTML = l.slice(0,40).map(x => '<div class="opt" data-id="'+x.id+'" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #eaf2ff">'+esc(x.nombre)+'</div>').join("") + (!l.length ? '<div class="muted" style="padding:8px">Ninguna coincide.</div>' : "");
   res.style.display = "block";
   res.querySelectorAll(".opt").forEach(d => d.onmousedown = () => { document.getElementById("ed_tienda").value = d.dataset.id; inp.value = d.textContent; inp.style.borderColor = "#16a34a"; res.style.display = "none"; });

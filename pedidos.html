@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALMMA - Pedidos</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="tiendas_activas.js"></script>
 <script src="busqueda.js"></script>
 <script src="distancia.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -321,7 +322,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
                onkeydown="if(event.key==='Enter'){event.preventDefault();elegirPrimeraTiendaNuevaOrden();}">
         <div id="no_tienda_desplegable" style="display:none;border:1px solid var(--border);border-radius:6px;background:#fff;margin-top:4px;padding:4px;">
           <select id="no_tienda" size="6" onclick="elegirTiendaNuevaOrden()" onkeydown="if(event.key==='Enter'){event.preventDefault();elegirTiendaNuevaOrden();}" style="width:100%;border:none;"></select>
-          <label style="display:flex;gap:6px;align-items:center;font-weight:normal;margin:6px 4px 2px;"><input type="checkbox" id="no_tiendas_todas" style="width:auto;" onchange="cargarListaTiendasNuevaOrden()"> Incluir tiendas sin pedidos en los últimos 4 años</label>
+          <label style="display:flex;gap:6px;align-items:center;font-weight:normal;margin:6px 4px 2px;"><input type="checkbox" id="no_tiendas_todas" style="width:auto;" onchange="cargarListaTiendasNuevaOrden()"> Incluir tiendas antiguas (sin órdenes en los últimos 3 meses)</label>
         </div>
       </div>
       <div class="campo">
@@ -681,8 +682,8 @@ async function comprobarSesion() {
   if (staffRow.solo_montajes) { window.location.href = "montador.html"; return; }
   staffUserId = staffRow.user_id;
   await llenarSelectEstado("filtro_estado", "");
-  try {   // desplegable de tiendas del buscador
-    const ts = await cargarTodasTiendas();
+  try {   // desplegable de tiendas del buscador: solo tiendas activas (tiendas_activas.js)
+    const ts = soloTiendasActivas(await cargarTodasTiendas(), await idsTiendasActivas(client));
     document.getElementById("filtro_tienda").innerHTML = '<option value="">Todas las tiendas</option>' + ts.map(t => `<option value="${t.id}">${escMont(t.nombre)}</option>`).join("");
   } catch (_) {}
   cargarAvisoServicios();
@@ -743,11 +744,8 @@ async function llenarSelectEstado(selectId, valorActual) {
 }
 
 async function llenarSelectTiendaCabecera(tiendaIdActual) {
-  let tiendas = await cargarTodasTiendas();
-  try {   // solo tiendas con pedidos en los últimos 2 años + la de esta orden (SQL 103; sin él se ven todas)
-    const r = await client.rpc("tiendas_activas", { p_anyo_desde: new Date().getFullYear() - 1 });
-    if (!r.error) { const act = new Set((r.data || []).map(x => x.id)); tiendas = tiendas.filter(t => act.has(t.id) || t.id === tiendaIdActual); }
-  } catch (_) {}
+  // solo tiendas activas (tiendas_activas.js) + la que ya tiene esta orden
+  const tiendas = soloTiendasActivas(await cargarTodasTiendas(), await idsTiendasActivas(client), tiendaIdActual);
   const sel = document.getElementById("ch_tienda");
   sel.innerHTML = '<option value="">-- sin asignar --</option>' +
     tiendas.map(t => `<option value="${t.id}">${t.nombre}</option>`).join("");
@@ -769,7 +767,7 @@ async function llenarSelectDependiente(tiendaId, dependienteIdActual, selectId =
   sel.value = dependienteIdActual || "";
 }
 
-// --- selector de tienda de "Nueva orden": con filtro, limitado a tiendas con pedidos en los últimos 4 años.
+// --- selector de tienda de "Nueva orden": con filtro, limitado a tiendas activas (tiendas_activas.js).
 // El buscador solo se ve mientras escribes; al elegir una tienda su nombre queda marcado arriba. ---
 let tiendasNuevaOrden = [];
 let tiendaNuevaOrdenElegida = null;
@@ -783,13 +781,8 @@ async function cargarListaTiendasNuevaOrden() {
   let lista;
   if (todas) {
     lista = await cargarTodasTiendas();
-  } else {
-    const anyoMinimo = new Date().getFullYear() - 3;
-    const { data, error } = await client.rpc("tiendas_con_actividad", { p_anyo_desde: anyoMinimo });
-    if (error) {   // si todavía no existe la función en la base de datos, se enseñan todas
-      console.warn("tiendas_con_actividad no disponible, se muestran todas:", error.message);
-      lista = await cargarTodasTiendas();
-    } else lista = data || [];
+  } else {   // solo tiendas activas (tiendas_activas.js); la casilla de debajo enseña todas
+    lista = soloTiendasActivas(await cargarTodasTiendas(), await idsTiendasActivas(client));
   }
   tiendasNuevaOrden = lista;
   contador.textContent = "";

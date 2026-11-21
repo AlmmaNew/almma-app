@@ -58,6 +58,8 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 <li><b>Guardar cambios</b>.</li>
 </ol>
 <div class="ok">El buscador mira solo los <b>últimos 4 años</b>. Si no encuentras algo antiguo, marca <b>«Incluir años anteriores»</b>.</div>
+<div class="aviso"><b>Listas de tiendas más cortas.</b> En todas las pantallas de la oficina (Órdenes, Planificar, Recepción, Incidencias, Devoluciones, Facturas, Sistema y Administración), los desplegables y buscadores de tienda solo enseñan las <b>tiendas activas</b> (unas 30): las que han mandado <b>alguna orden en los últimos 3 meses</b> o se han dado de alta hace menos de 2 meses. Salen por orden alfabético. Las órdenes de las tiendas antiguas no se pierden: salen con «Todas las tiendas» o buscando por nº, cliente…
+Si alguna vez necesitas una tienda antigua: en <b>Nueva orden</b> marca <b>«Incluir tiendas antiguas»</b>; en <b>Sistema → Tiendas</b>, <b>«Ver antiguas»</b>; en Administración, si escribes su nombre y no hay ninguna activa que coincida, salen las antiguas. La tienda que ya tiene una orden o un vendedor sigue saliendo aunque sea antigua.</div>
 
 <h2>3. Órdenes (oficina)</h2>
 <p>Botón <b>📋 Órdenes</b>. Es la pantalla más completa: la ficha de cada pedido tiene pestañas:</p>
@@ -106,6 +108,7 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 <h3>Izquierda: órdenes sin agendar</h3>
 <ul>
 <li>Salen las órdenes con <b>toda la mercancía recibida</b> («Recepcionada») que aún no tienen montaje, <b>agrupadas por zona</b> (comarca) y población. Por defecto, las recibidas en los <b>últimos 6 meses</b> (el desplegable «Recibidas» amplía a más tiempo). Las que no tienen población salen al final en <b>📭 Sin población</b>: complétala en Órdenes.</li>
+<li>El desplegable <b>Tienda</b> solo enseña las <b>tiendas activas</b> (con órdenes en los últimos 3 meses; ver el aviso de la sección 2). Las órdenes de las demás siguen en la lista con «Todas».</li>
 <li>Bajo cada zona, <b>🚚 Van por esta zona</b>: qué equipos y días de las 2 próximas semanas ya tienen montajes allí y cuántas horas les quedan libres.</li>
 <li><b>📎 Pedido y planos (N)</b>, debajo del cliente: abre lo que la tienda ha adjuntado a la orden (el PDF del pedido, los planos o dibujos de montaje, fotos), con una miniatura de cada uno; pulsa uno para verlo en grande. Si pone «La tienda no ha adjuntado nada», no hay documentos. En las órdenes ya agendadas de la derecha es el botón <b>📎</b>.</li>
 <li>Cada orden muestra los <b>km desde la tienda</b> («≈» mientras se calcula la distancia por carretera). <b>Tempur y Dimaflex no llevan kilometraje.</b></li>
@@ -118,7 +121,7 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 <h3>Derecha: agendadas</h3>
 <table>
 <tr><th>Vista</th><th>Qué enseña</th></tr>
-<tr><td>📋 Tabla</td><td>La semana por <b>día → equipo → zona</b>, con la hora y el estado de cada orden, las horas ocupadas sobre la jornada y lo que queda libre. Pulsando un equipo se ve la ruta del día en un mapa. Cada orden tiene <b>✎</b> (cambiar fecha, hora o equipo) y <b>🗑</b> (quitar).</td></tr>
+<tr><td>📋 Tabla</td><td>La semana por <b>día → equipo → zona</b>, con la hora y el estado de cada orden, las horas ocupadas sobre la jornada y lo que queda libre. Pulsando un equipo se ve la ruta del día en un mapa. Cada orden tiene <b>✎</b> (cambiar fecha, hora o equipo) y <b>🗑</b> (quitar). Las que ya se han montado salen con los <b>mismos colores que en Órdenes</b>: verde «✔ Montada», verde con raya roja «⚠ Montada con incidencia», y en rojo las que están en <b>incidencia</b>; las montadas ya no se pueden mover ni quitar.</td></tr>
 <tr><td>📲 Avisar y confirmar</td><td>Las citas que el cliente aún no ha confirmado: «sin avisar» y «esperando respuesta».</td></tr>
 <tr><td>🗓 Calendario</td><td>El mes entero con una barrita por equipo y día (verde = hueco, amarillo = casi lleno, rojo = se pasa). Pulsa un día para verlo en la tabla.</td></tr>
 </table>
