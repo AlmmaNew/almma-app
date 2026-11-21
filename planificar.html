@@ -56,6 +56,15 @@ tr.ops td{padding:0 8px 10px;border-top:none;}
 .espera{font-size:11.5px;padding:1px 7px;border-radius:10px;background:#f1f5f9;white-space:nowrap;}
 .espera.mucho{background:#fee2e2;color:#b91c1c;font-weight:600;}
 .km{font-size:11.5px;color:#1e40af;margin-top:2px;} .sinkm{color:#94a3b8;font-style:italic;}
+.bdocs{background:#fff;color:#1e40af;border:1px solid #bfdbfe;padding:2px 8px;font-size:12px;margin-top:4px;font-weight:600;}
+.bdocs:hover{background:#eff6ff;}
+.sindocs{font-size:11.5px;color:#9ca3af;display:inline-block;margin-top:4px;}
+.docs-grid{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0;}
+.doc{width:160px;border:1px solid #cbd5e1;border-radius:8px;padding:6px;text-decoration:none;color:#1f2937;font-size:12px;display:flex;flex-direction:column;gap:3px;}
+.doc:hover{border-color:#2563eb;box-shadow:0 2px 8px rgba(37,99,235,.15);}
+.doc img,.doc .icono{width:100%;height:150px;object-fit:cover;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:28px;color:#64748b;}
+.doc b{word-break:break-word;}
+.doc span{color:#6b7280;font-size:11px;}
 #selbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;font-size:13px;}
 #selbar .cuenta{background:#eef2ff;color:#1e3a8a;border-radius:6px;padding:4px 10px;font-weight:600;}
 .marca{width:16px;height:16px;vertical-align:middle;margin:0 4px 0 0;cursor:pointer;}
@@ -267,6 +276,7 @@ let pend = [], agenda = [], citasAbiertas = [], citasConf = {}, ordenesCita = {}
 let agendaDesde = null, agendaHasta = null;
 let filtro = "", vista = "tabla", lunes = lunesDe(HOY), mes = HOY.slice(0,7), sel = null, editando = null;
 const abiertoOps = new Set(), zonasCerradas = new Set();
+let docs = {};                          // documentos que ha adjuntado la tienda (pedido, planos, fotos), por "anyo/orden"
 let sacadas = {}, haySacadas = true;   // órdenes sacadas de la lista (SQL 127), por "anyo/orden"
 const marcadas = new Set();             // órdenes con la casilla marcada, para sacar o devolver varias a la vez
 const pseudo = {};   // equipos que no están dados de alta (órdenes agendadas desde Órdenes/Rutas con otros montadores)
@@ -322,7 +332,7 @@ async function cargarTodo(){
     const raw = await todo(() => client.from("ordenes").select(ORD_SEL).eq("estado", "recepcionado_total")
       .or("fecha_prev_montaje.is.null,fecha_prev_montaje.gte." + HOY).order("anyo").order("orden"), 300);
     pend = raw.map(normOrden);
-    await cargarSacadas();
+    await Promise.all([cargarSacadas(), cargarDocs()]);
     await cargarCitas();
     await cargarAgenda(true);
     await cargarFabricantes();
@@ -337,6 +347,12 @@ async function cargarSacadas(){
     const data = await todo(() => client.from("planificar_sacadas").select("anyo, orden, motivo, sacada_at"));
     sacadas = Object.fromEntries(data.map(s => [s.anyo + "/" + s.orden, s])); haySacadas = true;
   } catch (e) { sacadas = {}; haySacadas = false; }   // sin el SQL 127 la pantalla sigue funcionando, sin poder sacar órdenes
+}
+async function cargarDocs(){
+  try {
+    const data = await todo(() => client.from("documentos_orden").select("anyo, orden, storage_path, nombre, created_at").order("created_at"));
+    docs = {}; data.forEach(d => (docs[d.anyo + "/" + d.orden] ||= []).push(d));
+  } catch (e) { docs = {}; }
 }
 async function cargarCitas(){
   const { data, error } = await client.from("citas_montaje").select("id, anyo, orden, fecha_hora, hora, equipo_id, estado, avisado_at").in("estado", ["propuesta", "avisada"]);
@@ -628,6 +644,30 @@ function pintarLista(vis){
     ? '<div class="ya-cita">No hay órdenes sacadas de la lista con estos filtros (mira también «Recibidas: todas»).</div>'
     : '<div class="ya-cita">No hay órdenes pendientes de agendar con estos filtros. 🎉</div>');
 }
+/* ---------- pedido y planos que ha adjuntado la tienda (documentos_orden) ---------- */
+function botonDocs(o){
+  const n = (docs[o.n] || []).length;
+  return n ? '<div><button class="bdocs" onclick="verDocs(' + o.anyo + ',' + o.orden + ')" title="Ver el pedido, los planos y las fotos que ha enviado la tienda">📎 Pedido y planos (' + n + ')</button></div>'
+           : '<div class="sindocs">📎 La tienda no ha adjuntado nada</div>';
+}
+async function verDocs(anyo, orden){
+  const n = anyo + "/" + orden, lst = [...(docs[n] || [])].reverse(), o = buscarOrden(anyo, orden) || {};
+  abrirVentana('<h3>📎 Pedido y planos · ' + n + '</h3><div class="muted">' + esc(o.cli || "") + (o.tiendaId ? ' · ' + esc(nomTienda(o.tiendaId)) : "") +
+    ' · lo que ha adjuntado la tienda (y la oficina) a esta orden. Pulsa uno para abrirlo en grande.</div><div id="docs_cont" class="docs-grid"><span class="muted">Cargando…</span></div>' +
+    '<div class="fila2"><a href="pedidos.html?anyo=' + anyo + '&orden=' + orden + '" target="_blank"><button class="secondary">Abrir la ficha de la orden</button></a><button class="secondary" onclick="cerrarVentana()">Cerrar</button></div>');
+  if (!lst.length) { document.getElementById("docs_cont").innerHTML = '<span class="muted">Esta orden no tiene documentos.</span>'; return; }
+  const { data, error } = await client.storage.from("ordenes-adjuntos").createSignedUrls(lst.map(d => d.storage_path), 3600);
+  if (error) { document.getElementById("docs_cont").innerHTML = '<span class="muted" style="color:#b91c1c">No se han podido abrir: ' + esc(error.message) + '</span>'; return; }
+  const url = {}; (data || []).forEach(d => url[d.path] = d.signedUrl);
+  document.getElementById("docs_cont").innerHTML = lst.map(d => {
+    const u = url[d.storage_path], nom = d.nombre || d.storage_path.split("/").pop();
+    const img = /\.(jpe?g|png|webp|gif)$/i.test(d.storage_path), pdf = /\.pdf$/i.test(d.storage_path);
+    if (!u) return '<div class="doc"><div class="icono">⚠</div><b>' + esc(nom) + '</b><span>No disponible</span></div>';
+    return '<a class="doc" href="' + esc(u) + '" target="_blank" rel="noopener">' + (img ? '<img src="' + esc(u) + '" alt="">' : '<div class="icono">' + (pdf ? "📄 PDF" : "📎") + '</div>') +
+      '<b>' + esc(nom) + '</b><span>' + new Date(d.created_at).toLocaleString("es-ES", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) + '</span></a>';
+  }).join("");
+}
+
 /* ---------- sacar de la lista las que no se van a montar (SQL 127) ---------- */
 function pintarSeleccion(vis){
   const verSac = document.getElementById("ver_sacadas").checked, nSac = Object.keys(sacadas).length;
@@ -694,7 +734,7 @@ function filaPendiente(o){
       (d != null ? '<div><span class="espera ' + (d >= 10 ? "mucho" : "") + '" title="Días desde que llegó la última mercancía">' + d + ' días</span></div>' : "") +
       (haySacadas ? '<div>' + (sac ? '<button class="bsacar" style="color:#1e40af" title="Devolver a la lista" onclick="devolver([\'' + o.n + '\'])">↩ Devolver</button>'
                                    : '<button class="bsacar" title="Sacar de la lista: no se va a montar" onclick="sacar([\'' + o.n + '\'])">🚫 Sacar</button>') + '</div>' : "") + '</td>' +
-    '<td>' + esc(o.cli) + '<div class="muted">' + esc(o.dir) + '</div><div class="km">' + kmTxt + '</div>' +
+    '<td>' + esc(o.cli) + '<div class="muted">' + esc(o.dir) + '</div><div class="km">' + kmTxt + '</div>' + botonDocs(o) +
       (sac ? '<div class="sacada-info">🚫 Sacada el ' + fdia(String(sac.sacada_at).slice(0, 10)) + (sac.motivo ? ": " + esc(sac.motivo) : "") + '</div>' : "") + '</td>' +
     '<td>' + esc(o.lineas.map(l => capFrase(l.desc)).slice(0, 3).join(" + ") + (o.lineas.length > 3 ? " …" : "")) + '<div class="muted">' + esc(nomTienda(o.tiendaId)) + (o.bultos ? " · " + o.bultos + " bultos" : "") + '</div></td>' +
     '<td><button class="tbtn ' + (T.t == null ? "vacio" : "") + '" onclick="abrirTiempo(' + o.anyo + ',' + o.orden + ')" title="Tiempo de montaje por artículo">⏱ ' + tTxt + '</button>' +
@@ -759,7 +799,8 @@ function paradaHtml(s, e, f){
     '<a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> ' + esc(o.loc) +
     ' <span class="muted">· ' + esc((o.cli || "").split(" ")[0]) + ' · ' + (T.t != null ? txtT(T.t) : "⏱ ?") + '</span>' +
     '<span class="est ' + s.estado + '" title="' + (s.sinCita ? "Agendada desde Órdenes / Rutas (sin cita en esta pantalla)" : "") + '">' + ESTX[s.estado] + (s.sinCita ? "*" : "") + '</span>' +
-    '<span class="acc">' + bts + '<button class="ic" title="Cambiar fecha, hora o equipo" onclick="editando=\'' + idp + '\';pintar()">✎</button>' +
+    '<span class="acc">' + bts + ((docs[o.n] || []).length ? '<button class="ic" title="Pedido y planos que ha enviado la tienda (' + docs[o.n].length + ')" onclick="verDocs(' + o.anyo + ',' + o.orden + ')">📎</button>' : "") +
+    '<button class="ic" title="Cambiar fecha, hora o equipo" onclick="editando=\'' + idp + '\';pintar()">✎</button>' +
     '<button class="ic" title="Quitar de este día" onclick="quitar(' + o.anyo + ',' + o.orden + ',\'' + (s.cita ? s.cita.id : "") + '\',\'' + s.estado + '\')">🗑</button></span></div>';
 }
 function detalle(e, f){
