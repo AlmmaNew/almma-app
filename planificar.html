@@ -858,7 +858,8 @@ function avisos(){
       '<div><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> · ' + esc(o.cli) + ' <span class="muted">📞 ' + esc(o.tel || o.tel2 || "sin teléfono") + '</span><div class="muted">' + esc(o.loc) + ' · ' + esc(nomTienda(o.tiendaId)) + '</div>' +
       (c.estado === "avisada" && c.avisado_at ? '<div class="muted" style="color:#92400e">Avisado por WhatsApp el ' + new Date(c.avisado_at).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + '</div>' : "") + '</div>' +
       '<div class="bts">' + (c.estado === "propuesta" ? '<button class="ambar" onclick="abrirAviso(\'' + c.id + '\')">📲 Avisar</button>' :
-        '<button class="verde" onclick="confirmar(\'' + c.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + c.id + '\')">✖ No le va bien</button><button class="secondary" onclick="abrirAviso(\'' + c.id + '\')">Reenviar</button>') + '</div></div>'; };
+        '<button class="verde" onclick="confirmar(\'' + c.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + c.id + '\')">✖ No le va bien</button><button class="secondary" onclick="abrirAviso(\'' + c.id + '\')">Reenviar</button>') +
+        '<button class="secondary" title="Quitar la cita: la orden vuelve a «Sin agendar»" onclick="quitar(' + c.anyo + ',' + c.orden + ',\'' + c.id + '\',\'' + c.estado + '\')">↩ Devolver a Sin agendar</button></div></div>'; };
   const p = lista.filter(c => c.estado === "propuesta"), a = lista.filter(c => c.estado === "avisada");
   return '<div class="muted" style="margin-bottom:6px">Citas que aún no ha confirmado el cliente, de la más próxima a la más lejana.</div>' +
     '<div class="grupo">Sin avisar (' + p.length + ')</div>' + (p.map(fila).join("") || '<div class="muted">Nada pendiente.</div>') +
@@ -929,6 +930,8 @@ async function quitar(anyo, orden, citaId, estado){
   if (!citaId) { if (confirm("La orden " + anyo + "/" + orden + " se agendó desde Órdenes o Rutas (no tiene cita aquí).\n\n¿Abrirla en Órdenes para quitarle la fecha?")) window.open("pedidos.html?anyo=" + anyo + "&orden=" + orden, "_blank"); return; }
   const msg = estado === "confirmada"
     ? "La cita de " + anyo + "/" + orden + " está CONFIRMADA con el cliente.\n\nSi la quitas, la orden pierde la fecha y los montadores y vuelve a «Recepcionada». Habrá que avisar al cliente.\n\n¿Quitarla?"
+    : estado === "avisada"
+    ? "Al cliente de " + anyo + "/" + orden + " YA se le ha avisado por WhatsApp de esta cita.\n\n¿Quitarla? La orden vuelve a «Sin agendar» (si hace falta, avisa al cliente de que se cambia)."
     : "¿Quitar la cita propuesta de " + anyo + "/" + orden + "? La orden vuelve a «Sin agendar».";
   if (!confirm(msg)) return;
   const { error } = await client.rpc("cancelar_cita", { p_id: citaId, p_motivo: "Quitada desde Planificar montajes" });
