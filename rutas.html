@@ -30,6 +30,10 @@ table{width:100%;border-collapse:collapse;background:var(--card);border:1px soli
 th{background:#dbeafe;color:#1e3a8a;text-align:left;padding:9px 8px;} td{padding:8px;border-top:1px solid #dbeafe;vertical-align:top;}
 tr.sin td:first-child{border-left:5px solid #d97706;} tr.con td:first-child{border-left:5px solid #16a34a;}
 tr.dia th{background:#eff6ff;font-size:12px;}
+tr.hecha td{background:#dcfce7;} tr.hecha td:first-child{border-left:5px solid #15803d;}
+tr.hecha.conincid td:first-child{border-left-color:#dc2626;} tr.incid td{background:#fee2e2;} tr.incid td:first-child{border-left:5px solid #dc2626;}
+.etq{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap;}
+.etq.ok{background:#bbf7d0;color:#14532d;} .etq.fact{background:#e0e7ff;color:#3730a3;} .etq.nofact{background:#fef3c7;color:#92400e;} .etq.inc{background:#fecaca;color:#991b1b;}
 .chip{display:inline-block;background:#dbeafe;color:#1e3a8a;border-radius:12px;padding:2px 4px 2px 10px;margin:0 4px 4px 0;font-size:12px;}
 .chip button{background:none;color:#1e3a8a;padding:0 6px;font-size:14px;}
 .muted{color:var(--muted);font-size:13px;}
@@ -84,6 +88,7 @@ tr.tot td{background:#dbeafe;font-weight:700;border-top:2px solid #2563eb;}
     <select id="f_eq" onchange="pintarMontajes()"><option value="">Todos los equipos</option></select>
     <label class="muted" id="l_mios" style="display:none"><input type="checkbox" id="solo_mios" onchange="pintarMontajes()"> <b>Solo mis montajes</b></label>
     <label class="muted"><input type="checkbox" id="solo_sin" onchange="pintarMontajes()"> Solo sin montador</label>
+    <label class="muted" title="Quita de la lista (y del listado impreso) las órdenes que ya están montadas"><input type="checkbox" id="ocultar_hechas" onchange="guardarOcultar(); pintarMontajes()"> Ocultar las ya montadas</label>
   </div>
   <div id="hoja_msg" class="muted" style="margin-bottom:10px"></div>
   <div id="cab_imp"></div>
@@ -122,7 +127,7 @@ async function cargarMontajes(){
   const fin = new Date(semanaIni.getFullYear(), semanaIni.getMonth(), semanaIni.getDate()+7);
   document.getElementById("rango_semana").textContent = semanaIni.toLocaleDateString("es-ES") + " – " + new Date(+fin-864e5).toLocaleDateString("es-ES");
   const { data, error } = await client.from("ordenes")
-    .select("anyo, orden, nombre_cli, localidad_cli, estado, fecha_prev_montaje, horamont, importe_cobrado, tipo_cobro, ordenes_montadores(montador_id), linorden(tipolinea, importe_cobrar)")
+    .select("anyo, orden, nombre_cli, localidad_cli, estado, con_incidencia, fecha_prev_montaje, fecha_montaje, horamont, importe_cobrado, tipo_cobro, facturada, anyo_factura, serie_factura, numero_factura, ordenes_montadores(montador_id), linorden(tipolinea, importe_cobrar, facturada, facturada_anyo, facturada_serie, facturada_factura)")
     .gte("fecha_prev_montaje", iso(semanaIni)).lt("fecha_prev_montaje", iso(fin)).order("fecha_prev_montaje");
   if (error) { document.getElementById("montajes_tabla").innerHTML = '<span class="muted">Error: '+esc(error.message)+'</span>'; return; }
   ordenesSemana = data || []; rutasCam = {};
@@ -177,10 +182,28 @@ function claveEquipo(o){
   return n.length ? n.join("/") : SIN_EQ;
 }
 const porHora = (a,b) => (a.horamont || "99").localeCompare(b.horamont || "99") || a.orden - b.orden;
+// ya montada: completada (o el estado antiguo terminado_incidencia) o con fecha de montaje real
+const montada = o => o.estado === "completado" || o.estado === "terminado_incidencia" || !!o.fecha_montaje;
+// números de factura de la orden (línea a línea si se facturó desde la web; si no, el de la cabecera del programa antiguo)
+function facturasOrden(o){
+  const s = new Set((o.linorden || []).filter(l => l.facturada && l.facturada_factura).map(l => l.facturada_serie + "-" + l.facturada_anyo + "/" + l.facturada_factura));
+  if (!s.size && o.facturada === "S" && Number(o.numero_factura) > 0) s.add(o.serie_factura + "-" + o.anyo_factura + "/" + o.numero_factura);
+  return [...s];
+}
+const ESTADOS = { en_proceso:"En proceso", recepcionado_parcial:"Recepción parcial", recepcionado_total:"Recepcionada", agendado:"Agendada", completado:"Completada", incidencia:"Incidencia", terminado_incidencia:"Completada" };
+function celdaEstado(o){
+  if (!montada(o)) return o.estado === "incidencia" ? '<span class="etq inc">⚠ Incidencia</span>' : esc(ESTADOS[o.estado] || o.estado);
+  const inc = o.con_incidencia || o.estado === "terminado_incidencia";
+  const f = facturasOrden(o);
+  return '<span class="etq ok">✔ Montada' + (inc ? ' ⚠' : '') + '</span>' + (inc ? '<br><span class="muted">con incidencia</span>' : '') + '<br>' +
+    (f.length ? '<span class="etq fact" title="Factura">Facturada ' + esc(f.join(", ")) + '</span>' : '<span class="etq nofact">Sin facturar</span>');
+}
+function guardarOcultar(){ try { localStorage.setItem("almma_rutas_ocultar_hechas", document.getElementById("ocultar_hechas").checked ? "1" : ""); } catch(_){} }
+try { if (localStorage.getItem("almma_rutas_ocultar_hechas") === "1") document.getElementById("ocultar_hechas").checked = true; } catch(_){}
 function filasFiltradas(){
   const soloSin = document.getElementById("solo_sin").checked, fDia = document.getElementById("f_dia").value, fEq = document.getElementById("f_eq").value;
-  const soloMios = document.getElementById("solo_mios").checked;
-  return ordenesSemana.filter(o => (!soloSin || !o.ordenes_montadores.length) && (!soloMios || o.ordenes_montadores.some(a => a.montador_id === miMontador)) && (!fDia || String(o.fecha_prev_montaje).slice(0,10) === fDia) && (!fEq || claveEquipo(o) === fEq));
+  const soloMios = document.getElementById("solo_mios").checked, ocultar = document.getElementById("ocultar_hechas").checked;
+  return ordenesSemana.filter(o => (!ocultar || !montada(o)) && (!soloSin || (!o.ordenes_montadores.length && !montada(o))) &&(!soloMios || o.ordenes_montadores.some(a => a.montador_id === miMontador)) && (!fDia || String(o.fecha_prev_montaje).slice(0,10) === fDia) && (!fEq || claveEquipo(o) === fEq));
 }
 function pintarMontajes(){
   const soloSin = document.getElementById("solo_sin").checked, nom = Object.fromEntries(montadores.map(m => [m.id, m.nombre]));
@@ -201,9 +224,13 @@ function pintarMontajes(){
       h += '<tr class="eq"><td colspan="9"><b>'+esc(eq)+'</b> <span class="muted">· '+delEq.length+' montaje'+(delEq.length>1?'s':'')+'</span> '+selCam+
         (eq !== SIN_EQ ? '<button class="secondary noprint" onclick="imprimirHoja(\''+d+'\',\''+eq.replace(/'/g,"")+'\',this,false)" title="Borrador para revisar: sin QR y NO se envía a DeCA">Imprimir borrador</button> <button class="noprint" onclick="imprimirHoja(\''+d+'\',\''+eq.replace(/'/g,"")+'\',this,true)" title="Lo envía a DeCA (el montador lo ve) y abre el PDF con QR para imprimir">Enviar a DeCA e imprimir (con QR)</button>' : '')+'</td></tr>';
       for (const o of delEq) {
-        const asig = o.ordenes_montadores.map(a => '<span class="chip">'+esc(nom[a.montador_id] || "?")+'<button title="Quitar" onclick="quitar('+o.anyo+','+o.orden+',\''+a.montador_id+'\')">×</button></span>').join("");
+        const hecha = montada(o);
+        // una orden ya montada no se toca desde aquí: el equipo que fue queda fijo (si hay que cambiarlo, desde Órdenes)
+        const asig = o.ordenes_montadores.map(a => '<span class="chip"'+(hecha ? ' style="padding-right:10px"' : '')+'>'+esc(nom[a.montador_id] || "?")+(hecha ? '' : '<button title="Quitar" onclick="quitar('+o.anyo+','+o.orden+',\''+a.montador_id+'\')">×</button>')+'</span>').join("");
         const opts = montadores.filter(m => !o.ordenes_montadores.some(a => a.montador_id === m.id)).map(m => '<option value="'+m.id+'">'+esc(m.nombre)+'</option>').join("");
-        h += '<tr class="'+(o.ordenes_montadores.length?'con':'sin')+'"><td><b>'+esc(o.horamont || "—")+'</b></td><td><a href="pedidos.html?anyo='+o.anyo+'&orden='+o.orden+'">'+o.anyo+'/'+o.orden+'</a></td><td>'+esc(o.nombre_cli)+'</td><td>'+esc(o.localidad_cli)+'</td><td>'+esc(o.estado)+'</td><td>'+(asig||'<span class="muted">Sin montador</span>')+'</td><td class="num">'+eur(importeOrden(o))+'</td><td>'+textoCobro(cobroOrden(o))+'</td><td class="noprint"><select onchange="anadir('+o.anyo+','+o.orden+',this)"><option value="">Elegir...</option>'+opts+'</select></td></tr>';
+        const clase = hecha ? 'hecha' + (o.con_incidencia || o.estado === "terminado_incidencia" ? ' conincid' : '') : o.estado === "incidencia" ? 'incid' : (o.ordenes_montadores.length ? 'con' : 'sin');
+        const anadirTd = hecha ? '<span class="muted" title="Ya montada: no se asignan montadores">—</span>' : '<select onchange="anadir('+o.anyo+','+o.orden+',this)"><option value="">Elegir...</option>'+opts+'</select>';
+        h += '<tr class="'+clase+'"><td><b>'+esc(o.horamont || "—")+'</b></td><td><a href="pedidos.html?anyo='+o.anyo+'&orden='+o.orden+'">'+o.anyo+'/'+o.orden+'</a></td><td>'+esc(o.nombre_cli)+'</td><td>'+esc(o.localidad_cli)+'</td><td>'+celdaEstado(o)+'</td><td>'+(asig||'<span class="muted">Sin montador</span>')+'</td><td class="num">'+eur(importeOrden(o))+'</td><td>'+textoCobro(cobroOrden(o))+'</td><td class="noprint">'+anadirTd+'</td></tr>';
       }
       h += filaSuma("Subtotal " + eq, delEq, "sub");
     }
