@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALMMA - Planificar montajes</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--primary:#2563eb;--bg:#f5f6fa;--card:#fff;--border:#e2e4eb;--text:#1f2430;--muted:#6b7280;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+button{background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px;}
+button.secondary{background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;font-weight:600;}
+button.peq{padding:4px 10px;font-size:12px;}
+button.on{background:#2563eb;color:#fff;border-color:#2563eb;}
+button.verde{background:#16a34a;} button.rojo{background:#fff;color:#b91c1c;border:1px solid #fca5a5;}
+button.ambar{background:#f59e0b;}
+button:disabled{opacity:.45;cursor:default;}
+input,select,textarea{padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;}
+input.pq,select.pq{padding:3px 5px;font-size:12px;}
+a{color:#1d4ed8;}
+#toolbar{display:flex;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;}
+#toolbar .spacer{flex:1;}
+h1{font-size:20px;margin:18px 24px 4px;color:#1e3a8a;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.acceso{font-size:12px;font-weight:600;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:12px;padding:3px 10px;}
+.sub{margin:0 24px 14px;color:var(--muted);font-size:14px;}
+.tarjetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin:0 24px 14px;}
+.tarjeta{background:var(--card);border:1px solid #bfdbfe;border-left:5px solid #2563eb;border-radius:8px;padding:10px 14px;}
+.tarjeta .n{font-size:24px;font-weight:700;color:#1e3a8a;} .tarjeta .t{font-size:13px;color:var(--muted);}
+.tarjeta.nar{border-left-color:#fb923c;} .tarjeta.nar .n{color:#c2410c;}
+.tarjeta.gris{border-left-color:#94a3b8;} .tarjeta.gris .n{color:#475569;}
+.tarjeta.amb{border-left-color:#f59e0b;background:#fffbeb;} .tarjeta.amb .n{color:#b45309;}
+.tarjeta.clic{cursor:pointer;} .tarjeta.clic:hover{box-shadow:0 4px 12px -6px rgba(30,64,175,.6);}
+.barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 24px 14px;}
+.barra label{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;}
+#progreso{margin:0 24px 10px;font-size:12.5px;color:#1e40af;display:none;}
+.cuerpo{display:grid;grid-template-columns:minmax(0,1fr) 600px;gap:16px;margin:0 24px 30px;align-items:start;}
+@media(max-width:1250px){.cuerpo{grid-template-columns:1fr;}}
+.col-tit{font-size:15px;font-weight:700;color:#1e3a8a;margin:0 0 8px;}
+.zona{background:var(--card);border:1px solid #bfdbfe;border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.zona-cab{display:flex;align-items:center;gap:10px;padding:9px 14px;background:#ffedd5;color:#9a3412;flex-wrap:wrap;cursor:pointer;}
+.zona-cab b{font-size:15px;} .zona-cab .dato{font-size:12px;background:#fff;border-radius:12px;padding:2px 10px;}
+.zona.cerrada .zona-cuerpo{display:none;}
+.zona-van{padding:6px 14px;font-size:12px;color:#334155;background:#fff;border-top:1px solid #fed7aa;display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
+.zona-van .van{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:10px;padding:1px 8px;}
+.zona-van .van i{font-style:normal;color:#15803d;}
+.zona-van .van.lleno{background:#fef2f2;border-color:#fecaca;color:#991b1b;} .zona-van .van.lleno i{color:#b91c1c;}
+.pob{padding:6px 14px;background:#fff7ed;font-weight:600;font-size:13px;color:#9a3412;border-top:1px solid #fed7aa;display:flex;gap:10px;}
+.pob span{font-weight:400;color:var(--muted);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+td{padding:7px 8px;border-top:1px solid #f1f5f9;vertical-align:middle;}
+tr.fila td:first-child{border-left:5px solid #fb923c;}
+tr.fila.concita td:first-child{border-left-color:#94a3b8;}
+tr.ops td{padding:0 8px 10px;border-top:none;}
+.muted{color:var(--muted);font-size:12px;}
+.espera{font-size:11.5px;padding:1px 7px;border-radius:10px;background:#f1f5f9;white-space:nowrap;}
+.espera.mucho{background:#fee2e2;color:#b91c1c;font-weight:600;}
+.km{font-size:11.5px;color:#1e40af;margin-top:2px;} .sinkm{color:#94a3b8;font-style:italic;}
+.tbtn{background:#fff;color:#1e3a8a;border:1px solid #93c5fd;padding:4px 8px;font-size:12px;white-space:nowrap;font-weight:600;}
+.tbtn.vacio{background:#fffbeb;border-color:#f59e0b;color:#b45309;}
+.apr{color:#166534;font-size:11px;} .nuevo{color:#b45309;font-size:11px;} .med{color:#6d28d9;font-size:11px;font-weight:600;}
+.agendar{display:flex;flex-direction:column;gap:4px;min-width:250px;}
+.manual{display:flex;gap:4px;align-items:center;}
+.manual input[type=date]{width:118px;} .manual input[type=time]{width:78px;} .manual select{width:96px;}
+.manual button{padding:3px 8px;font-size:12px;}
+.ya-cita{font-size:12px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:4px 8px;}
+.opciones{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.ops-tit{font-size:12px;font-weight:700;color:#1e3a8a;margin-right:2px;}
+.op{font-size:11.5px;border:1px solid;border-radius:8px;padding:2px 3px 2px 7px;display:flex;gap:4px;align-items:center;}
+.op.zona{background:#f0fdf4;border-color:#86efac;color:#166534;}
+.op.cerca{background:#f7fee7;border-color:#d9f99d;color:#3f6212;}
+.op.lleno{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
+.op .op-pob{max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.op button{padding:1px 8px;font-size:11px;background:#16a34a;} .op button.rojo{background:#fff;}
+.panel{background:var(--card);border:1px solid #bfdbfe;border-radius:8px;padding:12px;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow-y:auto;}
+.cab-panel{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.cab-panel h3{margin:0;font-size:16px;color:#1e3a8a;flex:1;}
+.nav{display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:13px;}
+.nav b{flex:1;text-align:center;color:#1e3a8a;}
+table.ag th{background:#dbeafe;color:#1e3a8a;text-align:left;padding:6px;font-size:12px;}
+table.ag td{padding:5px 6px;font-size:12px;vertical-align:top;border-top:1px solid #e0e7ff;}
+table.ag tr.dia td{background:#1e3a8a;color:#fff;font-weight:700;font-size:12.5px;padding:6px 8px;}
+table.ag tr.dia td span{font-weight:400;opacity:.8;}
+table.ag td.eq{cursor:pointer;width:125px;background:#f8fafc;}
+table.ag td.eq:hover{background:#eff6ff;}
+table.ag td.eq.completo{background:#fde68a;} table.ag td.eq.sobre{background:#fecaca;}
+table.ag td.eq.sel{outline:2px solid #facc15;outline-offset:-2px;}
+table.ag td.zn{color:#1e40af;font-weight:600;width:90px;}
+table.ag tr.libre td{color:#15803d;}
+.marca{display:inline-block;font-size:10.5px;font-weight:700;border-radius:8px;padding:1px 6px;margin-top:3px;}
+.marca.completo{background:#f59e0b;color:#fff;} .marca.sobre{background:#dc2626;color:#fff;}
+.ordag{display:flex;align-items:center;gap:5px;padding:3px 4px;margin:2px 0;border-radius:5px;border-left:4px solid;flex-wrap:wrap;}
+.ordag.propuesta{border-left-color:#94a3b8;background:#f8fafc;}
+.ordag.avisada{border-left-color:#f59e0b;background:#fffbeb;}
+.ordag.confirmada{border-left-color:#2563eb;background:#eff6ff;}
+.ordag .hora{font-weight:700;color:#1e3a8a;min-width:38px;}
+.ordag .acc{margin-left:auto;display:flex;gap:3px;align-items:center;}
+.ordag .acc button{padding:2px 7px;font-size:11px;}
+.ordag .acc button.ic{background:none;color:#94a3b8;padding:0 3px;font-size:13px;}
+.ordag .acc button.ic:hover{color:#1e3a8a;}
+.est{font-size:10.5px;font-weight:700;border-radius:9px;padding:1px 7px;white-space:nowrap;}
+.est.propuesta{background:#e2e8f0;color:#475569;} .est.avisada{background:#fef3c7;color:#92400e;} .est.confirmada{background:#dbeafe;color:#1e40af;}
+.mini{display:flex;align-items:center;gap:4px;margin-top:3px;}
+.mini .bh{flex:1;height:7px;background:#e5e7eb;border-radius:4px;overflow:hidden;display:flex;}
+.mini .bh i{display:block;height:100%;}
+.bh i.m{background:#3b82f6;} .bh i.v{background:#93c5fd;}
+.h{font-size:11px;white-space:nowrap;} .h.pasa{color:#dc2626;font-weight:700;} .h.libre{color:#15803d;}
+.detalle{border:2px solid #facc15;background:#fffef5;border-radius:8px;padding:10px;font-size:13px;margin-top:10px;}
+.aviso-f{display:grid;grid-template-columns:88px 1fr auto;gap:8px;align-items:center;padding:8px;border:1px solid #e2e8f0;border-left:5px solid;border-radius:8px;margin-bottom:6px;font-size:12.5px;}
+.aviso-f.propuesta{border-left-color:#94a3b8;} .aviso-f.avisada{border-left-color:#f59e0b;background:#fffbeb;}
+.aviso-f .cuando{font-weight:700;color:#1e3a8a;font-size:12px;}
+.aviso-f .bts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
+.aviso-f .bts button{padding:4px 8px;font-size:11.5px;}
+.grupo{font-size:12px;font-weight:700;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.03em;}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal .cd{font-size:11px;font-weight:700;color:var(--muted);text-align:center;padding:2px;}
+.cal .c{border:1px solid #e2e8f0;border-radius:6px;min-height:78px;padding:4px;cursor:pointer;background:#fff;font-size:11px;}
+.cal .c:hover{border-color:#2563eb;}
+.cal .c.fuera{background:#f8fafc;color:#cbd5e1;cursor:default;}
+.cal .c.finde{background:#f8fafc;}
+.cal .c.hoy{border:2px solid #2563eb;}
+.cal .c .d{font-weight:700;font-size:12px;}
+.cal .c .eqb{display:flex;align-items:center;gap:3px;margin-top:2px;}
+.cal .c .eqb i{flex:1;height:6px;border-radius:3px;background:#e5e7eb;position:relative;overflow:hidden;}
+.cal .c .eqb i b{position:absolute;left:0;top:0;bottom:0;}
+.cal .c .eqb span{width:34px;font-size:9px;color:var(--muted);overflow:hidden;white-space:nowrap;}
+.leyenda{font-size:11.5px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;margin:6px 0;}
+.leyenda i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:3px;}
+#fondo{display:none;position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:40;}
+#ventana{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(880px,96vw);max-height:94vh;overflow-y:auto;background:#fff;border-radius:10px;box-shadow:0 20px 50px -20px rgba(0,0,0,.5);z-index:41;padding:18px;}
+#ventana h3{margin:0 0 4px;color:#1e3a8a;}
+#ventana .fila2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0;}
+#ventana label.campo{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);}
+.aviso-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0;}
+@media(max-width:760px){.aviso-2col{grid-template-columns:1fr;}}
+#ventana .aviso-2col textarea{height:430px;margin:0;font-size:12.5px;line-height:1.4;width:100%;}
+.whats{border:1px solid #d1d5db;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;height:430px;}
+.whats-cab{background:#075e54;color:#fff;font-size:13px;font-weight:600;padding:8px 12px;}
+.whats-fondo{flex:1;background:#efeae2;padding:12px;overflow-y:auto;}
+.burbuja{background:#d9fdd3;border-radius:8px 0 8px 8px;padding:8px 10px;font-size:13px;line-height:1.45;color:#111;margin-left:24px;box-shadow:0 1px 1px rgba(0,0,0,.12);}
+table.tt{margin:10px 0;border:1px solid #dbeafe;} table.tt th{background:#dbeafe;color:#1e3a8a;text-align:left;padding:6px;font-size:12px;} table.tt td{padding:6px;font-size:13px;border-top:1px solid #e0e7ff;}
+.explica{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px;font-size:12px;color:#4c1d95;line-height:1.45;margin-bottom:8px;}
+.eqed{border:1px solid #dbeafe;border-radius:8px;padding:10px;margin-bottom:8px;}
+.eqed .monts{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:13px;}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e3a8a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;display:none;z-index:50;max-width:90vw;box-shadow:0 10px 30px -10px rgba(0,0,0,.5);}
+svg text{font-family:inherit;}
+</style>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
+</head>
+<body>
+<div id="toolbar">
+  <button class="secondary" onclick="location.href='inicio.html'">🏠 Inicio</button>
+  <button class="secondary" onclick="location.href='pedidos.html'">Ordenes</button>
+  <button class="secondary" onclick="location.href='recepcion.html'">Consulta almacén</button>
+  <button class="secondary" onclick="location.href='rutas.html'">Rutas</button>
+  <button onclick="location.href='planificar.html'">📍 Planificar montajes</button>
+  <div class="spacer"></div>
+  <button class="secondary peq" onclick="abrirEquipos()">👥 Equipos</button>
+  <button class="secondary peq" onclick="abrirAjustes()">⚙ Ajustes</button>
+  <span id="quien" class="muted"></span>
+  <button class="secondary" onclick="logout()">Salir</button>
+</div>
+
+<h1>📍 Planificar montajes <span class="acceso">🔒 Solo oficina y administradores</span></h1>
+<div class="sub">Izquierda: órdenes con <b>toda la mercancía recibida</b> que aún no tienen montaje. Derecha: lo agendado, por día, equipo y zona. Una orden solo pasa a <b>«Agendada»</b> cuando el cliente confirma la cita.</div>
+
+<div class="tarjetas" id="tarjetas"></div>
+
+<div class="barra">
+  <input id="buscar" placeholder="Buscar nº, cliente, población, tienda…" style="min-width:250px" oninput="filtro=normBusq(this.value);pintarDiferido()">
+  <label>Tienda <select id="f_tienda" onchange="pintar()"><option value="">Todas</option></select></label>
+  <label>Recibidas <select id="f_meses" onchange="pintar();situarEnMapa()"><option value="3">últimos 3 meses</option><option value="6" selected>últimos 6 meses</option><option value="12">último año</option><option value="0">todas (incluye antiguas)</option></select></label>
+  <label>Orden <select id="f_orden" onchange="pintar()"><option value="dist">Por cercanía a la nave</option><option value="espera">Por días esperando</option></select></label>
+  <label><input type="checkbox" id="solo_sin" onchange="pintar()"> Solo sin tiempo de montaje</label>
+</div>
+<div id="progreso"></div>
+
+<div class="cuerpo">
+  <div>
+    <div class="col-tit">🟠 Sin agendar</div>
+    <div id="lista"><span class="muted">Cargando…</span></div>
+  </div>
+  <div class="panel">
+    <div class="cab-panel">
+      <h3>📅 Agendadas</h3>
+      <button class="secondary peq" id="b_tabla" onclick="cambiarVista('tabla')">📋 Tabla</button>
+      <button class="secondary peq" id="b_avisos" onclick="cambiarVista('avisos')">📲 Avisar y confirmar <span id="n_avisos"></span></button>
+      <button class="secondary peq" id="b_cal" onclick="cambiarVista('cal')">🗓 Calendario</button>
+      <select class="pq" id="f_eq" onchange="pintar()"><option value="">Todos los equipos</option></select>
+    </div>
+    <div class="leyenda"><span><i style="background:#94a3b8"></i>Propuesta (sin avisar)</span><span><i style="background:#f59e0b"></i>Avisada, esperando respuesta</span><span><i style="background:#2563eb"></i>Confirmada (agendada)</span></div>
+    <div id="derecha"></div>
+  </div>
+</div>
+
+<div id="fondo" onclick="cerrarVentana()"></div>
+<div id="ventana"></div>
+<div id="toast"></div>
+
+<script>
+const client = supabase.createClient("https://uamgbtbsxbrgymhqalak.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k");
+
+/* ======================= utilidades ======================= */
+const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const normBusq = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9ñ]+/g, " ").trim();
+const clave = d => String(d || "").trim().replace(/\s+/g, " ").toUpperCase();          // = clave_articulo() del SQL 126
+const claveLoc = l => "loc:" + String(l || "").trim().toLowerCase();                   // = 'loc:' || lower(trim(localidad))
+const pad = n => String(n).padStart(2, "0");
+const iso = d => d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+const D = s => new Date(s + "T12:00:00");
+const suma = (s, n) => { const d = D(s); d.setDate(d.getDate() + n); return iso(d); };
+const HOY = iso(new Date());
+const NOMD = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"], NOMDL = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const NOMM = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const fdia = s => { const d = D(s); return NOMD[d.getDay()] + " " + d.getDate() + " " + NOMM[d.getMonth()]; };
+const flargo = s => { const d = D(s); return NOMDL[d.getDay()] + " " + d.getDate() + " de " + MESES[d.getMonth()].toLowerCase(); };
+const lunesDe = s => { const d = D(s); return suma(s, -((d.getDay()+6)%7)); };
+const laborables = (desde, n) => { const r = []; let s = desde; while (r.length < n) { const w = D(s).getDay(); if (w > 0 && w < 6) r.push(s); s = suma(s, 1); } return r; };
+const hm = m => m == null ? "—" : Math.floor(m/60) + ":" + pad(Math.round(m % 60));
+const aHora = m => pad(Math.floor(m/60) % 24) + ":" + pad(Math.round(m % 60 / 15) * 15 % 60);
+const txtT = m => m == null ? "Sin poner" : (m < 60 ? m + " min" : (m % 60 ? hm(m) + " h" : (m/60) + " h"));
+const r5 = m => Math.max(5, Math.round(m / 5) * 5);
+// "10:30" -> 630 · "10-12" -> 600 · "M" (mañana) -> 540 · "T" (tarde) -> 960
+function minHora(h){
+  h = String(h || "").trim().toUpperCase(); if (!h) return null;
+  const m = h.match(/^(\d{1,2})(?:[:.h](\d{2}))?/); if (m) return (+m[1]) * 60 + (+(m[2] || 0));
+  if (h.startsWith("M")) return 540; if (h.startsWith("T")) return 960; return null;
+}
+const horaValida = h => /^\d{1,2}:\d{2}$/.test(String(h || ""));
+function kmAprox(a, b){   // = km_aprox() del SQL 126: línea recta × 1,3
+  if (!a || !b || a.lat == null || b.lat == null) return null;
+  const R = 6371, r = x => x * Math.PI / 180, dLa = r(b.lat - a.lat), dLo = r(b.lon - a.lon);
+  const h = Math.sin(dLa/2)**2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLo/2)**2;
+  return 1.3 * 2 * R * Math.asin(Math.sqrt(h));
+}
+const capFrase = s => { s = String(s || "").trim().toLowerCase(); return s ? s[0].toUpperCase() + s.slice(1) : s; };
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+function toast(t){ const el = document.getElementById("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = "none", 5000); }
+function cerrarVentana(){ document.getElementById("fondo").style.display = document.getElementById("ventana").style.display = "none"; }
+function abrirVentana(html){ const v = document.getElementById("ventana"); v.innerHTML = html; document.getElementById("fondo").style.display = v.style.display = "block"; }
+async function logout(){ await client.auth.signOut(); location.href = "login.html"; }
+async function todo(fabrica, paso = 1000){   // lee todas las filas, de `paso` en `paso`
+  let r = [], desde = 0;
+  for (;;) {
+    const { data, error } = await fabrica().range(desde, desde + paso - 1);
+    if (error) throw error;
+    r = r.concat(data || []);
+    if (!data || data.length < paso) return r;
+    desde += paso;
+  }
+}
+
+/* ======================= estado ======================= */
+let user, cfg = {}, equipos = [], montadores = [], tiendas = {}, fabs = {}, tiempos = {}, geo = {};
+let pend = [], agenda = [], citasAbiertas = [], citasConf = {}, ordenesCita = {};
+let agendaDesde = null, agendaHasta = null;
+let filtro = "", vista = "tabla", lunes = lunesDe(HOY), mes = HOY.slice(0,7), sel = null, editando = null;
+const abiertoOps = new Set(), zonasCerradas = new Set();
+const pseudo = {};   // equipos que no están dados de alta (órdenes agendadas desde Órdenes/Rutas con otros montadores)
+
+/* ======================= arranque ======================= */
+(async function iniciar(){
+  const { data: { user: u } } = await client.auth.getUser();
+  if (!u) { location.href = "login.html"; return; }
+  user = u;
+  const { data: st } = await client.from("staff").select("nombre, solo_deca, solo_montajes").eq("user_id", u.id).maybeSingle();
+  if (!st || st.solo_deca || st.solo_montajes) { location.href = "inicio.html"; return; }
+  document.getElementById("quien").textContent = st.nombre || u.email;
+  try {
+    await Promise.all([cargarCfg(), cargarEquipos(), cargarMontadores(), cargarTiendas(), cargarTiempos(), cargarGeo()]);
+  } catch (e) {
+    document.getElementById("lista").innerHTML = '<div class="ya-cita" style="color:#b91c1c">No se ha podido cargar: ' + esc(e.message) +
+      '<br>Si dice que no existe una tabla (planificacion_config, equipos_montaje…), falta pegar en Supabase el <b>SQL 126</b>.</div>';
+    return;
+  }
+  await cargarTodo();
+  if (!equipos.filter(e => e.activo).length) toast("Aún no hay equipos: créalos con el botón «👥 Equipos» (arriba a la derecha).");
+  situarEnMapa();
+  recalculoAutomatico();
+})();
+
+async function cargarCfg(){ const { data, error } = await client.from("planificacion_config").select("*").eq("id", 1).maybeSingle(); if (error) throw error; cfg = data || {}; }
+async function cargarEquipos(){ const { data, error } = await client.from("equipos_montaje").select("*").order("orden").order("nombre"); if (error) throw error; equipos = data || []; }
+async function cargarMontadores(){ const { data } = await client.from("montadores").select("id, nombre, activo").order("nombre"); montadores = data || []; }
+async function cargarTiendas(){
+  const data = await todo(() => client.from("tiendas").select("id, nombre, nombre_comercial, direccion, cp, localidad, provincia, sin_kilometraje").order("nombre"));
+  tiendas = Object.fromEntries(data.map(t => [t.id, t]));
+}
+async function cargarTiempos(){ const data = await todo(() => client.from("tiempos_montaje").select("*")); tiempos = Object.fromEntries(data.map(t => [t.fabricante + "|" + t.articulo, t])); }
+async function cargarGeo(){ const data = await todo(() => client.from("geo_lugares").select("*")); geo = Object.fromEntries(data.map(g => [g.clave, g])); }
+
+const ORD_SEL = "anyo, orden, nombre_cli, domicilio_cli, localidad_cli, telefono_cli, telefono2_cli, tienda_id, estado, fecha_recepcion, fecha_prev_montaje, horamont, bultos, linorden(tipolinea, proveedor, descripcion, cantidad, recibido_at), ordenes_montadores(montador_id)";
+function normOrden(r){
+  const lin = r.linorden || [];
+  const rec = [r.fecha_recepcion, ...lin.map(l => l.recibido_at)].filter(Boolean).map(x => String(x).slice(0,10)).sort();
+  return {
+    anyo: r.anyo, orden: r.orden, n: r.anyo + "/" + r.orden, cli: r.nombre_cli || "", dir: r.domicilio_cli || "", loc: (r.localidad_cli || "").trim(),
+    tel: r.telefono_cli || "", tel2: r.telefono2_cli || "", tiendaId: r.tienda_id, estado: r.estado, bultos: r.bultos,
+    ultRec: rec.length ? rec[rec.length-1] : null,
+    fprev: r.fecha_prev_montaje ? String(r.fecha_prev_montaje).slice(0,10) : null, hora: r.horamont || "",
+    mont: (r.ordenes_montadores || []).map(a => a.montador_id),
+    lineas: lin.filter(l => l.tipolinea === 1 && clave(l.descripcion)).map(l => ({ fab: l.proveedor || 0, art: clave(l.descripcion), desc: l.descripcion, cant: Math.max(1, l.cantidad || 1) })),
+  };
+}
+async function cargarTodo(){
+  document.getElementById("progreso").style.display = "block";
+  document.getElementById("progreso").textContent = "Cargando órdenes…";
+  try {
+    const raw = await todo(() => client.from("ordenes").select(ORD_SEL).eq("estado", "recepcionado_total")
+      .or("fecha_prev_montaje.is.null,fecha_prev_montaje.gte." + HOY).order("anyo").order("orden"), 300);
+    pend = raw.map(normOrden);
+    await cargarCitas();
+    await cargarAgenda(true);
+    await cargarFabricantes();
+  } catch (e) {
+    document.getElementById("lista").innerHTML = '<div class="ya-cita" style="color:#b91c1c">Error al cargar: ' + esc(e.message) + '</div>';
+  }
+  document.getElementById("progreso").style.display = "none";
+  rellenarFiltros(); pintar();
+}
+async function cargarCitas(){
+  const { data, error } = await client.from("citas_montaje").select("id, anyo, orden, fecha_hora, hora, equipo_id, estado, avisado_at").in("estado", ["propuesta", "avisada"]);
+  if (error) throw error;
+  citasAbiertas = (data || []).map(c => ({ ...c, fecha: iso(new Date(c.fecha_hora)) }));
+  // órdenes de las citas que no están en la lista de pendientes (p. ej. una agendada a la que se cambia el día)
+  const conocidas = new Set(pend.map(o => o.n));
+  const faltan = citasAbiertas.filter(c => !conocidas.has(c.anyo + "/" + c.orden));
+  ordenesCita = {};
+  const porAnyo = {}; faltan.forEach(c => (porAnyo[c.anyo] ||= []).push(c.orden));
+  for (const [a, lst] of Object.entries(porAnyo)) {
+    const { data: os } = await client.from("ordenes").select(ORD_SEL).eq("anyo", +a).in("orden", lst);
+    (os || []).forEach(r => { const o = normOrden(r); ordenesCita[o.n] = o; });
+  }
+}
+// Agendadas: un rango que cubre la semana y el mes que se ven, y siempre las 3 próximas semanas (para las opciones)
+async function cargarAgenda(forzar){
+  const ini = [lunes, lunesDe(mes + "-01"), lunesDe(HOY)].sort()[0];
+  const fin = [suma(lunes, 7), suma(lunesDe(mes + "-01"), 42), suma(HOY, 22)].sort().reverse()[0];
+  if (!forzar && agendaDesde && ini >= agendaDesde && fin <= agendaHasta) return;
+  agendaDesde = ini; agendaHasta = fin;
+  const raw = await todo(() => client.from("ordenes").select(ORD_SEL).gte("fecha_prev_montaje", ini).lt("fecha_prev_montaje", fin)
+    .neq("estado", "recepcionado_total").order("fecha_prev_montaje"), 300);
+  agenda = raw.map(normOrden);
+  const { data: cc } = await client.from("citas_montaje").select("id, anyo, orden, fecha_hora, hora, equipo_id, estado").eq("estado", "confirmada")
+    .gte("fecha_hora", ini).lt("fecha_hora", fin);
+  citasConf = {}; (cc || []).forEach(c => citasConf[c.anyo + "/" + c.orden] = c);
+}
+async function cargarFabricantes(){
+  const cods = [...new Set([...pend, ...agenda, ...Object.values(ordenesCita)].flatMap(o => o.lineas.map(l => l.fab)).filter(c => c && !(c in fabs)))];
+  for (let i = 0; i < cods.length; i += 200) {
+    const { data } = await client.from("fabricantes").select("codigo, nombre, nombre_comercial").in("codigo", cods.slice(i, i + 200));
+    (data || []).forEach(f => fabs[f.codigo] = f.nombre_comercial || f.nombre);
+  }
+}
+const nomFab = c => c ? (fabs[c] || "Fabricante " + c) : "Sin fabricante";
+const nomTienda = id => { const t = tiendas[id]; return t ? (t.nombre_comercial || t.nombre) : "Sin tienda"; };
+function rellenarFiltros(){
+  const ft = document.getElementById("f_tienda"), ant = ft.value;
+  const ids = [...new Set(pend.map(o => o.tiendaId).filter(Boolean))].sort((a, b) => nomTienda(a).localeCompare(nomTienda(b)));
+  ft.innerHTML = '<option value="">Todas</option>' + ids.map(id => '<option value="' + id + '">' + esc(nomTienda(id)) + '</option>').join("");
+  if (ids.includes(ant)) ft.value = ant;
+  const fe = document.getElementById("f_eq"), antE = fe.value;
+  fe.innerHTML = '<option value="">Todos los equipos</option>' + equipos.filter(e => e.activo).map(e => '<option value="' + e.id + '">' + esc(e.nombre) + '</option>').join("");
+  fe.value = antE;
+}
+
+/* ======================= mapa: poblaciones y tiendas ======================= */
+const posOrden = o => { const g = geo[claveLoc(o.loc)]; return g && g.lat != null ? g : null; };
+function claveTienda(t){ return "tienda:" + t.id + ":" + [t.direccion, t.cp, t.localidad].map(x => String(x || "").trim().toLowerCase()).join("|"); }
+const posTienda = id => { const t = tiendas[id]; if (!t) return null; const g = geo[claveTienda(t)]; return g && g.lat != null ? g : null; };
+const NAVE = () => cfg.nave_lat != null ? { lat: cfg.nave_lat, lon: cfg.nave_lon } : null;
+function zonaDe(o){
+  if (!o.loc) return "📭 Sin población";
+  const g = geo[claveLoc(o.loc)];
+  if (!g) return "⏳ Situando en el mapa…";
+  if (!g.encontrado) return "❓ Población no encontrada";
+  return g.comarca || o.loc;
+}
+async function nominatim(q){
+  const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=es&viewbox=-1.6,40.9,0.7,37.8&q=" + encodeURIComponent(q), { headers: { "Accept-Language": "es" } });
+  if (!r.ok) throw new Error("mapa no disponible");
+  const j = await r.json();
+  if (!j || !j[0]) return null;
+  const a = j[0].address || {};
+  return { lat: +j[0].lat, lon: +j[0].lon, comarca: a.county || a.state_district || a.municipality || a.city || a.town || a.village || null };
+}
+const espera = ms => new Promise(r => setTimeout(r, ms));
+let situando = false;
+const intentadas = new Set();   // lo ya buscado en esta visita (si el mapa falla, no se reintenta sin fin)
+async function situarEnMapa(){
+  if (situando) return; situando = true;
+  const todas = [...pendientesVisibles(), ...agenda, ...Object.values(ordenesCita)];   // solo lo que se ve (no las ~1.400 antiguas)
+  const tareas = [];
+  [...new Set(todas.map(o => o.loc).filter(Boolean))].forEach(l => { if (!geo[claveLoc(l)]) tareas.push({ clave: claveLoc(l), q: l + ", España" }); });
+  [...new Set(todas.map(o => o.tiendaId).filter(Boolean))].forEach(id => {
+    const t = tiendas[id]; if (!t || t.sin_kilometraje || !(t.direccion || t.localidad)) return;
+    const k = claveTienda(t); if (!geo[k]) tareas.push({ clave: k, q: [t.direccion, t.cp, t.localidad, "España"].filter(Boolean).join(", "), alt: [t.localidad, t.provincia, "España"].filter(Boolean).join(", ") });
+  });
+  const pr = document.getElementById("progreso");
+  for (let i = 0; i < tareas.length; i++) {
+    const t = tareas[i];
+    if (intentadas.has(t.clave)) continue;
+    intentadas.add(t.clave);
+    pr.style.display = "block"; pr.textContent = "🗺 Situando poblaciones en el mapa (solo la primera vez): " + (i + 1) + " de " + tareas.length + "…";
+    try {
+      let p = await nominatim(t.q); await espera(1100);
+      if (!p && t.alt) { p = await nominatim(t.alt); await espera(1100); }
+      const fila = { clave: t.clave, lat: p ? p.lat : null, lon: p ? p.lon : null, comarca: p ? p.comarca : null, encontrado: !!p, actualizado_at: new Date().toISOString() };
+      geo[t.clave] = fila;
+      await client.from("geo_lugares").upsert(fila);
+    } catch (e) { console.warn("mapa:", e); await espera(3000); }
+    if (i % 4 === 3) pintar();
+  }
+  pr.style.display = "none";
+  situando = false;
+  pintar();
+  kmCarretera();
+  if (tareas.length && [...pendientesVisibles(), ...agenda].some(o => o.loc && !geo[claveLoc(o.loc)] && !intentadas.has(claveLoc(o.loc)))) situarEnMapa();   // si se amplió el filtro mientras tanto
+}
+// km por carretera tienda -> población del cliente (OSRM), en segundo plano y guardados en el navegador
+const kmRuta = {};
+async function kmCarretera(){
+  const pares = new Map();
+  pendientesVisibles().forEach(o => { const t = tiendas[o.tiendaId], a = posTienda(o.tiendaId), b = posOrden(o); if (t && !t.sin_kilometraje && a && b) pares.set(kKm(a, b), [a, b]); });
+  let n = 0;
+  for (const [k, [a, b]] of pares) {
+    if (k in kmRuta) continue;
+    const g = lsGet("plan_km:" + k); if (typeof g === "number") { kmRuta[k] = g; continue; }
+    try {
+      const r = await fetch("https://router.project-osrm.org/route/v1/driving/" + a.lon + "," + a.lat + ";" + b.lon + "," + b.lat + "?overview=false");
+      const j = await r.json();
+      if (j.routes && j.routes[0]) { kmRuta[k] = j.routes[0].distance / 1000; lsSet("plan_km:" + k, kmRuta[k]); }
+    } catch (e) { break; }
+    await espera(300);
+    if (++n % 10 === 0) pintar();
+  }
+  pintar();
+}
+const kKm = (a, b) => [a.lat, a.lon, b.lat, b.lon].map(x => (+x).toFixed(4)).join(",");
+function kmTienda(o){
+  const t = tiendas[o.tiendaId]; if (!t) return { txt: "" };
+  if (t.sin_kilometraje) return { sin: true };
+  const a = posTienda(o.tiendaId), b = posOrden(o); if (!a || !b) return { txt: "" };
+  const k = kKm(a, b);
+  if (k in kmRuta) return { km: Math.round(kmRuta[k]), exacto: true };
+  return { km: Math.round(kmAprox(a, b)), exacto: false };
+}
+
+/* ======================= tiempos de montaje ======================= */
+const usaMedia = t => t && !t.fijado_a_mano && (t.n_medidas || 0) >= (cfg.min_medidas || 3) && t.media_real != null;
+function efectivo(fab, art){ const t = tiempos[fab + "|" + art]; if (!t) return null; return usaMedia(t) ? r5(+t.media_real) : (t.minutos ?? null); }
+const cacheT = new Map();
+function tiempoOrden(o){
+  if (cacheT.has(o.n)) return cacheT.get(o.n);
+  let s = 0, falta = 0, auto = false, med = false;
+  for (const l of o.lineas) {
+    const v = efectivo(l.fab, l.art), t = tiempos[l.fab + "|" + l.art];
+    if (v == null) { falta++; continue; }
+    s += v * l.cant;
+    if (usaMedia(t)) med = true; else if (!(t.puesto_en_anyo === o.anyo && t.puesto_en_orden === o.orden)) auto = true;
+  }
+  const r = { t: o.lineas.length && !falta ? s : null, parcial: s, falta, auto, med, sinLineas: !o.lineas.length };
+  cacheT.set(o.n, r); return r;
+}
+
+/* ======================= equipos y días ======================= */
+const eqActivos = () => equipos.filter(e => e.activo);
+const nomEq = id => (equipos.find(e => e.id === id) || pseudo[id] || {}).nombre || "?";
+const corto = id => nomEq(id).split(/\s*[\/,]\s*/)[0];
+function equipoDeOrden(o){
+  const k = [...o.mont].sort().join(",");
+  const e = equipos.find(e => [...e.montadores].sort().join(",") === k);
+  if (e) return e.id;
+  const nombres = o.mont.map(id => (montadores.find(m => m.id === id) || {}).nombre || "?").map(s => s.toUpperCase()).sort();
+  const nombre = nombres.length ? nombres.join(" / ") + " (sin equipo)" : "SIN MONTADOR";
+  const id = "x:" + nombre;
+  pseudo[id] = { id, nombre, pseudo: true };
+  return id;
+}
+// Paradas de cada equipo y día: agendadas (confirmadas) + citas abiertas (propuestas y avisadas)
+let paradas = {};
+function construirParadas(){
+  paradas = {};
+  const add = (eq, f, p) => (paradas[eq + "|" + f] ||= []).push(p);
+  agenda.forEach(o => { if (!o.fprev) return; const c = citasConf[o.n]; add(equipoDeOrden(o), o.fprev, { o, estado: "confirmada", hora: o.hora, cita: c || null, sinCita: !c }); });
+  citasAbiertas.forEach(c => {
+    const o = pend.find(x => x.anyo === c.anyo && x.orden === c.orden) || ordenesCita[c.anyo + "/" + c.orden] || agenda.find(x => x.anyo === c.anyo && x.orden === c.orden);
+    if (o) add(c.equipo_id, c.fecha, { o, estado: c.estado, hora: c.hora, cita: c });
+  });
+}
+const cacheDia = new Map();
+function dia(e, f, extra){
+  const k = e + "|" + f;
+  if (!extra && cacheDia.has(k)) return cacheDia.get(k);
+  const ps = [...(paradas[k] || []), ...(extra ? [extra] : [])].sort((a, b) => (minHora(a.hora) ?? 9999) - (minHora(b.hora) ?? 9999));
+  const vel = Math.max(cfg.velocidad_kmh || 45, 10);
+  let km = 0, prev = NAVE(), reloj = minHora(cfg.hora_salida) ?? 480, mont = 0, sinT = 0;
+  const sug = {};
+  for (const p of ps) {
+    const pos = posOrden(p.o), tramo = prev && pos ? kmAprox(prev, pos) : 0;
+    km += tramo; reloj += tramo / vel * 60; sug[p.o.n] = aHora(reloj);
+    const T = tiempoOrden(p.o); if (T.t == null) sinT++;
+    const t = T.t ?? T.parcial;   // si falta algún artículo, cuenta al menos lo que se sabe
+    mont += t; reloj += t;
+    if (pos) prev = pos;
+  }
+  if (ps.length && prev && NAVE()) km += kmAprox(prev, NAVE());
+  const viaje = Math.round(km / vel * 60);
+  const r = { ps, km: Math.round(km), viaje, mont, sinT, total: viaje + mont, fin: reloj, sug };
+  if (!extra) cacheDia.set(k, r);
+  return r;
+}
+const JORNADA = () => cfg.jornada_min || 480;
+const estadoCarga = p => p.total > JORNADA() ? "sobre" : (p.ps.length && JORNADA() - p.total <= 15 ? "completo" : "");
+const marcaCarga = p => { const c = estadoCarga(p); return c === "sobre" ? '<span class="marca sobre">⚠ Sobrecarga +' + hm(p.total - JORNADA()) + ' h</span>' : c === "completo" ? '<span class="marca completo">✔ Día completo</span>' : ""; };
+function horaSugerida(o, e, f){
+  const p = dia(e, f); const ult = p.ps[p.ps.length - 1];
+  if (!ult) { const pos = posOrden(o), n = NAVE(); return aHora((minHora(cfg.hora_salida) ?? 480) + (pos && n ? kmAprox(n, pos) / Math.max(cfg.velocidad_kmh || 45, 10) * 60 : 0)); }
+  const a = posOrden(ult.o), b = posOrden(o), vel = Math.max(cfg.velocidad_kmh || 45, 10);
+  const finUlt = Math.max(p.fin, (minHora(ult.hora) ?? 0) + (tiempoOrden(ult.o).t || 60));
+  return aHora(finUlt + (a && b ? kmAprox(a, b) / vel * 60 : 0));
+}
+function barra(p){
+  const w = v => Math.min(100, v / JORNADA() * 100), libre = JORNADA() - p.total;
+  return '<div class="mini"><div class="bh"><i class="m" style="width:' + w(p.mont) + '%"></i><i class="v" style="width:' + w(p.viaje) + '%"></i></div>' +
+    '<span class="h ' + (libre < 0 ? "pasa" : (libre >= 120 ? "libre" : "")) + '">' + (libre < 0 ? "+" + hm(-libre) + " h" : hm(libre) + " libres") + '</span></div>' +
+    (p.sinT ? '<div class="muted" style="color:#b45309">' + p.sinT + ' sin tiempo</div>' : "");
+}
+const diasOpciones = () => laborables(suma(HOY, 1), 10);
+function opciones(o){
+  const pos = posOrden(o), z = zonaDe(o), t = tiempoOrden(o).t || 0, vel = Math.max(cfg.velocidad_kmh || 45, 10), r = [];
+  if (!pos) return r;
+  for (const e of eqActivos()) for (const f of diasOpciones()) {
+    const p = dia(e.id, f); if (!p.ps.length) continue;    // los días libres no se proponen
+    const enZona = p.ps.some(s => s.o.n !== o.n && zonaDe(s.o) === z);
+    const cerca = Math.min(...p.ps.map(s => kmAprox(posOrden(s.o), pos) ?? 999));
+    if (!enZona && cerca > 12) continue;
+    const libre = JORNADA() - p.total, extra = t + Math.round((cerca < 999 ? cerca : 0) * 2 / vel * 60);
+    r.push({ e: e.id, f, libre, pobs: [...new Set(p.ps.map(s => s.o.loc).filter(Boolean))].join(", "), tipo: libre < extra ? "lleno" : enZona ? "zona" : "cerca" });
+  }
+  const rango = { zona: 0, cerca: 1, lleno: 2 };
+  r.sort((a, b) => rango[a.tipo] - rango[b.tipo] || (a.f < b.f ? -1 : a.f > b.f ? 1 : 0));
+  r.forEach(x => x.h = horaSugerida(o, x.e, x.f));
+  return r;
+}
+function vanPorZona(z){
+  const r = [];
+  for (const e of eqActivos()) for (const f of diasOpciones()) { const p = dia(e.id, f); if (p.ps.some(s => zonaDe(s.o) === z)) r.push({ e: e.id, f, libre: JORNADA() - p.total }); }
+  return r.sort((a, b) => a.f < b.f ? -1 : a.f > b.f ? 1 : 0);
+}
+
+/* ======================= pintar ======================= */
+let tPintar = null;
+function pintarDiferido(){ clearTimeout(tPintar); tPintar = setTimeout(pintar, 250); }
+function pendientesVisibles(){
+  const meses = +document.getElementById("f_meses").value, ft = document.getElementById("f_tienda").value, soloSin = document.getElementById("solo_sin").checked;
+  const lim = meses ? iso(new Date(new Date().setMonth(new Date().getMonth() - meses))) : null;
+  const conCita = new Set(citasAbiertas.map(c => c.anyo + "/" + c.orden));
+  return pend.filter(o => !conCita.has(o.n)
+    && (!lim || (o.ultRec && o.ultRec >= lim))
+    && (!ft || o.tiendaId === ft)
+    && (!soloSin || tiempoOrden(o).t == null)
+    && (!filtro || normBusq(o.n + " " + o.cli + " " + o.loc + " " + nomTienda(o.tiendaId) + " " + o.dir).includes(filtro)));
+}
+function pintar(){
+  cacheT.clear(); cacheDia.clear(); construirParadas();
+  const vis = pendientesVisibles();
+  const nP = citasAbiertas.filter(c => c.estado === "propuesta").length, nA = citasAbiertas.filter(c => c.estado === "avisada").length;
+  const proximas = agenda.filter(o => o.fprev >= HOY).length;
+  document.getElementById("tarjetas").innerHTML =
+    '<div class="tarjeta nar"><div class="n">' + vis.length + '</div><div class="t">sin agendar · ' + hm(vis.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h de montaje conocido</div></div>' +
+    '<div class="tarjeta gris clic" onclick="cambiarVista(\'avisos\')"><div class="n">' + nP + '</div><div class="t">propuestas sin avisar al cliente</div></div>' +
+    '<div class="tarjeta amb clic" onclick="cambiarVista(\'avisos\')"><div class="n">' + nA + '</div><div class="t">avisadas, esperando respuesta</div></div>' +
+    '<div class="tarjeta"><div class="n">' + proximas + '</div><div class="t">agendadas desde hoy (' + fdia(HOY) + ' en adelante)</div></div>' +
+    '<div class="tarjeta amb"><div class="n">' + vis.filter(o => tiempoOrden(o).t == null).length + '</div><div class="t">sin tiempo de montaje completo</div></div>';
+  document.getElementById("n_avisos").textContent = (nP + nA) ? "(" + (nP + nA) + ")" : "";
+  pintarLista(vis);
+  ["tabla", "avisos", "cal"].forEach(v => document.getElementById("b_" + v).classList.toggle("on", vista === v));
+  document.getElementById("derecha").innerHTML = vista === "tabla" ? tabla() : vista === "avisos" ? avisos() : calendario();
+}
+function pintarLista(vis){
+  const orden = document.getElementById("f_orden").value, nave = NAVE();
+  const porZona = {};
+  vis.forEach(o => (porZona[zonaDe(o)] ||= []).push(o));
+  const distZ = z => { if (!nave) return 0; const ds = porZona[z].map(o => kmAprox(nave, posOrden(o))).filter(x => x != null); return ds.length ? Math.min(...ds) : 99999; };
+  const especial = z => /^[📭⏳❓]/u.test(z) ? 1 : 0;
+  const zs = Object.keys(porZona).sort((a, b) => especial(a) - especial(b) || distZ(a) - distZ(b) || porZona[b].length - porZona[a].length || a.localeCompare(b));
+  let h = "";
+  for (const z of zs) {
+    const ords = porZona[z], porPob = {};
+    ords.forEach(o => (porPob[o.loc || "—"] ||= []).push(o));
+    const pobs = Object.keys(porPob).sort((a, b) => (nave ? (kmAprox(nave, posOrden(porPob[a][0])) ?? 9e9) - (kmAprox(nave, posOrden(porPob[b][0])) ?? 9e9) : 0) || a.localeCompare(b));
+    const mz = ords.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0);
+    const van = especial(z) ? [] : vanPorZona(z);
+    let cuerpo = '<div class="zona-van">🚚 <b>Van por esta zona:</b> ' + (van.length ? van.map(x => '<span class="van ' + (x.libre < 60 ? "lleno" : "") + '">' + fdia(x.f) + ' · ' + esc(corto(x.e)) + ' <i>' + (x.libre < 0 ? "+" + hm(-x.libre) : hm(x.libre) + " libres") + '</i></span>').join("") : '<span class="muted">ningún equipo en las 2 próximas semanas</span>') + '</div>';
+    if (especial(z)) cuerpo = z.startsWith("📭") ? '<div class="zona-van muted">Estas órdenes no tienen población: complétala en Órdenes para poder situarlas.</div>' : "";
+    for (const p of pobs) {
+      let lst = porPob[p];
+      lst = [...lst].sort(orden === "espera" ? (a, b) => (a.ultRec || "") < (b.ultRec || "") ? -1 : 1 : (a, b) => a.orden - b.orden);
+      cuerpo += '<div class="pob">📍 ' + esc(p) + ' <span>' + lst.length + ' orden' + (lst.length > 1 ? "es" : "") + ' · ' + hm(lst.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h</span></div><table>' + lst.map(filaPendiente).join("") + '</table>';
+    }
+    h += '<div class="zona ' + (zonasCerradas.has(z) ? "cerrada" : "") + '"><div class="zona-cab" onclick="plegar(this)" data-z="' + esc(z) + '"><b>' + esc(z) + '</b><span class="dato">' + ords.length + ' órdenes</span><span class="dato">⏱ ' + hm(mz) + ' h</span><span class="muted" style="margin-left:auto">' + (zonasCerradas.has(z) ? "▸ abrir" : "▾ plegar") + '</span></div><div class="zona-cuerpo">' + cuerpo + '</div></div>';
+  }
+  document.getElementById("lista").innerHTML = h || '<div class="ya-cita">No hay órdenes pendientes de agendar con estos filtros. 🎉</div>';
+}
+function plegar(el){ const z = el.dataset.z; zonasCerradas.has(z) ? zonasCerradas.delete(z) : zonasCerradas.add(z); pintar(); }
+const diasDesde = f => f ? Math.round((Date.now() - D(f)) / 864e5) : null;
+function filaPendiente(o){
+  const T = tiempoOrden(o), km = kmTienda(o), d = diasDesde(o.ultRec);
+  const defEq = (sel && !String(sel.e).startsWith("x:") ? sel.e : (eqActivos()[0] || {}).id) || "";
+  const defF = sel ? sel.f : suma(HOY, 1);
+  const ops = opciones(o), abierto = abiertoOps.has(o.n), vis = abierto ? ops : ops.slice(0, 4);
+  const TIPOX = { zona: "va por su zona", cerca: "pasa cerca", lleno: "va por su zona, pero no cabe" };
+  const chip = x => '<div class="op ' + x.tipo + '" title="' + TIPOX[x.tipo] + ': ' + esc(x.pobs) + '"><b>' + fdia(x.f) + '</b> · ' + esc(corto(x.e)) + ' · <span class="op-pob">' + esc(x.pobs) + '</span> · ' +
+    (x.libre < 0 ? "+" + hm(-x.libre) + " h" : hm(x.libre) + " libres") + ' · ~' + x.h +
+    '<button class="' + (x.tipo === "lleno" ? "rojo" : "") + '" onclick="proponer(' + o.anyo + ',' + o.orden + ',\'' + x.e + '\',\'' + x.f + '\',\'' + x.h + '\')">' + (x.tipo === "lleno" ? "Usar igual" : "Usar") + '</button></div>';
+  const kmTxt = km.sin ? '<span class="sinkm">Sin kilometraje (' + esc(nomTienda(o.tiendaId)) + ')</span>' : km.km != null ? "🚗 " + (km.exacto ? "" : "≈ ") + km.km + " km desde la tienda" : "";
+  const tTxt = T.sinLineas ? "Sin artículos" : T.t != null ? hm(T.t) + " h" : T.parcial ? hm(T.parcial) + " h + ?" : "Poner tiempo";
+  return '<tr class="fila"><td style="width:84px" rowspan="2"><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a>' +
+      (d != null ? '<div><span class="espera ' + (d >= 10 ? "mucho" : "") + '" title="Días desde que llegó la última mercancía">' + d + ' días</span></div>' : "") + '</td>' +
+    '<td>' + esc(o.cli) + '<div class="muted">' + esc(o.dir) + '</div><div class="km">' + kmTxt + '</div></td>' +
+    '<td>' + esc(o.lineas.map(l => capFrase(l.desc)).slice(0, 3).join(" + ") + (o.lineas.length > 3 ? " …" : "")) + '<div class="muted">' + esc(nomTienda(o.tiendaId)) + (o.bultos ? " · " + o.bultos + " bultos" : "") + '</div></td>' +
+    '<td><button class="tbtn ' + (T.t == null ? "vacio" : "") + '" onclick="abrirTiempo(' + o.anyo + ',' + o.orden + ')" title="Tiempo de montaje por artículo">⏱ ' + tTxt + '</button>' +
+      (T.med ? '<div class="med">📏 medido</div>' : T.auto ? '<div class="apr">⚡ automático</div>' : "") + (T.falta && T.parcial ? '<div class="nuevo">' + T.falta + ' artículo' + (T.falta > 1 ? "s" : "") + ' sin tiempo</div>' : "") + '</td>' +
+    '<td><div class="agendar"><div class="muted">✍ Fecha a mano:</div><div class="manual">' +
+      '<input type="date" class="pq" id="f_' + o.anyo + '_' + o.orden + '" value="' + defF + '" min="' + HOY + '" title="Fecha">' +
+      '<input type="time" class="pq" id="h_' + o.anyo + '_' + o.orden + '" value="' + (defEq ? horaSugerida(o, defEq, defF) : "09:00") + '" step="900" title="Hora prevista">' +
+      '<select class="pq" id="e_' + o.anyo + '_' + o.orden + '" title="Equipo">' + eqActivos().map(e => '<option value="' + e.id + '" ' + (e.id === defEq ? "selected" : "") + '>' + esc(e.nombre) + '</option>').join("") + '</select>' +
+      '<button title="Proponer esta fecha, hora y equipo" onclick="proponerManual(' + o.anyo + ',' + o.orden + ')">📅</button></div></div></td></tr>' +
+    '<tr class="ops"><td colspan="4"><div class="opciones"><span class="ops-tit">🚚 Días posibles:</span>' +
+      (!posOrden(o) ? '<span class="muted">Hace falta la población en el mapa para proponer días.</span>' : vis.map(chip).join("") || '<span class="muted">Ningún equipo va por esta zona en las 2 próximas semanas.</span>') +
+      (ops.length > 4 ? '<button class="secondary peq" onclick="verOps(\'' + o.n + '\')">' + (abierto ? "Ver menos" : "+ " + (ops.length - 4) + (ops.length - 4 === 1 ? " opción más" : " opciones más")) + '</button>' : "") +
+      (T.t == null && !T.sinLineas ? '<span class="muted" style="color:#b45309">⚠ Sin tiempo completo: no se sabe bien si cabe.</span>' : "") +
+    '</div></td></tr>';
+}
+function verOps(n){ abiertoOps.has(n) ? abiertoOps.delete(n) : abiertoOps.add(n); pintar(); }
+
+/* ---------- derecha: tabla por día → equipo → zona ---------- */
+const eqsFiltro = (f) => {
+  const fe = document.getElementById("f_eq").value;
+  const reales = eqActivos().map(e => e.id);
+  const extra = Object.keys(paradas).filter(k => f.some(d => k.endsWith("|" + d))).map(k => k.split("|")[0]).filter(id => !reales.includes(id));
+  return [...reales, ...new Set(extra)].filter(id => !fe || id === fe);
+};
+function tabla(){
+  const dias = laborables(lunes, 5);
+  if (Object.keys(paradas).some(k => k.endsWith("|" + suma(lunes, 5)))) dias.push(suma(lunes, 5));   // sábado, si hay algo
+  const eqs = eqsFiltro(dias);
+  let h = '<div class="nav"><button class="secondary peq" onclick="moverSemana(-1)">&larr;</button><b>Semana del ' + fdia(lunes) + ' al ' + fdia(suma(lunes, 4)) + '</b><button class="secondary peq" onclick="moverSemana(1)">&rarr;</button><button class="secondary peq" onclick="moverSemana(0)">Hoy</button></div>' +
+    '<table class="ag"><thead><tr><th>Equipo</th><th>Zona</th><th>Hora · orden · estado</th></tr></thead><tbody>';
+  if (!eqs.length) h += '<tr><td colspan="3" class="muted">No hay equipos. Créalos con «👥 Equipos».</td></tr>';
+  for (const f of dias) {
+    const tot = eqs.reduce((s, e) => s + dia(e, f).ps.length, 0);
+    h += '<tr class="dia"><td colspan="3">' + fdia(f) + ' <span>· ' + tot + ' montaje' + (tot !== 1 ? "s" : "") + '</span></td></tr>';
+    for (const e of eqs) {
+      const p = dia(e, f), esSel = sel && sel.e === e && sel.f === f;
+      if (!p.ps.length && pseudo[e]) continue;
+      const porZona = {}; p.ps.forEach(s => (porZona[zonaDe(s.o)] ||= []).push(s));
+      const zn = Object.keys(porZona);
+      const celdaEq = '<td class="eq ' + (esSel ? "sel " : "") + estadoCarga(p) + '" rowspan="' + Math.max(1, zn.length) + '" onclick="elegir(\'' + e + '\',\'' + f + '\')" title="Ver la ruta de este día"><b>' + esc(nomEq(e)) + '</b>' + barra(p) + '<div class="muted">' + p.km + ' km · ' + hm(p.total) + ' h</div>' + marcaCarga(p) + '</td>';
+      if (!zn.length) { h += '<tr class="libre">' + celdaEq + '<td colspan="2">Libre</td></tr>'; continue; }
+      zn.forEach((z, i) => { h += '<tr>' + (i === 0 ? celdaEq : "") + '<td class="zn">' + esc(z) + '</td><td>' + porZona[z].map(s => paradaHtml(s, e, f)).join("") + '</td></tr>'; });
+    }
+  }
+  h += '</tbody></table>';
+  if (sel && dias.includes(sel.f) && eqs.includes(sel.e)) h += detalle(sel.e, sel.f);
+  return h;
+}
+const ESTX = { propuesta: "Propuesta", avisada: "Avisada", confirmada: "Confirmada" };
+function paradaHtml(s, e, f){
+  const o = s.o, idp = (s.cita ? s.cita.id : "o" + o.anyo + "_" + o.orden);
+  if (editando === idp) return '<div class="ordag ' + s.estado + '"><b>' + o.n + '</b>' +
+    '<input type="date" class="pq" id="ed_f" value="' + f + '" min="' + HOY + '" style="width:118px"><input type="time" class="pq" id="ed_h" value="' + (horaValida(s.hora) ? s.hora.padStart(5, "0") : "09:00") + '" step="900">' +
+    '<select class="pq" id="ed_e">' + eqActivos().map(q => '<option value="' + q.id + '" ' + (q.id === e ? "selected" : "") + '>' + esc(q.nombre) + '</option>').join("") + '</select>' +
+    '<span class="acc"><button onclick="guardarEdicion(' + o.anyo + ',' + o.orden + ')">✔</button><button class="secondary" onclick="editando=null;pintar()">✕</button></span>' +
+    (s.estado === "confirmada" ? '<div class="muted" style="width:100%">La cita nueva queda como «Propuesta»; la actual sigue hasta que el cliente confirme la nueva.</div>' : "") + '</div>';
+  const T = tiempoOrden(o);
+  let bts = "";
+  if (s.estado === "propuesta") bts = '<button class="ambar" onclick="abrirAviso(\'' + s.cita.id + '\')">📲 Avisar</button>';
+  else if (s.estado === "avisada") bts = '<button class="verde" onclick="confirmar(\'' + s.cita.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + s.cita.id + '\')" title="Al cliente no le va bien">✖</button>';
+  return '<div class="ordag ' + s.estado + '"><span class="hora">' + esc(s.hora || "—") + '</span>' +
+    '<a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> ' + esc(o.loc) +
+    ' <span class="muted">· ' + esc((o.cli || "").split(" ")[0]) + ' · ' + (T.t != null ? txtT(T.t) : "⏱ ?") + '</span>' +
+    '<span class="est ' + s.estado + '" title="' + (s.sinCita ? "Agendada desde Órdenes / Rutas (sin cita en esta pantalla)" : "") + '">' + ESTX[s.estado] + (s.sinCita ? "*" : "") + '</span>' +
+    '<span class="acc">' + bts + '<button class="ic" title="Cambiar fecha, hora o equipo" onclick="editando=\'' + idp + '\';pintar()">✎</button>' +
+    '<button class="ic" title="Quitar de este día" onclick="quitar(' + o.anyo + ',' + o.orden + ',\'' + (s.cita ? s.cita.id : "") + '\',\'' + s.estado + '\')">🗑</button></span></div>';
+}
+function detalle(e, f){
+  const p = dia(e, f), nave = NAVE();
+  const pts = [nave, ...p.ps.map(s => posOrden(s.o))].filter(Boolean);
+  let svg = "";
+  if (pts.length) {
+    const la = pts.map(x => x.lat), lo = pts.map(x => x.lon), m = 0.02;
+    const [a1, a2, o1, o2] = [Math.min(...la) - m, Math.max(...la) + m, Math.min(...lo) - m, Math.max(...lo) + m];
+    const X = x => 20 + (x.lon - o1) / (o2 - o1 || 1) * 260, Y = x => 195 - (x.lat - a1) / (a2 - a1 || 1) * 180;
+    const ruta = [nave, ...p.ps.map(s => posOrden(s.o)), nave].filter(Boolean);
+    svg += '<polyline points="' + ruta.map(x => X(x) + "," + Y(x)).join(" ") + '" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="4 3"/>';
+    if (nave) svg += '<circle cx="' + X(nave) + '" cy="' + Y(nave) + '" r="7" fill="#1e3a8a"/><text x="' + (X(nave) + 9) + '" y="' + (Y(nave) + 4) + '" font-size="10" fill="#1e3a8a">Nave</text>';
+    p.ps.forEach((s, i) => { const q = posOrden(s.o); if (!q) return; const col = s.estado === "confirmada" ? "#2563eb" : s.estado === "avisada" ? "#f59e0b" : "#94a3b8";
+      svg += '<circle cx="' + X(q) + '" cy="' + Y(q) + '" r="8" fill="' + col + '"/><text x="' + X(q) + '" y="' + (Y(q) + 3.5) + '" font-size="9" fill="#fff" text-anchor="middle">' + (i + 1) + '</text><text x="' + (X(q) + 10) + '" y="' + (Y(q) - 6) + '" font-size="8" fill="#64748b">' + esc(s.o.loc) + '</text>'; });
+  }
+  return '<div class="detalle"><b>🗺 Ruta · ' + esc(nomEq(e)) + ' · ' + fdia(f) + '</b><div class="muted">' + p.km + ' km · ' + hm(p.mont) + ' h montaje + ' + hm(p.viaje) + ' h viaje = <b>' + hm(p.total) + ' h</b> ' + marcaCarga(p) +
+    (nave ? "" : ' · <span style="color:#b45309">sin dirección de la nave (⚙ Ajustes): el viaje de ida y vuelta no cuenta</span>') + '</div>' +
+    (svg ? '<svg viewBox="0 0 300 210" style="width:100%;margin:8px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">' + svg + '</svg>' : "") +
+    '<div class="muted">' + (p.ps.map((s, i) => (i + 1) + ". <b>" + esc(s.hora || "—") + "</b> " + esc(s.o.loc) + (p.sug[s.o.n] && horaValida(s.hora) && Math.abs(minHora(s.hora) - minHora(p.sug[s.o.n])) > 30 ? ' <span title="Hora a la que llegaría según la ruta">(ruta: ' + p.sug[s.o.n] + ')</span>' : "")).join(" → ") || "Día libre") + '</div></div>';
+}
+/* ---------- derecha: avisar y confirmar ---------- */
+function avisos(){
+  const fe = document.getElementById("f_eq").value;
+  const lista = citasAbiertas.filter(c => !fe || c.equipo_id === fe).sort((a, b) => (a.fecha + (a.hora || "")).localeCompare(b.fecha + (b.hora || "")));
+  const ord = c => pend.find(x => x.anyo === c.anyo && x.orden === c.orden) || ordenesCita[c.anyo + "/" + c.orden] || agenda.find(x => x.anyo === c.anyo && x.orden === c.orden);
+  const fila = c => { const o = ord(c); if (!o) return "";
+    return '<div class="aviso-f ' + c.estado + '"><div class="cuando">' + fdia(c.fecha) + '<br>' + esc(c.hora) + ' h<div class="muted">' + esc(corto(c.equipo_id)) + '</div></div>' +
+      '<div><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> · ' + esc(o.cli) + ' <span class="muted">📞 ' + esc(o.tel || o.tel2 || "sin teléfono") + '</span><div class="muted">' + esc(o.loc) + ' · ' + esc(nomTienda(o.tiendaId)) + '</div>' +
+      (c.estado === "avisada" && c.avisado_at ? '<div class="muted" style="color:#92400e">Avisado por WhatsApp el ' + new Date(c.avisado_at).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + '</div>' : "") + '</div>' +
+      '<div class="bts">' + (c.estado === "propuesta" ? '<button class="ambar" onclick="abrirAviso(\'' + c.id + '\')">📲 Avisar</button>' :
+        '<button class="verde" onclick="confirmar(\'' + c.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + c.id + '\')">✖ No le va bien</button><button class="secondary" onclick="abrirAviso(\'' + c.id + '\')">Reenviar</button>') + '</div></div>'; };
+  const p = lista.filter(c => c.estado === "propuesta"), a = lista.filter(c => c.estado === "avisada");
+  return '<div class="muted" style="margin-bottom:6px">Citas que aún no ha confirmado el cliente, de la más próxima a la más lejana.</div>' +
+    '<div class="grupo">Sin avisar (' + p.length + ')</div>' + (p.map(fila).join("") || '<div class="muted">Nada pendiente.</div>') +
+    '<div class="grupo">Esperando respuesta del cliente (' + a.length + ')</div>' + (a.map(fila).join("") || '<div class="muted">Nada pendiente.</div>');
+}
+/* ---------- derecha: calendario del mes ---------- */
+function calendario(){
+  const [y, m] = mes.split("-").map(Number), ini = lunesDe(mes + "-01");
+  const sig = m === 12 ? (y + 1) + "-01" : y + "-" + pad(m + 1), ant = m === 1 ? (y - 1) + "-12" : y + "-" + pad(m - 1);
+  const fe = document.getElementById("f_eq").value, eqs = eqActivos().map(e => e.id).filter(id => !fe || id === fe);
+  let h = '<div class="nav"><button class="secondary peq" onclick="moverMes(\'' + ant + '\')">&larr;</button><b>' + MESES[m - 1] + ' ' + y + '</b><button class="secondary peq" onclick="moverMes(\'' + sig + '\')">&rarr;</button></div>' +
+    '<div class="leyenda"><span><i style="background:#16a34a"></i>con hueco (≥ 2 h)</span><span><i style="background:#f59e0b"></i>casi lleno</span><span><i style="background:#dc2626"></i>se pasa de la jornada</span><span><i style="background:#e5e7eb"></i>libre</span></div>' +
+    '<div class="cal">' + ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d => '<div class="cd">' + d + '</div>').join("");
+  for (let i = 0; i < 42; i++) {
+    const f = suma(ini, i), d = D(f), fuera = d.getMonth() + 1 !== m, finde = d.getDay() === 0 || d.getDay() === 6;
+    if (i >= 35 && fuera) break;
+    if (fuera) { h += '<div class="c fuera"><div class="d">' + d.getDate() + '</div></div>'; continue; }
+    let barras = "", n = 0, sinConf = 0;
+    for (const e of eqs) {
+      const p = dia(e, f); n += p.ps.length; sinConf += p.ps.filter(s => s.estado !== "confirmada").length;
+      if (finde && !p.ps.length) continue;
+      const libre = JORNADA() - p.total, col = !p.ps.length ? "#e5e7eb" : libre < 0 ? "#dc2626" : libre < 120 ? "#f59e0b" : "#16a34a";
+      barras += '<div class="eqb" title="' + esc(nomEq(e)) + ': ' + (p.ps.length ? hm(p.total) + " h (" + esc([...new Set(p.ps.map(s => s.o.loc))].join(", ")) + ")" : "libre") + '"><span>' + esc(corto(e)) + '</span><i><b style="width:' + (p.ps.length ? Math.min(100, p.total / JORNADA() * 100) : 0) + '%;background:' + col + '"></b></i></div>';
+    }
+    h += '<div class="c ' + (finde ? "finde " : "") + (f === HOY ? "hoy" : "") + '" onclick="irDia(\'' + f + '\')"><div class="d">' + d.getDate() + (n ? ' <span class="muted">· ' + n + '</span>' : "") + (sinConf ? ' <span title="' + sinConf + ' sin confirmar" style="color:#b45309">●' + sinConf + '</span>' : "") + '</div>' + barras + '</div>';
+  }
+  return h + '</div><div class="muted" style="margin-top:6px"><span style="color:#b45309">●</span> = citas aún sin confirmar. Pulsa un día para verlo en la tabla.</div>';
+}
+async function cambiarVista(v){ vista = v; await cargarAgenda(); pintar(); }
+async function moverSemana(n){ lunes = n === 0 ? lunesDe(HOY) : suma(lunes, 7 * n); await cargarAgenda(); pintar(); }
+async function moverMes(m){ mes = m; await cargarAgenda(); pintar(); }
+async function irDia(f){ lunes = lunesDe(f); vista = "tabla"; await cargarAgenda(); const e = eqActivos()[0]; sel = { e: sel ? sel.e : (e ? e.id : null), f }; pintar(); }
+function elegir(e, f){ sel = (sel && sel.e === e && sel.f === f) ? null : { e, f }; pintar(); }
+
+/* ======================= acciones ======================= */
+const buscarOrden = (a, o) => pend.find(x => x.anyo === a && x.orden === o) || ordenesCita[a + "/" + o] || agenda.find(x => x.anyo === a && x.orden === o);
+// Si el día pasa de la jornada, avisa pero deja hacerlo
+function aceptaCarga(o, e, f, h){
+  const p = dia(e, f, { o, estado: "propuesta", hora: h });
+  if (p.total <= JORNADA()) return true;
+  return confirm("⚠ SOBRECARGA DE TRABAJO\n\n" + nomEq(e) + " el " + fdia(f) + " quedaría con " + hm(p.total) + " h de trabajo (montaje + viaje), " +
+    hm(p.total - JORNADA()) + " h más de la jornada de " + hm(JORNADA()) + " h.\n\n¿Proponer la cita igualmente?");
+}
+async function recargarCitas(){ await cargarCitas(); await cargarAgenda(true); pintar(); }
+async function proponer(anyo, orden, e, f, h){
+  const o = buscarOrden(anyo, orden); if (!o) return;
+  if (!e || String(e).startsWith("x:")) { alert("Elige un equipo dado de alta (botón «👥 Equipos»)."); return; }
+  if (f < HOY) { alert("La fecha ya ha pasado."); return; }
+  if (!horaValida(h)) { alert("Pon una hora válida (por ejemplo 09:30)."); return; }
+  if (!aceptaCarga(o, e, f, h)) return;
+  const { error } = await client.rpc("proponer_cita", { p_anyo: anyo, p_orden: orden, p_fecha: f, p_hora: h, p_equipo: e });
+  if (error) { alert("No se ha podido proponer la cita: " + error.message); return; }
+  sel = { e, f }; lunes = lunesDe(f); if (vista === "cal") vista = "tabla";
+  await recargarCitas();
+  toast(o.n + " propuesta para el " + fdia(f) + " a las " + h + " h. Falta avisar al cliente (📲 Avisar).");
+}
+function proponerManual(anyo, orden){
+  const k = anyo + "_" + orden;
+  proponer(anyo, orden, document.getElementById("e_" + k).value, document.getElementById("f_" + k).value, document.getElementById("h_" + k).value);
+}
+async function guardarEdicion(anyo, orden){
+  const f = document.getElementById("ed_f").value, h = document.getElementById("ed_h").value, e = document.getElementById("ed_e").value;
+  editando = null;
+  await proponer(anyo, orden, e, f, h);
+}
+async function quitar(anyo, orden, citaId, estado){
+  const o = buscarOrden(anyo, orden);
+  if (!citaId) { if (confirm("La orden " + anyo + "/" + orden + " se agendó desde Órdenes o Rutas (no tiene cita aquí).\n\n¿Abrirla en Órdenes para quitarle la fecha?")) window.open("pedidos.html?anyo=" + anyo + "&orden=" + orden, "_blank"); return; }
+  const msg = estado === "confirmada"
+    ? "La cita de " + anyo + "/" + orden + " está CONFIRMADA con el cliente.\n\nSi la quitas, la orden pierde la fecha y los montadores y vuelve a «Recepcionada». Habrá que avisar al cliente.\n\n¿Quitarla?"
+    : "¿Quitar la cita propuesta de " + anyo + "/" + orden + "? La orden vuelve a «Sin agendar».";
+  if (!confirm(msg)) return;
+  const { error } = await client.rpc("cancelar_cita", { p_id: citaId, p_motivo: "Quitada desde Planificar montajes" });
+  if (error) { alert("No se ha podido quitar: " + error.message); return; }
+  if (estado === "confirmada") await cargarTodo(); else await recargarCitas();
+  toast((o ? o.n : anyo + "/" + orden) + " vuelve a «Sin agendar».");
+}
+async function confirmar(id){
+  const c = citasAbiertas.find(x => x.id === id); if (!c) return;
+  if (!confirm("¿El cliente de " + c.anyo + "/" + c.orden + " ha confirmado el " + fdia(c.fecha) + " a las " + c.hora + " h?\n\nLa orden pasará a «Agendada» con esa fecha, hora y los montadores de " + nomEq(c.equipo_id) + ".")) return;
+  const { error } = await client.rpc("confirmar_cita", { p_id: id });
+  if (error) { alert("No se ha podido confirmar: " + error.message); return; }
+  await cargarTodo();
+  toast("✅ " + c.anyo + "/" + c.orden + " confirmada → «Agendada» · " + fdia(c.fecha) + " " + c.hora + " h · " + nomEq(c.equipo_id) + ". Ya sale en Rutas y en Mi día.");
+}
+async function rechazar(id){
+  const c = citasAbiertas.find(x => x.id === id); if (!c) return;
+  const motivo = prompt("Al cliente de " + c.anyo + "/" + c.orden + " no le va bien. La orden vuelve a «Sin agendar».\n\nMotivo u otra fecha que prefiere (queda anotado en Llamadas):", "Al cliente no le va bien");
+  if (motivo === null) return;
+  const { error } = await client.rpc("cancelar_cita", { p_id: id, p_motivo: motivo || "Al cliente no le va bien" });
+  if (error) { alert("No se ha podido anular: " + error.message); return; }
+  await recargarCitas();
+  toast(c.anyo + "/" + c.orden + " vuelve a «Sin agendar».");
+}
+
+/* ---------- aviso por WhatsApp ---------- */
+function mensajeAviso(o, c){
+  const desde = minHora(c.hora) ?? 540, hasta = desde + 60, fr = m => Math.floor(m / 60) + ":" + pad(m % 60);
+  const fecha = flargo(c.fecha), Fecha = fecha[0].toUpperCase() + fecha.slice(1);
+  const nombre = capFrase((o.cli || "").trim().split(/\s+/)[0] || "");
+  const arts = o.lineas.map(l => capFrase(l.desc));
+  const pedido = arts.length ? arts.slice(0, 3).join(", ") + (arts.length > 3 ? " y " + (arts.length - 3) + " artículo" + (arts.length > 4 ? "s" : "") + " más" : "") : "su pedido";
+  return "Hola *" + nombre + "*, le escribimos de *ALMMA*, el servicio de entrega y montaje de *" + nomTienda(o.tiendaId) + "*.\n\n" +
+    "Tenemos previsto llevarle y montarle su pedido:\n📦 *" + pedido + "*\n\n" +
+    "📅 *" + Fecha + "*\n🕘 *Entre las " + fr(desde) + " y las " + fr(hasta) + " h* (hora aproximada de llegada)\n📍 " + [o.dir, o.loc].filter(Boolean).join(", ") + "\n\n" +
+    "Por favor, *responda a este mensaje*:\n✅ *SÍ* para confirmar el día y la hora\n📆 o díganos qué otro día le vendría mejor\n\n" +
+    "Para que todo vaya bien:\n• Tiene que haber una persona mayor de edad en casa.\n• Deje despejada la zona donde se va a montar.\n• Si no hay ascensor o el acceso es complicado, avísenos.\n\n" +
+    "Muchas gracias,\n*ALMMA* · Entregas y montajes\n📞 613 037 899";
+}
+const aWhats = s => esc(s).replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+function telWhats(t){ let d = String(t || "").replace(/\D/g, ""); if (d.startsWith("0034")) d = d.slice(4); if (d.length === 11 && d.startsWith("34")) d = d.slice(2); return d.length === 9 && /^[67]/.test(d) ? "34" + d : null; }   // solo móviles (los fijos no tienen WhatsApp)
+function abrirAviso(id){
+  const c = citasAbiertas.find(x => x.id === id); if (!c) return;
+  const o = buscarOrden(c.anyo, c.orden); if (!o) return;
+  const msg = mensajeAviso(o, c);
+  const tels = [o.tel, o.tel2].filter(t => telWhats(t));
+  abrirVentana('<h3>📲 Avisar por WhatsApp · ' + esc(o.cli) + '</h3><div class="muted">Orden ' + o.n + ' · ' + esc(nomTienda(o.tiendaId)) + ' · ' + esc(fdia(c.fecha)) + ' ' + esc(c.hora) + ' h · ' + esc(nomEq(c.equipo_id)) + '</div>' +
+    '<div class="fila2"><label class="muted">Enviar al:</label>' + (tels.length ? '<select id="av_tel">' + tels.map(t => '<option value="' + telWhats(t) + '">' + esc(t) + '</option>').join("") + '</select>' :
+      '<b style="color:#b91c1c">La orden no tiene un teléfono válido.</b> <span class="muted">Avisa por otro medio y luego pulsa «Marcar como avisado».</span>') +
+      '<span class="muted">Puedes retocar el texto antes de enviarlo.</span></div>' +
+    '<div class="aviso-2col"><textarea id="av_msg" oninput="document.getElementById(\'burbuja\').innerHTML=aWhats(this.value)">' + esc(msg) + '</textarea>' +
+    '<div class="whats"><div class="whats-cab">🟢 ' + esc(o.cli) + '</div><div class="whats-fondo"><div class="burbuja" id="burbuja">' + aWhats(msg) + '</div></div></div></div>' +
+    '<div class="fila2">' + (tels.length ? '<button class="verde" onclick="abrirWhatsApp()">🟢 Abrir WhatsApp</button>' : "") +
+    '<button class="ambar" onclick="marcarAvisado(\'' + id + '\')">Marcar como avisado</button><button class="secondary" onclick="cerrarVentana()">Cancelar</button></div>' +
+    '<div class="muted">«Abrir WhatsApp» abre WhatsApp (o WhatsApp Web) con el número y el mensaje escritos: solo hay que pulsar Enviar. Después, «Marcar como avisado»: queda anotado en la pestaña «Llamadas» de la orden con el texto enviado.</div>');
+}
+function abrirWhatsApp(){ window.open("https://wa.me/" + document.getElementById("av_tel").value + "?text=" + encodeURIComponent(document.getElementById("av_msg").value), "_blank"); }
+async function marcarAvisado(id){
+  const texto = document.getElementById("av_msg").value;
+  const { error } = await client.rpc("marcar_cita_avisada", { p_id: id, p_texto: texto });
+  if (error) { alert("No se ha podido marcar: " + error.message); return; }
+  cerrarVentana(); await recargarCitas();
+  toast("📲 Avisado. Cuando el cliente conteste, pulsa ✅ Confirmar o ✖.");
+}
+
+/* ---------- tiempo de montaje por artículo ---------- */
+const TIEMPOS = [null, 5, 10, 15, 20, 30, 45, 60, 75, 90, 120, 150, 180, 240, 300, 360, 420, 480];
+function abrirTiempo(anyo, orden){
+  const o = buscarOrden(anyo, orden); if (!o) return;
+  if (!o.lineas.length) { alert("Esta orden no tiene líneas de mercancía: no hay artículos a los que poner tiempo."); return; }
+  const filas = o.lineas.map((l, i) => {
+    const t = tiempos[l.fab + "|" + l.art], val = efectivo(l.fab, l.art);
+    const opts = [...new Set([...TIEMPOS, val].filter(v => v !== undefined))].sort((a, b) => (a ?? -1) - (b ?? -1));
+    const origen = !t || (t.minutos == null && !usaMedia(t)) ? '<span class="nuevo">nuevo: ponlo tú</span>' : usaMedia(t) ? '<span class="med">📏 media real de ' + t.n_medidas + ' montajes</span>' :
+      (t.puesto_en_anyo === o.anyo && t.puesto_en_orden === o.orden ? '<span class="apr">puesto en esta orden</span>' : '<span class="apr">⚡ puesto a mano' + (t.puesto_en_orden ? " (orden " + t.puesto_en_anyo + "/" + t.puesto_en_orden + ")" : "") + '</span>') + (t.fijado_a_mano ? ' <span class="muted">· fijado, manda sobre la media</span>' : "");
+    const real = t && t.n_medidas ? '<b>' + hm(Math.round(+t.media_real)) + ' h</b> <span class="muted">· ' + t.n_medidas + ' montaje' + (t.n_medidas > 1 ? "s" : "") + '</span>' + (t.n_medidas < (cfg.min_medidas || 3) ? '<div class="muted">aún pocos, no se usa</div>' : "") : '<span class="muted">sin datos aún</span>';
+    return '<tr><td>' + esc(capFrase(l.desc)) + '</td><td>' + esc(nomFab(l.fab)) + '</td><td>' + l.cant + '</td><td><select id="tl_' + i + '" data-orig="' + (val ?? "") + '">' + opts.map(v => '<option value="' + (v ?? "") + '" ' + (v === val ? "selected" : "") + '>' + txtT(v) + '</option>').join("") + '</select></td><td>' + origen + '</td><td>' + real + '</td></tr>';
+  }).join("");
+  abrirVentana('<h3>⏱ Tiempo de montaje · ' + o.n + '</h3><div class="muted">' + esc(o.cli) + ' · ' + esc(nomTienda(o.tiendaId)) + '. Se pone por artículo (tiempo por unidad) y se guarda: las próximas órdenes con el <b>mismo artículo y el mismo fabricante</b> lo traerán puesto solo.</div>' +
+    '<table class="tt"><thead><tr><th>Artículo</th><th>Fabricante</th><th>Cant.</th><th>Tiempo por unidad</th><th>De dónde sale</th><th>📏 Real (firmas PDA)</th></tr></thead><tbody>' + filas + '</tbody></table>' +
+    '<div class="explica">📏 <b>Cómo se aprende:</b> cuando el cliente firma en la PDA se guarda la hora. El tiempo de esa orden = hora de su firma − hora de la firma anterior del mismo montador ese día (o la hora de salida, si es la primera) − el viaje estimado. Se reparte entre sus artículos y se hace la media por <b>artículo + fabricante</b>. Con ' + (cfg.min_medidas || 3) + ' montajes o más, el tiempo propuesto pasa a ser la media real (salvo que lo cambies aquí a mano: entonces manda el tuyo).</div>' +
+    '<div class="fila2"><button onclick="guardarTiempo(' + anyo + ',' + orden + ')">💾 Guardar</button><button class="secondary" onclick="cerrarVentana()">Cancelar</button></div>');
+}
+async function guardarTiempo(anyo, orden){
+  const o = buscarOrden(anyo, orden), filas = [];
+  o.lineas.forEach((l, i) => {
+    const s = document.getElementById("tl_" + i); if (s.value === "" || s.value === s.dataset.orig) return;
+    const t = tiempos[l.fab + "|" + l.art], v = +s.value;
+    filas.push({ fabricante: l.fab, articulo: l.art, minutos: v, fijado_a_mano: !!(t && t.n_medidas >= (cfg.min_medidas || 3)),
+      puesto_en_anyo: anyo, puesto_en_orden: orden, actualizado_at: new Date().toISOString(), actualizado_por: user.id });
+  });
+  if (!filas.length) { cerrarVentana(); return; }
+  const unicas = Object.values(Object.fromEntries(filas.map(f => [f.fabricante + "|" + f.articulo, f])));
+  const { error } = await client.from("tiempos_montaje").upsert(unicas, { onConflict: "fabricante,articulo" });
+  if (error) { alert("No se ha podido guardar: " + error.message); return; }
+  const antes = new Set(pend.filter(x => x.n !== o.n && tiempoOrden(x).t != null).map(x => x.n));
+  await cargarTiempos(); cerrarVentana(); pintar();
+  const otras = pend.filter(x => x.n !== o.n && tiempoOrden(x).t != null && !antes.has(x.n)).map(x => x.n);
+  toast("⏱ Guardado." + (tiempoOrden(o).t != null ? " " + o.n + ": " + hm(tiempoOrden(o).t) + " h." : " Aún falta algún artículo.") + (otras.length ? " También se ha completado solo en: " + otras.slice(0, 6).join(", ") + (otras.length > 6 ? "…" : "") + "." : ""));
+}
+
+/* ---------- equipos ---------- */
+function abrirEquipos(){
+  const activos = montadores.filter(m => m.activo);
+  const bloque = (e, i) => '<div class="eqed" data-id="' + (e.id || "") + '"><div class="fila2" style="margin:0"><input class="eq_nom" value="' + esc(e.nombre || "") + '" placeholder="Nombre del equipo (p. ej. CESAR / FRANCISCO)" style="flex:1;min-width:220px">' +
+    '<label class="muted"><input type="checkbox" class="eq_act" ' + (e.activo !== false ? "checked" : "") + '> Activo</label></div>' +
+    '<div class="monts">' + activos.map(m => '<label><input type="checkbox" class="eq_m" value="' + m.id + '" ' + ((e.montadores || []).includes(m.id) ? "checked" : "") + '> ' + esc(m.nombre) + '</label>').join("") + '</div></div>';
+  abrirVentana('<h3>👥 Equipos de montaje</h3><div class="muted">Cada equipo es un grupo fijo de montadores. Al confirmar una cita, a la orden se le ponen los montadores de su equipo. Un equipo que ya no se usa se desmarca como «Activo» (no se borra, para no perder su historial).</div>' +
+    '<div id="eq_lista" style="margin-top:10px">' + equipos.map(bloque).join("") + '</div>' +
+    '<div class="fila2"><button class="secondary" onclick="document.getElementById(\'eq_lista\').insertAdjacentHTML(\'beforeend\', window._nuevoEq)">➕ Nuevo equipo</button><span style="flex:1"></span><button onclick="guardarEquipos()">💾 Guardar</button><button class="secondary" onclick="cerrarVentana()">Cancelar</button></div>');
+  window._nuevoEq = bloque({ activo: true, montadores: [] });
+}
+async function guardarEquipos(){
+  const bloques = [...document.querySelectorAll("#eq_lista .eqed")];
+  for (const [i, b] of bloques.entries()) {
+    const monts = [...b.querySelectorAll(".eq_m:checked")].map(x => x.value);
+    let nombre = b.querySelector(".eq_nom").value.trim();
+    if (!nombre && !monts.length) continue;
+    if (!nombre) nombre = monts.map(id => (montadores.find(m => m.id === id) || {}).nombre || "?").map(s => s.toUpperCase()).join(" / ");
+    const fila = { nombre, montadores: monts, activo: b.querySelector(".eq_act").checked, orden: i };
+    const id = b.dataset.id;
+    const { error } = id ? await client.from("equipos_montaje").update(fila).eq("id", id) : await client.from("equipos_montaje").insert(fila);
+    if (error) { alert("No se ha podido guardar «" + nombre + "»: " + error.message); return; }
+  }
+  await cargarEquipos(); cerrarVentana(); rellenarFiltros(); pintar(); toast("👥 Equipos guardados.");
+}
+
+/* ---------- ajustes ---------- */
+function abrirAjustes(){
+  abrirVentana('<h3>⚙ Ajustes de la planificación</h3>' +
+    '<div class="fila2"><label class="campo" style="flex:1">Dirección de la nave (de donde salen los equipos)<input id="aj_nave" value="' + esc(cfg.nave_direccion || "") + '" placeholder="Calle, número, CP, población"></label></div>' +
+    '<div class="muted">' + (cfg.nave_lat != null ? "✔ Situada en el mapa." : "Aún sin situar: sin ella no se cuenta el viaje de ida y vuelta a la nave ni se ordena por cercanía.") + '</div>' +
+    '<div class="fila2"><label class="campo">Hora de salida<input id="aj_hora" type="time" value="' + esc(cfg.hora_salida || "08:00") + '"></label>' +
+    '<label class="campo">Jornada (horas)<input id="aj_jor" type="number" min="1" max="14" step="0.5" value="' + ((cfg.jornada_min || 480) / 60) + '" style="width:90px"></label>' +
+    '<label class="campo">Velocidad media (km/h)<input id="aj_vel" type="number" min="10" max="120" value="' + (cfg.velocidad_kmh || 45) + '" style="width:90px"></label>' +
+    '<label class="campo">Montajes medidos para fiarse<input id="aj_min" type="number" min="1" max="50" value="' + (cfg.min_medidas || 3) + '" style="width:90px"></label></div>' +
+    '<div class="fila2"><button onclick="guardarAjustes()">💾 Guardar</button><button class="secondary" onclick="cerrarVentana()">Cancelar</button></div>' +
+    '<hr style="border:none;border-top:1px solid #e2e8f0;margin:14px 0"><b>📏 Tiempos reales</b><div class="muted">Se recalculan solos cada 12 horas con las firmas de la PDA. Última vez: ' +
+    (cfg.tiempos_recalculados_at ? new Date(cfg.tiempos_recalculados_at).toLocaleString("es-ES") : "nunca") + '</div>' +
+    '<div class="fila2"><button class="secondary" onclick="recalcular(true)">📏 Recalcular ahora</button></div>');
+}
+async function guardarAjustes(){
+  const dir = document.getElementById("aj_nave").value.trim();
+  const fila = { nave_direccion: dir || null, hora_salida: document.getElementById("aj_hora").value || "08:00",
+    jornada_min: Math.round(+document.getElementById("aj_jor").value * 60) || 480, velocidad_kmh: +document.getElementById("aj_vel").value || 45,
+    min_medidas: +document.getElementById("aj_min").value || 3 };
+  if (dir && dir !== cfg.nave_direccion) {
+    try { const p = await nominatim(dir + ", España"); if (!p) { alert("No se ha encontrado esa dirección en el mapa. Revisa cómo está escrita."); return; } fila.nave_lat = p.lat; fila.nave_lon = p.lon; }
+    catch (e) { alert("El mapa no responde ahora mismo. Prueba en un rato."); return; }
+  }
+  if (!dir) { fila.nave_lat = null; fila.nave_lon = null; }
+  const { error } = await client.from("planificacion_config").update(fila).eq("id", 1);
+  if (error) { alert("No se ha podido guardar: " + error.message); return; }
+  await cargarCfg(); cerrarVentana(); pintar(); toast("⚙ Ajustes guardados.");
+}
+async function recalcular(aMano){
+  const { data, error } = await client.rpc("recalcular_tiempos_reales");
+  if (error) { if (aMano) alert("No se ha podido recalcular: " + error.message); return; }
+  await Promise.all([cargarTiempos(), cargarCfg()]); pintar();
+  if (aMano) { cerrarVentana(); toast("📏 Tiempos reales recalculados: " + data + " artículos con medidas."); }
+}
+function recalculoAutomatico(){
+  const t = cfg.tiempos_recalculados_at ? new Date(cfg.tiempos_recalculados_at) : null;
+  if (!t || Date.now() - t > 12 * 3600e3) recalcular(false);
+}
+</script>
+</body>
+</html>

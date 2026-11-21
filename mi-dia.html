@@ -825,7 +825,11 @@ async function enviarUno(it){
       const { error } = await client.from("fotos_orden").insert({ anyo:it.anyo, orden:it.orden, storage_path:it.path, categoria:it.categoria, comentario:it.comentario || null, subida_por:uid });
       if (error) throw error;
     } else {
-      const { error } = await client.from("entregas").insert({ anyo:it.anyo, orden:it.orden, firmante_nombre:it.nombre, firma_storage_path:it.path, observaciones:it.obs, montador_id:uid });
+      // firmado_at = momento real de la firma (si se envía más tarde por falta de cobertura, no vale la hora del envío):
+      // con esa hora se miden los tiempos reales de montaje en Planificar montajes
+      const fila = { anyo:it.anyo, orden:it.orden, firmante_nombre:it.nombre, firma_storage_path:it.path, observaciones:it.obs, montador_id:uid };
+      if (it.ts) fila.firmado_at = new Date(it.ts).toISOString();
+      const { error } = await client.from("entregas").insert(fila);
       if (error) throw error;
     }
   } else if (it.tipo === "cobro") {   // la base de datos apunta el cobro y descuenta el pendiente; si se repite no cobra dos veces

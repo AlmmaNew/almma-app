@@ -17,7 +17,7 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 <ol>
 <li>La <b>tienda</b> crea el pedido.</li>
 <li>El <b>almacén</b> recibe la mercancía y la registra → el pedido pasa solo a «recepcionado parcial» o «total».</li>
-<li>La <b>oficina</b> asigna montador, fecha y cita → «agendado».</li>
+<li>La <b>oficina</b> planifica el montaje en <b>📍 Planificar montajes</b>, avisa al cliente y, cuando confirma → «agendado».</li>
 <li>El <b>montador</b> monta, sube fotos y recoge la firma del cliente → «completado» y queda pendiente de facturar.</li>
 </ol>
 
@@ -100,7 +100,37 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 </ul>
 <p>El <b>montador</b> ve su trabajo en <b>📱 Mi día</b>: sus montajes, fotos, firma del cliente y servicios adicionales. Desde el botón <b>📷 Fotos</b> de arriba abre la galería con las fotos de sus montajes.</p>
 
-<h2>6. Galería de fotos</h2>
+<h2>6. Planificar montajes (agendar, avisar y confirmar)</h2>
+<p>Botón <b>📍 Planificar montajes</b>. Solo lo ven la oficina y los administradores. Sirve para decidir qué día y qué equipo monta cada orden, avisar al cliente por WhatsApp y dejarla agendada cuando el cliente dice que sí.</p>
+<div class="ok"><b>Antes de empezar (una sola vez):</b> en <b>👥 Equipos</b> crea los equipos de montadores (p. ej. «CESAR / FRANCISCO»), y en <b>⚙ Ajustes</b> escribe la <b>dirección de la nave</b>, la hora de salida y la jornada (8 h). La primera vez la pantalla tarda un poco en <b>situar las poblaciones en el mapa</b>; después ya lo recuerda.</div>
+<h3>Izquierda: órdenes sin agendar</h3>
+<ul>
+<li>Salen las órdenes con <b>toda la mercancía recibida</b> («Recepcionada») que aún no tienen montaje, <b>agrupadas por zona</b> (comarca) y población. Por defecto, las recibidas en los <b>últimos 6 meses</b> (el desplegable «Recibidas» amplía a más tiempo). Las que no tienen población salen al final en <b>📭 Sin población</b>: complétala en Órdenes.</li>
+<li>Bajo cada zona, <b>🚚 Van por esta zona</b>: qué equipos y días de las 2 próximas semanas ya tienen montajes allí y cuántas horas les quedan libres.</li>
+<li>Cada orden muestra los <b>km desde la tienda</b> («≈» mientras se calcula la distancia por carretera). <b>Tempur y Dimaflex no llevan kilometraje.</b></li>
+<li><b>⏱ Tiempo de montaje</b>: se pone por <b>artículo</b> (tiempo por unidad). Se guarda por <b>artículo + fabricante</b>, así que la próxima orden con el mismo artículo del mismo fabricante lo trae puesto solo (<b>⚡ automático</b>). Además se aprende de los montajes reales con la hora de la firma del cliente en la PDA (<b>📏 medido</b>): cuando un artículo tiene 3 montajes medidos, manda la media real (salvo que lo cambies a mano).</li>
+<li><b>🚚 Días posibles</b>: días en los que un equipo <b>ya tiene algo agendado</b> cerca. Verde = va a su zona y cabe; verde claro = pasa cerca; rojo = va por la zona pero no cabe (<b>Usar igual</b>). Pulsa <b>Usar</b> para proponer ese día con la hora aproximada.</li>
+<li>Si prefieres otra cosa: <b>✍ Fecha a mano</b> (fecha, hora y equipo) y pulsa <b>📅</b>.</li>
+</ul>
+<h3>Derecha: agendadas</h3>
+<table>
+<tr><th>Vista</th><th>Qué enseña</th></tr>
+<tr><td>📋 Tabla</td><td>La semana por <b>día → equipo → zona</b>, con la hora y el estado de cada orden, las horas ocupadas sobre la jornada y lo que queda libre. Pulsando un equipo se ve la ruta del día en un mapa. Cada orden tiene <b>✎</b> (cambiar fecha, hora o equipo) y <b>🗑</b> (quitar).</td></tr>
+<tr><td>📲 Avisar y confirmar</td><td>Las citas que el cliente aún no ha confirmado: «sin avisar» y «esperando respuesta».</td></tr>
+<tr><td>🗓 Calendario</td><td>El mes entero con una barrita por equipo y día (verde = hueco, amarillo = casi lleno, rojo = se pasa). Pulsa un día para verlo en la tabla.</td></tr>
+</table>
+<ul>
+<li>Un equipo con el día lleno sale en <b>amarillo «✔ Día completo»</b>; si pasa de la jornada, en <b>rojo «⚠ Sobrecarga»</b>. Si propones algo que hace pasar de la jornada, la pantalla <b>avisa de la sobrecarga</b> pero te deja hacerlo.</li>
+</ul>
+<h3>Los tres pasos de una cita</h3>
+<ol>
+<li><b>Propuesta</b> (gris): tiene día, hora y equipo, pero el cliente aún no sabe nada. La orden sigue «Recepcionada».</li>
+<li><b>📲 Avisar</b>: sale el mensaje de WhatsApp ya escrito (tienda, artículos, fecha, franja de una hora, dirección y consejos). <b>🟢 Abrir WhatsApp</b> lo abre con el número del cliente; envíalo y pulsa <b>Marcar como avisado</b> (amarillo). Queda anotado en la pestaña <b>Llamadas</b> de la orden.</li>
+<li>Cuando el cliente conteste: <b>✅ Confirmar</b> → la orden pasa a <b>«Agendada»</b> con esa fecha, hora y los montadores del equipo (sale en Rutas y en Mi día). Si no le va bien: <b>✖ No le va bien</b> → vuelve a «Sin agendar».</li>
+</ol>
+<div class="aviso">Si cambias la fecha, la hora o el equipo de una cita, vuelve a <b>Propuesta</b> y hay que avisar otra vez al cliente. Si la cita ya estaba confirmada, la orden mantiene la fecha anterior hasta que el cliente confirme la nueva. Las tiendas solo ven la cita cuando está <b>confirmada</b>.</div>
+
+<h2>7. Galería de fotos</h2>
 <p>Botón <b>📷 Galería de fotos</b>. Todas las fotos y vídeos que suben los montadores, <b>agrupados por orden</b> (la más reciente arriba). Cada orden muestra el <b>número</b>, el <b>cliente</b>, la localidad, la tienda, la referencia de pedido, la fecha de montaje, los montadores y el estado.</p>
 <ul>
 <li><b>Buscar</b>: por nº de orden, cliente, referencia de pedido, localidad, tienda o montador (no hace falta poner tildes).</li>
@@ -116,7 +146,7 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 </table>
 <div class="ok">La galería solo sirve para <b>ver</b> las fotos. Se suben, como siempre, desde cada montaje en <b>Mi día</b>. Necesita conexión a internet.</div>
 
-<h2>7. Devoluciones (almacén de cambios)</h2>
+<h2>8. Devoluciones (almacén de cambios)</h2>
 <p>Botón <b>↩️ Devoluciones</b>. Controla la mercancía devuelta y lo que se cambia.</p>
 <ul>
 <li><b>📦 Stock de cambios</b>: qué hay ahora (entró, salió, <b>STOCK</b>, ubicación). «Dar salida» entrega una pieza.</li>
@@ -124,14 +154,14 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 <li><b>➕ Entrada de devolución</b> y <b>➖ Salida manual</b>: rellena fecha, albarán, pedido del fabricante, orden de origen, líneas, bultos y peso.</li>
 </ul>
 
-<h2>8. Incidencias</h2>
+<h2>9. Incidencias</h2>
 <p>Pantalla <b>Gestión de Incidencias</b>. Filtra por orden, cliente, tienda, fechas y estado (abiertas, en proceso, resueltas). Cada una se pasa a <b>«en proceso»</b> y luego a <b>«resuelta»</b>.</p>
 <div class="aviso">Al <b>resolver</b> una incidencia, la orden <b>no vuelve</b> sola a su estado anterior (por ejemplo «recepcionado total»). Hay que cambiarlo a mano en la orden.</div>
 
-<h2>9. Albarán de salida / entrega</h2>
+<h2>10. Albarán de salida / entrega</h2>
 <p>Es el documento que acompaña la entrega: artículos, cantidades, bultos, peso, ubicación y fecha/hora de montaje previstos, con el logo de la tienda. Botón <b>Imprimir / Guardar PDF</b>.</p>
 
-<h2>10. Otras pantallas</h2>
+<h2>11. Otras pantallas</h2>
 <table>
 <tr><th>Botón</th><th>Para qué</th></tr>
 <tr><td>🧾 Facturación</td><td>Pendientes, borradores y emitidas. Normalmente solo oficina/dirección.</td></tr>
