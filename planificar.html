@@ -956,7 +956,7 @@ async function rechazar(id){
 
 /* ---------- aviso por WhatsApp ---------- */
 /* Franja de llegada de 2 horas (petición de Arturo, 21-11-2026): «Llegamos de 10 a 12 h». Por defecto empieza en la hora en punto de la cita. */
-const FRANJA_MIN = 120, FRANJAS = [8, 9, 10, 11, 12, 15, 16, 17];
+const FRANJA_MIN = 120, FRANJAS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 const frH = m => Math.floor(m / 60) + (m % 60 ? ":" + pad(m % 60) : "");
 const lineaFranja = desde => "🕘 *Llegamos de " + frH(desde) + " a " + frH(desde + FRANJA_MIN) + " h* (hora aproximada)";
 const franjaDe = c => Math.floor((minHora(c.hora) ?? 540) / 60) * 60;
