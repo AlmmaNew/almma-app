@@ -156,6 +156,8 @@ table.ag tr.libre td{color:#15803d;}
 .aviso-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0;}
 @media(max-width:760px){.aviso-2col{grid-template-columns:1fr;}}
 #ventana .aviso-2col textarea{height:430px;margin:0;font-size:12.5px;line-height:1.4;width:100%;}
+#av_franjas button.franja{background:#fff;color:#1e3a8a;border:1px solid #93c5fd;padding:3px 9px;font-size:12px;font-weight:600;}
+#av_franjas button.franja.on{background:#2563eb;color:#fff;border-color:#2563eb;}
 .whats{border:1px solid #d1d5db;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;height:430px;}
 .whats-cab{background:#075e54;color:#fff;font-size:13px;font-weight:600;padding:8px 12px;}
 .whats-fondo{flex:1;background:#efeae2;padding:12px;overflow-y:auto;}
@@ -953,15 +955,26 @@ async function rechazar(id){
 }
 
 /* ---------- aviso por WhatsApp ---------- */
+/* Franja de llegada de 2 horas (petición de Arturo, 21-11-2026): «Llegamos de 10 a 12 h». Por defecto empieza en la hora en punto de la cita. */
+const FRANJA_MIN = 120, FRANJAS = [8, 9, 10, 11, 12, 15, 16, 17];
+const frH = m => Math.floor(m / 60) + (m % 60 ? ":" + pad(m % 60) : "");
+const lineaFranja = desde => "🕘 *Llegamos de " + frH(desde) + " a " + frH(desde + FRANJA_MIN) + " h* (hora aproximada)";
+const franjaDe = c => Math.floor((minHora(c.hora) ?? 540) / 60) * 60;
+function ponerFranja(desde){
+  const ta = document.getElementById("av_msg"); if (!ta || desde == null || isNaN(desde)) return;
+  ta.value = /🕘 [^\n]*/.test(ta.value) ? ta.value.replace(/🕘 [^\n]*/, lineaFranja(desde)) : ta.value;
+  document.getElementById("burbuja").innerHTML = aWhats(ta.value);
+  document.querySelectorAll("#av_franjas .franja").forEach(b => b.classList.toggle("on", +b.dataset.m === desde));
+  const h = document.getElementById("av_franja_h"); if (h) h.value = pad(Math.floor(desde / 60)) + ":" + pad(desde % 60);
+}
 function mensajeAviso(o, c){
-  const desde = minHora(c.hora) ?? 540, hasta = desde + 60, fr = m => Math.floor(m / 60) + ":" + pad(m % 60);
   const fecha = flargo(c.fecha), Fecha = fecha[0].toUpperCase() + fecha.slice(1);
   const nombre = capFrase((o.cli || "").trim().split(/\s+/)[0] || "");
   const arts = o.lineas.map(l => capFrase(l.desc));
   const pedido = arts.length ? arts.slice(0, 3).join(", ") + (arts.length > 3 ? " y " + (arts.length - 3) + " artículo" + (arts.length > 4 ? "s" : "") + " más" : "") : "su pedido";
   return "Hola *" + nombre + "*, le escribimos de *ALMMA*, el servicio de entrega y montaje de *" + nomTienda(o.tiendaId) + "*.\n\n" +
     "Tenemos previsto llevarle y montarle su pedido:\n📦 *" + pedido + "*\n\n" +
-    "📅 *" + Fecha + "*\n🕘 *Entre las " + fr(desde) + " y las " + fr(hasta) + " h* (hora aproximada de llegada)\n📍 " + [o.dir, o.loc].filter(Boolean).join(", ") + "\n\n" +
+    "📅 *" + Fecha + "*\n" + lineaFranja(franjaDe(c)) + "\n📍 " + [o.dir, o.loc].filter(Boolean).join(", ") + "\n\n" +
     "Por favor, *responda a este mensaje*:\n✅ *SÍ* para confirmar el día y la hora\n📆 o díganos qué otro día le vendría mejor\n\n" +
     "Para que todo vaya bien:\n• Tiene que haber una persona mayor de edad en casa.\n• Deje despejada la zona donde se va a montar.\n• Si no hay ascensor o el acceso es complicado, avísenos.\n\n" +
     "Muchas gracias,\n*ALMMA* · Entregas y montajes\n📞 613 037 899";
@@ -977,6 +990,9 @@ function abrirAviso(id){
     '<div class="fila2"><label class="muted">Enviar al:</label>' + (tels.length ? '<select id="av_tel">' + tels.map(t => '<option value="' + telWhats(t) + '">' + esc(t) + '</option>').join("") + '</select>' :
       '<b style="color:#b91c1c">La orden no tiene un teléfono válido.</b> <span class="muted">Avisa por otro medio y luego pulsa «Marcar como avisado».</span>') +
       '<span class="muted">Puedes retocar el texto antes de enviarlo.</span></div>' +
+    '<div class="fila2" id="av_franjas"><label class="muted">🕘 Franja de llegada (2 h):</label>' +
+      FRANJAS.map(h => '<button type="button" class="franja' + (h * 60 === franjaDe(c) ? " on" : "") + '" data-m="' + (h * 60) + '" onclick="ponerFranja(' + (h * 60) + ')">' + h + '–' + (h + 2) + ' h</button>').join("") +
+      '<label class="muted">o desde las <input type="time" id="av_franja_h" class="pq" step="900" value="' + pad(Math.floor(franjaDe(c) / 60)) + ':00" onchange="ponerFranja(minHora(this.value))"></label></div>' +
     '<div class="aviso-2col"><textarea id="av_msg" oninput="document.getElementById(\'burbuja\').innerHTML=aWhats(this.value)">' + esc(msg) + '</textarea>' +
     '<div class="whats"><div class="whats-cab">🟢 ' + esc(o.cli) + '</div><div class="whats-fondo"><div class="burbuja" id="burbuja">' + aWhats(msg) + '</div></div></div></div>' +
     '<div class="fila2">' + (tels.length ? '<button class="verde" onclick="abrirWhatsApp()">🟢 Abrir WhatsApp</button>' : "") +
