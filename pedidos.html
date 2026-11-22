@@ -57,13 +57,49 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 #visor_tarifa .spacer{flex:1;}
 #visor_tarifa iframe{flex:1;border:0;width:100%;}
 @media (max-width:1100px){#visor_tarifa{right:0;}}
-#panel_detalle .panel-head{padding:18px 24px 0;}
-#panel_detalle .panel-head h3{margin:0 0 4px;}
-#panel_detalle .tabs{display:flex;gap:2px;padding:0 24px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
-#panel_detalle .tab-btn{background:none;border:none;color:var(--muted);padding:10px 14px;font-size:13px;font-weight:600;border-bottom:2px solid transparent;border-radius:0;}
-#panel_detalle .tab-btn.activa{color:var(--primary);border-bottom-color:var(--primary);}
+/* --- ficha de la orden: cabecera con resumen --- */
+#panel_detalle{background:#f8fafc;}
+#panel_detalle .panel-head{padding:16px 24px 12px;background:#fff;border-top:6px solid var(--est,#94a3b8);border-bottom:1px solid var(--border);}
+.ph-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.ph-num{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.3px;}
+.ph-spacer{flex:1;}
+.ph-btn{padding:6px 12px;font-size:13px;}
+.ph-del{color:#dc2626 !important;border-color:#fca5a5 !important;}
+.ph-del:hover{background:#fef2f2 !important;}
+.tarjeta-peligro{border-color:#fecaca;margin-top:24px;}
+.tarjeta-peligro .tarjeta-titulo{color:#b91c1c;}
+.ph-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;margin-right:4px;}
+.ph-cliente{font-size:24px;font-weight:700;margin:8px 0 4px;line-height:1.2;}
+.ph-cliente.vacio{color:var(--muted);font-weight:500;font-style:italic;}
+.ph-meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:#374151;}
+.ph-meta a{color:var(--primary);text-decoration:none;}
+.ph-meta b{color:var(--muted);font-weight:600;}
+.ph-pasos{display:flex;gap:0;margin:14px 0 4px;}
+.ph-paso{flex:1;position:relative;padding:0 6px 0 0;}
+.ph-paso .barra-p{height:6px;border-radius:3px;background:#e5e7eb;margin-bottom:6px;}
+.ph-paso.hecho .barra-p{background:var(--est,#2563eb);}
+.ph-paso.parcial .barra-p{background:linear-gradient(90deg,var(--est,#2563eb) 50%,#e5e7eb 50%);}
+.ph-paso .t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);}
+.ph-paso.hecho .t,.ph-paso.parcial .t{color:var(--text);}
+.ph-paso .v{font-size:13px;margin-top:1px;}
+.ph-paso .v.nada{color:#9ca3af;}
+.ph-auditoria{color:var(--muted);font-size:11px;margin-top:6px;}
+#panel_detalle .tabs{display:flex;gap:4px;padding:8px 20px;background:#fff;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+#panel_detalle .tab-btn{background:none;border:1px solid transparent;color:#4b5563;padding:6px 11px;font-size:13px;font-weight:600;border-radius:8px;}
+#panel_detalle .tab-btn:hover{background:#f1f5f9;opacity:1;}
+#panel_detalle .tab-btn.activa{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;}
 #panel_detalle .tab-panel{display:none;padding:18px 24px;overflow-y:auto;flex:1;}
 #panel_detalle .tab-panel.activa{display:block;}
+.tarjeta{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px 4px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+.tarjeta > button{margin-bottom:12px;}
+.tarjeta-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1e3a8a;margin-bottom:10px;}
+.dato{font-size:14px;padding:8px 0;font-weight:600;}
+.casilla{display:flex !important;align-items:center;gap:6px;font-size:14px !important;color:var(--text) !important;padding:8px 0;}
+.casilla input{width:auto !important;}
+#pie_grabar{display:none;align-items:center;gap:12px;justify-content:flex-end;padding:10px 96px 10px 24px;background:#fff;border-top:1px solid var(--border);}
+#pie_grabar.ver{display:flex;}
+#pie_grabar .meta{font-size:12px;color:var(--muted);}
+#pie_grabar button{padding:9px 20px;font-weight:600;}
 .campo{margin-bottom:14px;}
 .campo label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600;}
 .campo select,.campo textarea,.campo input{width:100%;}
@@ -168,6 +204,8 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 .muted{color:#6b7280}</style>
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
 <script src="campana.js"></script>
+<link rel="stylesheet" href="estilo_oficina.css">
+<script src="volver.js" defer></script>
 </head>
 <body>
 
@@ -385,88 +423,113 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
   <iframe id="vt_frame" title="Tarifa"></iframe>
 </div>
 <div id="panel_detalle">
-  <div class="panel-head">
-    <button class="secondary" onclick="cerrarPanel()" style="float:right;">✕</button>
-    <button class="secondary" onclick="eliminarOrdenActiva()" style="float:right;margin-right:8px;color:#dc2626;">Eliminar orden</button>
-    <h3 id="d_titulo"></h3>
-    <div id="d_auditoria" style="color:var(--muted);font-size:11px;margin-bottom:10px;"></div>
+  <div class="panel-head" id="d_head">
+    <div class="ph-top">
+      <span class="ph-num" id="d_titulo"></span>
+      <span id="d_estado_pill"></span>
+      <span id="d_badges"></span>
+      <span class="ph-spacer"></span>
+      <button class="secondary ph-btn" onclick="cerrarPanel()" title="Cerrar">✕</button>
+    </div>
+    <div class="ph-cliente" id="d_cliente"></div>
+    <div class="ph-meta" id="d_meta"></div>
+    <div class="ph-pasos" id="d_pasos"></div>
+    <div class="ph-auditoria" id="d_auditoria"></div>
   </div>
 
   <div class="tabs">
-    <button class="tab-btn activa" data-tab="tab_cabecera" onclick="cambiarTab('tab_cabecera')">Cabecera</button>
-    <button class="tab-btn" data-tab="tab_lineas" onclick="cambiarTab('tab_lineas')">Líneas</button>
-    <button class="tab-btn" data-tab="tab_montaje" onclick="cambiarTab('tab_montaje')">Montaje</button>
-    <button class="tab-btn" data-tab="tab_observaciones" onclick="cambiarTab('tab_observaciones')">Observaciones</button>
-    <button class="tab-btn" data-tab="tab_documentos" onclick="cambiarTab('tab_documentos')">Documentos adjuntos</button>
-    <button class="tab-btn" data-tab="tab_incidencias" onclick="cambiarTab('tab_incidencias')">Incidencias</button>
-    <button class="tab-btn" data-tab="tab_historial" onclick="cambiarTab('tab_historial')">Historial</button>
-    <button class="tab-btn" data-tab="tab_llamadas" onclick="cambiarTab('tab_llamadas')">Llamadas</button>
-    <button class="tab-btn" data-tab="tab_avisos_tienda" onclick="cambiarTab('tab_avisos_tienda')">Avisos tienda <span id="avisos_tienda_punto" style="display:none">🔔</span></button>
-    <button class="tab-btn" data-tab="tab_chat" onclick="cambiarTab('tab_chat'); cargarChat(pedidoActivo.anyo, pedidoActivo.orden, 'almma')">Chat tienda <span id="chat_aviso" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:0 7px;font-size:11px"></span></button>
+    <button class="tab-btn activa" data-tab="tab_cliente" onclick="cambiarTab('tab_cliente')">👤 Cliente</button>
+    <button class="tab-btn" data-tab="tab_pedido" onclick="cambiarTab('tab_pedido')">🏬 Pedido</button>
+    <button class="tab-btn" data-tab="tab_lineas" onclick="cambiarTab('tab_lineas')">📦 Líneas</button>
+    <button class="tab-btn" data-tab="tab_montaje" onclick="cambiarTab('tab_montaje')">🔧 Montaje</button>
+    <button class="tab-btn" data-tab="tab_importes" onclick="cambiarTab('tab_importes')">💶 Importes</button>
+    <button class="tab-btn" data-tab="tab_observaciones" onclick="cambiarTab('tab_observaciones')">📝 Observaciones</button>
+    <button class="tab-btn" data-tab="tab_documentos" onclick="cambiarTab('tab_documentos')">📎 Documentos</button>
+    <button class="tab-btn" data-tab="tab_incidencias" onclick="cambiarTab('tab_incidencias')">⚠️ Incidencias</button>
+    <button class="tab-btn" data-tab="tab_llamadas" onclick="cambiarTab('tab_llamadas')">📞 Llamadas</button>
+    <button class="tab-btn" data-tab="tab_chat" onclick="cambiarTab('tab_chat'); cargarChat(pedidoActivo.anyo, pedidoActivo.orden, 'almma')">💬 Chat tienda <span id="chat_aviso" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:0 7px;font-size:11px"></span></button>
+    <button class="tab-btn" data-tab="tab_avisos_tienda" onclick="cambiarTab('tab_avisos_tienda')">🔔 Avisos tienda <span id="avisos_tienda_punto" style="display:none">●</span></button>
+    <button class="tab-btn" data-tab="tab_historial" onclick="cambiarTab('tab_historial')">🕘 Historial</button>
   </div>
 
-  <!-- CABECERA -->
-  <div class="tab-panel activa" id="tab_cabecera">
-    <div class="form-grid">
-      <div class="campo"><label>Tienda</label><select id="ch_tienda" onchange="cambioTiendaCabecera()"><option value="">-- sin asignar --</option></select></div>
-      <div class="campo"><label>Dependiente</label><select id="ch_dependiente"><option value="">-- sin asignar --</option></select></div>
-      <div class="campo" style="grid-column:span 2;"><label>Tipo de Orden</label><select id="ch_tipo_orden">
-          <option value="0">0 – Sin definir (órdenes antiguas)</option>
-          <option value="1">1 – Se factura a la tienda (lo habitual)</option>
-          <option value="2">2 – Se factura al fabricante</option>
-          <option value="3">3 – Se carga a un vendedor de la tienda (no se imputa a la tienda)</option>
-        </select></div>
-      <div class="campo"><label>Referencia de pedido</label><input id="ch_num_pedido"></div>
-    </div>
-
-    <h4 style="margin-bottom:6px;">Datos Cliente</h4>
-    <div class="form-grid">
-      <div class="campo" style="grid-column:1/3;"><label>Nombre</label><input id="ch_nombre_cli"></div>
-      <div class="campo" style="grid-column:1/3;"><label>Dirección</label><input id="ch_domicilio_cli"><div id="ch_km"></div></div>
-      <div class="campo"><label>Localidad</label><input id="ch_localidad_cli"></div>
-      <div class="campo"><label>Provincia (cód.)</label><input id="ch_provincia_cli" type="number"></div>
-      <div class="campo"><label>Teléfono</label><input id="ch_telefono_cli"></div>
-      <div class="campo"><label>Teléfono 2</label><input id="ch_telefono2_cli"></div>
-      <div class="campo"><label>D.N.I.</label><input id="ch_dni_cli"></div>
-    </div>
-
-    <h4 style="margin-bottom:6px;">Fechas y situación</h4>
-    <div class="form-grid">
-      <div class="campo"><label>F. Creación</label><div id="ch_fecha_creacion">0/0/0</div></div>
-      <div class="campo"><label>Prev. Recepción</label><input id="ch_fecha_prev_recepcion" type="date" oninput="marcarFechaVacia('ch_fecha_prev_recepcion')"><span class="fecha-vacia" id="ch_fecha_prev_recepcion_vacia">0/0/0</span></div>
-      <div class="campo"><label>F. Recepción</label><input id="ch_fecha_recepcion" type="date" oninput="marcarFechaVacia('ch_fecha_recepcion')"><span class="fecha-vacia" id="ch_fecha_recepcion_vacia">0/0/0</span></div>
-    </div>
-
-    <div class="form-grid" style="margin-top:16px;">
-      <div class="campo">
-        <label>Situación</label>
-        <select id="ch_estado"></select>
+  <!-- CLIENTE -->
+  <div class="tab-panel activa" id="tab_cliente">
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Cliente final</div>
+      <div class="form-grid">
+        <div class="campo" style="grid-column:1/-1;"><label>Nombre</label><input id="ch_nombre_cli"></div>
+        <div class="campo" style="grid-column:1/-1;"><label>Dirección</label><input id="ch_domicilio_cli"><div id="ch_km"></div></div>
+        <div class="campo"><label>Localidad</label><input id="ch_localidad_cli"></div>
+        <div class="campo"><label>Provincia (cód.)</label><input id="ch_provincia_cli" type="number"></div>
+        <div class="campo"><label>D.N.I.</label><input id="ch_dni_cli"></div>
       </div>
-      <div class="campo"><label>Bultos (total líneas)</label><div id="ch_bultos">0</div></div>
-      <div class="campo"><label>Peso kg (total líneas)</label><div id="ch_peso">0</div></div>
     </div>
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Contacto</div>
+      <div class="form-grid">
+        <div class="campo"><label>Teléfono</label><input id="ch_telefono_cli"></div>
+        <div class="campo"><label>Teléfono 2</label><input id="ch_telefono2_cli"></div>
+      </div>
+    </div>
+  </div>
 
-    <h4 style="margin-bottom:6px;">Importes y facturación</h4>
-    <div class="form-grid">
-      <div class="campo"><label>Importe Total</label><input id="ch_importe_total" type="number" step="0.01" oninput="recalcularPendiente()">
-        <div class="meta" id="ch_total_l4" style="font-size:11px;margin-top:2px;"></div></div>
-      <div class="campo"><label>Entrega a Cuenta</label><input id="ch_entrega_a_cuenta" type="number" step="0.01" oninput="recalcularPendiente()"></div>
-      <div class="campo"><label>Importe Pendiente</label><input id="ch_importe_pendiente" type="number" step="0.01"><div class="meta" id="ch_cobros_montador" style="font-size:11px;margin-top:2px;"></div></div>
-      <div class="campo"><label>Forma de Cobro</label><input id="ch_tipo_cobro" placeholder="ej. Efectivo, Transferencia"></div>
-      <div class="campo"><label>Facturada</label><div id="ch_facturada">-</div></div>
-      <div class="campo"><label>Pendiente de facturar</label><input id="ch_pendiente_facturar" type="checkbox"></div>
+  <!-- PEDIDO (tienda, tipo, fechas de recepción y situación) -->
+  <div class="tab-panel" id="tab_pedido">
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Tienda y pedido</div>
+      <div class="form-grid">
+        <div class="campo"><label>Tienda</label><select id="ch_tienda" onchange="cambioTiendaCabecera()"><option value="">-- sin asignar --</option></select></div>
+        <div class="campo"><label>Dependiente</label><select id="ch_dependiente"><option value="">-- sin asignar --</option></select></div>
+        <div class="campo"><label>Referencia de pedido</label><input id="ch_num_pedido"></div>
+        <div class="campo" style="grid-column:1/-1;"><label>Tipo de Orden</label><select id="ch_tipo_orden">
+            <option value="0">0 – Sin definir (órdenes antiguas)</option>
+            <option value="1">1 – Se factura a la tienda (lo habitual)</option>
+            <option value="2">2 – Se factura al fabricante</option>
+            <option value="3">3 – Se carga a un vendedor de la tienda (no se imputa a la tienda)</option>
+          </select></div>
+      </div>
     </div>
-    <div class="form-grid">
-      <div class="campo" style="grid-column:1/3;"><label>Texto Factura</label><input id="ch_textofactura"></div>
-      <div class="campo" style="grid-column:1/3;"><label>Texto Albarán</label><input id="ch_obs_albaran"></div>
-      <div class="campo" style="grid-column:1/3;"><label>Servicios adicionales del montador</label><div class="meta" id="ch_servicios" style="font-size:13px;">-</div></div>
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Situación y recepción</div>
+      <div class="form-grid">
+        <div class="campo"><label>Situación</label><select id="ch_estado"></select></div>
+        <div class="campo"><label>F. Creación</label><div class="dato" id="ch_fecha_creacion">0/0/0</div></div>
+        <div class="campo"><label>Prev. Recepción</label><input id="ch_fecha_prev_recepcion" type="date" oninput="marcarFechaVacia('ch_fecha_prev_recepcion')"><span class="fecha-vacia" id="ch_fecha_prev_recepcion_vacia">0/0/0</span></div>
+        <div class="campo"><label>F. Recepción</label><input id="ch_fecha_recepcion" type="date" oninput="marcarFechaVacia('ch_fecha_recepcion')"><span class="fecha-vacia" id="ch_fecha_recepcion_vacia">0/0/0</span></div>
+        <div class="campo"><label>Bultos (total líneas)</label><div class="dato" id="ch_bultos">0</div></div>
+        <div class="campo"><label>Peso kg (total líneas)</label><div class="dato" id="ch_peso">0</div></div>
+      </div>
     </div>
+    <!-- Eliminar: lejos del botón de cerrar para que no se pulse sin querer (petición de Arturo) -->
+    <div class="tarjeta tarjeta-peligro">
+      <div class="tarjeta-titulo">Eliminar la orden</div>
+      <p class="meta" style="font-size:13px;margin:0 0 10px;">Borra para siempre la orden con todas sus líneas, citas, incidencias, fotos y llamadas. No se puede deshacer: te pedirá escribir el número de orden para confirmar.</p>
+      <button class="secondary ph-del" onclick="eliminarOrdenActiva()">🗑 Eliminar esta orden</button>
+    </div>
+  </div>
 
-    <div style="display:flex;gap:10px;margin-top:10px;">
-      <button onclick="guardarCabecera()">Grabar</button>
+  <!-- IMPORTES Y FACTURACIÓN -->
+  <div class="tab-panel" id="tab_importes">
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Cobro al cliente</div>
+      <div class="form-grid">
+        <div class="campo"><label>Importe Total</label><input id="ch_importe_total" type="number" step="0.01" oninput="recalcularPendiente()">
+          <div class="meta" id="ch_total_l4" style="font-size:11px;margin-top:2px;"></div></div>
+        <div class="campo"><label>Entrega a Cuenta</label><input id="ch_entrega_a_cuenta" type="number" step="0.01" oninput="recalcularPendiente()"></div>
+        <div class="campo"><label>Importe Pendiente</label><input id="ch_importe_pendiente" type="number" step="0.01"><div class="meta" id="ch_cobros_montador" style="font-size:11px;margin-top:2px;"></div></div>
+        <div class="campo"><label>Forma de Cobro</label><input id="ch_tipo_cobro" placeholder="ej. Efectivo, Transferencia"></div>
+      </div>
+    </div>
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Facturación</div>
+      <div class="form-grid">
+        <div class="campo"><label>Facturada</label><div class="dato" id="ch_facturada">-</div></div>
+        <div class="campo"><label>Pendiente de facturar</label><label class="casilla"><input id="ch_pendiente_facturar" type="checkbox"> Sí</label></div>
+        <div class="campo" style="grid-column:1/-1;"><label>Texto Factura</label><input id="ch_textofactura"></div>
+        <div class="campo" style="grid-column:1/-1;"><label>Texto Albarán</label><input id="ch_obs_albaran"></div>
+      </div>
       <button class="secondary" onclick="consultarFacturas()">Consulta facturas emitidas</button>
     </div>
-
   </div>
 
   <!-- MONTAJE -->
@@ -489,16 +552,21 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
       <div class="meta" style="font-size:11px;">Se rellena sola cuando el montador recoge la firma del cliente (día y hora de la firma); se puede corregir a mano. Al ponerla, la orden pasa a "completado".</div>
     </div>
 
-    <div class="form-grid" style="margin-top:16px;">
-      <div class="campo" style="grid-column:1/-1;"><label>Montadores (equipo del montaje)</label><div id="ch_montadores" class="chips"></div></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:10px;">
-      <button onclick="guardarCabecera()">Grabar</button>
+    <div class="tarjeta" style="margin-top:16px;">
+      <div class="tarjeta-titulo">Equipo del montaje</div>
+      <div id="ch_montadores" class="chips"></div>
     </div>
 
-    <h4>Fotos y firma del montaje</h4>
-    <div id="ch_lista_fotos_montaje" class="mini-list"></div>
-    <div id="ch_firma_montaje"></div>
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Servicios adicionales del montador</div>
+      <div class="meta" id="ch_servicios" style="font-size:13px;padding-bottom:10px;">-</div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Fotos y firma del montaje</div>
+      <div id="ch_lista_fotos_montaje" class="mini-list"></div>
+      <div id="ch_firma_montaje"></div>
+    </div>
   </div>
 
   <!-- LINEAS -->
@@ -636,6 +704,12 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
     <textarea id="llamada_notas" rows="2" placeholder="¿Qué se ha hablado/enviado?" style="margin-top:8px;"></textarea>
     <button class="secondary btn-mini" style="margin-top:8px;" onclick="registrarLlamada()">+ Registrar contacto</button>
   </div>
+
+  <!-- Barra de grabar: sale en Cliente, Pedido, Montaje e Importes (todo se graba junto) -->
+  <div id="pie_grabar">
+    <span class="meta">Los cambios de <b>Cliente</b>, <b>Pedido</b>, <b>Montaje</b> e <b>Importes</b> se graban juntos.</span>
+    <button onclick="guardarCabecera()">💾 Grabar cambios</button>
+  </div>
 </div>
 
 <script>
@@ -671,6 +745,58 @@ function cambiarTab(id) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("activa"));
   document.getElementById(id).classList.add("activa");
   document.querySelector(`.tab-btn[data-tab="${id}"]`).classList.add("activa");
+  document.getElementById("pie_grabar").classList.toggle("ver", ["tab_cliente", "tab_pedido", "tab_montaje", "tab_importes"].includes(id));
+}
+
+/* Cabecera de la ficha: resumen de un vistazo (cliente, tienda, contacto y en qué punto está la orden).
+   Lee lo que ya está escrito en los campos, así refleja también lo recién grabado. */
+const COLOR_ESTADO = { en_proceso: "#94a3b8", recepcionado_parcial: "#eab308", recepcionado_total: "#f97316", agendado: "#2563eb", completado: "#15803d", terminado_incidencia: "#15803d", incidencia: "#dc2626" };
+function pintarResumenOrden(o) {
+  const v = id => (document.getElementById(id).value || "").trim();
+  const esc = s => escMont(String(s ?? ""));
+  const fechaCorta = s => s ? new Date(s.length <= 10 ? s + "T12:00:00" : s).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const estado = o.estado || "en_proceso";
+  const selEst = document.getElementById("ch_estado");
+  const nomEstado = selEst.selectedOptions[0] ? selEst.selectedOptions[0].textContent : estado;
+  const conIncid = estado === "terminado_incidencia" || (estado === "completado" && o.con_incidencia);
+  document.getElementById("d_head").style.setProperty("--est", COLOR_ESTADO[estado] || "#94a3b8");
+  document.getElementById("d_estado_pill").innerHTML = `<span class="estado-pill estado-${esc(conIncid ? "conincid" : estado)}">${conIncid ? "⚠ " : ""}${esc(nomEstado)}</span>`;
+  const badges = [];
+  if (o.con_incidencia && estado !== "incidencia" && !conIncid) badges.push('<span class="ph-badge" style="background:#fee2e2;color:#b91c1c">⚠ Con incidencia</span>');
+  if (o.facturada === "S") badges.push('<span class="ph-badge" style="background:#dcfce7;color:#166534">✔ Facturada</span>');
+  else if (o.pendiente_facturar) badges.push('<span class="ph-badge" style="background:#fef3c7;color:#92400e">Pendiente de facturar</span>');
+  document.getElementById("d_badges").innerHTML = badges.join("");
+
+  const nombre = v("ch_nombre_cli");
+  const cli = document.getElementById("d_cliente");
+  cli.textContent = nombre || "Sin nombre de cliente";
+  cli.classList.toggle("vacio", !nombre);
+
+  const selT = document.getElementById("ch_tienda");
+  const tienda = selT.value && selT.selectedOptions[0] ? selT.selectedOptions[0].textContent : "";
+  const dir = [v("ch_domicilio_cli"), v("ch_localidad_cli")].filter(Boolean).join(", ");
+  const tels = [v("ch_telefono_cli"), v("ch_telefono2_cli")].filter(Boolean);
+  const meta = [];
+  if (dir) meta.push(`📍 <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dir)}" target="_blank" rel="noopener">${esc(dir)}</a>`);
+  if (tels.length) meta.push("📞 " + tels.map(t => `<a href="tel:${esc(t.replace(/\s/g, ""))}">${esc(t)}</a>`).join(" · "));
+  meta.push(`🏬 ${tienda ? esc(tienda) : '<span style="color:#9ca3af">Sin tienda</span>'}`);
+  if (v("ch_num_pedido")) meta.push(`<span><b>Ref.</b> ${esc(v("ch_num_pedido"))}</span>`);
+  document.getElementById("d_meta").innerHTML = meta.join("");
+
+  // los cuatro pasos de la orden: pedido → mercancía → cita → montaje
+  const recibidoTotal = ["recepcionado_total", "agendado", "completado", "terminado_incidencia"].includes(estado) || !!o.fecha_montaje;
+  const recibidoParcial = estado === "recepcionado_parcial";
+  const fRec = v("ch_fecha_recepcion"), fPrevRec = v("ch_fecha_prev_recepcion");
+  const fPrevMont = v("ch_fecha_prev_montaje"), hora = v("ch_horamont");
+  const fMont = v("ch_fecha_montaje");
+  const equipo = [...document.querySelectorAll("#ch_montadores input:checked")].map(i => i.parentElement.textContent.trim()).join(" / ");
+  const paso = (t, clase, texto) => `<div class="ph-paso ${clase}"><div class="barra-p"></div><div class="t">${t}</div><div class="v ${texto ? "" : "nada"}">${texto || "—"}</div></div>`;
+  document.getElementById("d_pasos").innerHTML =
+    paso("Pedido", "hecho", esc(fechaCorta(o.fecha_creacion))) +
+    paso("Mercancía", recibidoTotal ? "hecho" : recibidoParcial ? "parcial" : "",
+      recibidoTotal ? "Recibida" + (fRec ? " · " + esc(fechaCorta(fRec)) : "") : recibidoParcial ? "Parte recibida" : fPrevRec ? "Prevista " + esc(fechaCorta(fPrevRec)) : "") +
+    paso("Cita", fPrevMont || fMont ? "hecho" : "", fPrevMont ? esc(fechaCorta(fPrevMont)) + (hora ? " · " + esc(hora) : "") + (equipo ? "<br><span style='color:var(--muted)'>" + esc(equipo) + "</span>" : "") : "") +
+    paso("Montaje", fMont ? "hecho" : "", fMont ? "Montada · " + esc(fechaCorta(fMont)) : "");
 }
 
 async function comprobarSesion() {
@@ -1392,6 +1518,7 @@ function marcarFechaVacia(inputId) {
   span.style.display = input.value ? "none" : "inline-block";
 }
 
+let aperturaPanel = 0;   // cada vez que se abre una orden; sirve para no mezclar cargas de dos órdenes
 async function abrirPanel(orden) {
   // recargamos la fila completa por si el listado no trae todos los campos
   const { data: full, error: errFull } = await client.from("ordenes").select("*").eq("anyo", orden.anyo).eq("orden", orden.orden).maybeSingle();
@@ -1402,23 +1529,34 @@ async function abrirPanel(orden) {
   const cajaAlb = document.getElementById("caja_albaran_salida"); if (cajaAlb) cajaAlb.style.display = "none";
   const listaAlb = document.getElementById("lista_albaran_salida"); if (listaAlb) listaAlb.innerHTML = "";
 
-  document.getElementById("d_titulo").textContent = `Orden ${o.anyo}/${o.orden}`;
-  cambiarTab("tab_cabecera");
+  document.getElementById("d_titulo").textContent = `ORDEN ${o.anyo}/${o.orden}`;
+  cambiarTab("tab_cliente");
 
+  // auditoría (quién creó / modificó): no hace falta esperarla para enseñar la ficha
   const auditoriaBox = document.getElementById("d_auditoria");
+  auditoriaBox.textContent = "";
   if (o.creado_por || o.modificado_por) {
-    const [creadorNombre, modificadorNombre] = await Promise.all([
-      nombrePorUserId(o.creado_por), nombrePorUserId(o.modificado_por),
-    ]);
-    const partes = [];
-    if (creadorNombre) partes.push(`Creado por ${creadorNombre}`);
-    if (modificadorNombre && o.modificado_at) partes.push(`última modificación por ${modificadorNombre} el ${new Date(o.modificado_at).toLocaleString("es-ES")}`);
-    auditoriaBox.textContent = partes.join(" · ");
-  } else auditoriaBox.textContent = "";
+    Promise.all([nombrePorUserId(o.creado_por), nombrePorUserId(o.modificado_por)]).then(([creadorNombre, modificadorNombre]) => {
+      if (!pedidoActivo || pedidoActivo.anyo !== o.anyo || pedidoActivo.orden !== o.orden) return;
+      const partes = [];
+      if (creadorNombre) partes.push(`Creado por ${creadorNombre}`);
+      if (modificadorNombre && o.modificado_at) partes.push(`última modificación por ${modificadorNombre} el ${new Date(o.modificado_at).toLocaleString("es-ES")}`);
+      auditoriaBox.textContent = partes.join(" · ");
+    });
+  }
 
-  await llenarSelectTiendaCabecera(o.tienda_id);
+  // Mientras carga lo que va aparte, no se puede grabar (el dependiente y el equipo aún no están puestos)
+  const miApertura = ++aperturaPanel;
+  const btnGrabar = document.querySelector("#pie_grabar button");
+  btnGrabar.disabled = true;
+  const cargando = '<div class="meta">Cargando…</div>';
+  ["ch_montadores", "ch_lista_fotos_montaje", "ch_firma_montaje", "ch_lista_documentos", "lista_incidencias", "lista_historial", "lista_llamadas"]
+    .forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = cargando; });
+  const tablaLin = document.getElementById("tabla_lineas"); if (tablaLin) tablaLin.innerHTML = "<tr><td class='meta'>Cargando…</td></tr>";
+  document.getElementById("ch_dependiente").innerHTML = '<option value="">Cargando…</option>';
+
+  await Promise.all([llenarSelectTiendaCabecera(o.tienda_id), llenarSelectEstado("ch_estado", o.estado || "en_proceso")]);
   actualizarEtiquetaArticulo();
-  await llenarSelectDependiente(o.tienda_id, o.dependiente_id);
   document.getElementById("ch_tipo_orden").value = o.tipo_orden ?? 1;
   document.getElementById("ch_num_pedido").value = o.num_pedido || "";
   document.getElementById("ch_nombre_cli").value = o.nombre_cli || "";
@@ -1444,9 +1582,6 @@ async function abrirPanel(orden) {
     el.disabled = montajeCerrado;
     el.title = montajeCerrado ? "Montaje cerrado: la fecha y hora son las de la firma del cliente" : "";
   });
-  await llenarSelectEstado("ch_estado", o.estado || "en_proceso");
-  await llenarSelectTipoLinea();
-  mostrarNuevaLinea(false);
   document.getElementById("ch_importe_total").value = o.importe_total ?? "";
   document.getElementById("ch_entrega_a_cuenta").value = o.entrega_a_cuenta ?? "";
   document.getElementById("ch_importe_pendiente").value = o.importe_pendiente ?? "";
@@ -1468,20 +1603,27 @@ async function abrirPanel(orden) {
   document.getElementById("ch_textofactura").value = o.textofactura || "";
   document.getElementById("ch_obs_albaran").value = o.obs_albaran || "";
   document.getElementById("ch_observaciones").value = o.observaciones || "";
-  await cargarDetallesMontaje();
-  await cargarDocumentosOrden();
 
-  await pintarMontadores(o);
-
-  await cargarLineas();
-  await cargarIncidencias();
-  await cargarHistorial(o);
-  await cargarLlamadas();
-  avisoChat();
+  // ya se puede enseñar: cabecera y pestañas con los datos de la orden
+  pintarResumenOrden(o);
   pintarAvisosTienda(o);
-
   document.getElementById("panel_detalle").style.display = "flex";
   document.getElementById("overlay").style.display = "block";
+
+  // el resto se carga a la vez, por detrás
+  await Promise.all([
+    llenarSelectDependiente(o.tienda_id, o.dependiente_id),
+    pintarMontadores(o).then(() => pintarResumenOrden(o)),
+    llenarSelectTipoLinea().then(() => mostrarNuevaLinea(false)),
+    cargarDetallesMontaje(),
+    cargarDocumentosOrden(),
+    cargarLineas(),
+    cargarIncidencias(),
+    cargarHistorial(o),
+    cargarLlamadas(),
+    avisoChat(),
+  ].map(p => p.catch(e => console.error("abrirPanel:", e))));
+  if (miApertura === aperturaPanel) btnGrabar.disabled = false;
 }
 
 /* Ver tarifa de la tienda de la orden (PDF subido en Administración → Tarifas) */
@@ -1559,14 +1701,15 @@ async function guardarCabecera() {
   const errMontadores = await guardarMontadores();
   if (errMontadores) { alert("La cabecera se guardó, pero no el equipo de montadores: " + errMontadores.message); return; }
   // las fechas cambian el estado solas (prevista -> agendado, montaje -> completado): se refleja en pantalla
-  const { data: ordNueva } = await client.from("ordenes").select("estado, pendiente_facturar")
+  const { data: ordNueva } = await client.from("ordenes").select("*")
     .eq("anyo", pedidoActivo.anyo).eq("orden", pedidoActivo.orden).maybeSingle();
   if (ordNueva) {
     document.getElementById("ch_estado").value = ordNueva.estado;
     document.getElementById("ch_pendiente_facturar").checked = !!ordNueva.pendiente_facturar;
+    pintarResumenOrden(ordNueva);
   }
   cargarPedidos();
-  alert("Cabecera guardada.");
+  alert("Cambios grabados.");
 }
 
 // --- equipo de montadores de la orden (varias personas, con casillas) ---
@@ -1599,6 +1742,7 @@ async function pintarMontadores(o) {
   const todos = await cargarMontadores();
   const { data: asig, error } = await client.from("ordenes_montadores").select("montador_id").eq("anyo", o.anyo).eq("orden", o.orden);
   if (error) console.error("ordenes_montadores:", error);
+  if (!pedidoActivo || pedidoActivo.anyo !== o.anyo || pedidoActivo.orden !== o.orden) return;   // ya se abrió otra orden
   montadoresAsignadosOriginal = (asig || []).map(a => a.montador_id);
   // se ofrecen los activos y, si la orden ya los tiene, también los antiguos
   const visibles = todos.filter(m => m.activo || montadoresAsignadosOriginal.includes(m.id));

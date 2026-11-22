@@ -45,6 +45,7 @@ td.num,th.num{text-align:right;white-space:nowrap;}
 }
 @media screen and (max-width:850px){.hoja{zoom:.45;margin:8px auto;} #barra{padding:10px 12px;flex-wrap:wrap;}}
 </style>
+<script src="volver.js" defer></script>
 </head>
 <body>
 <div id="barra"><button onclick="imprimirAlbaran()">Imprimir / Guardar PDF</button><button class="sec" onclick="window.close()">Cerrar</button><label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer" title="Junta en una sola línea los artículos repetidos, sumando las cantidades"><input type="checkbox" id="chk_agrupar" onchange="pintarAlbaran()" style="width:auto"> Agrupar líneas iguales</label><span id="estado">Cargando…</span></div>

@@ -1,0 +1,106 @@
+/* =====================================================================
+   ALMMA — estilo común de las pantallas de la OFICINA (22-11-2026)
+   Se carga al FINAL del <head> de cada pantalla, después de su <style>,
+   y por eso manda sobre lo que cada pantalla trae.
+   Inicio (inicio.html) NO lo usa: se queda como está (petición de Arturo).
+   Los colores de los estados de las órdenes NO se tocan aquí.
+   ===================================================================== */
+
+:root{
+  --of-fondo:#f1f5f9;
+  --of-tarjeta:#ffffff;
+  --of-borde:#e2e8f0;
+  --of-borde-fuerte:#cbd5e1;
+  --of-texto:#0f172a;
+  --of-suave:#64748b;
+  --of-azul:#2563eb;
+  --of-azul-osc:#1d4ed8;
+  --of-azul-claro:#eff6ff;
+  --of-navy:#0f172a;
+  --of-sombra:0 1px 2px rgba(15,23,42,.04),0 4px 14px -6px rgba(15,23,42,.10);
+  --of-radio:12px;
+}
+
+body{background:var(--of-fondo);color:var(--of-texto);font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Arial,sans-serif;}
+
+/* ---------- barra superior oscura (menús Sistema / Órdenes de trabajo / Facturación) ---------- */
+body #menubar{background:linear-gradient(90deg,#0f172a,#1e293b);padding:0 20px;min-height:48px;box-shadow:0 1px 0 rgba(255,255,255,.04);}
+body #menubar .brand{font-size:16px;font-weight:800;letter-spacing:1px;color:#fff;padding:12px 22px 12px 0;display:flex;align-items:center;gap:8px;}
+body #menubar .brand::before{content:"";width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#60a5fa,#2563eb);box-shadow:0 0 0 3px rgba(96,165,250,.18);}
+body #menubar .menu-item > span{background:transparent;color:#cbd5e1;border:1px solid transparent;font-weight:600;margin:8px 2px;padding:6px 14px;border-radius:8px;box-shadow:none;}
+body #menubar .menu-item:hover > span,body #menubar .menu-item.abierto > span{background:rgba(255,255,255,.08);color:#fff;}
+body #menubar .menu-item.activo-menu > span{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(147,197,253,.35);box-shadow:none;}
+body #menubar .menu-drop{border-radius:10px;margin-top:4px;padding:6px;box-shadow:0 18px 40px -12px rgba(15,23,42,.45);border:1px solid var(--of-borde);background:#fff;}
+body #menubar .menu-drop a{background:transparent;color:var(--of-texto);border:none;border-radius:6px;padding:9px 12px;font-weight:500;}
+body #menubar .menu-drop a:hover{background:var(--of-azul-claro);color:var(--of-azul-osc);}
+
+/* ---------- barra de botones de pantallas ---------- */
+body #toolbar{background:var(--of-tarjeta);border-bottom:1px solid var(--of-borde);padding:8px 20px;gap:4px;box-shadow:0 1px 3px rgba(15,23,42,.04);}
+body #toolbar button[onclick]{background:transparent;color:#334155;border:1px solid transparent;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px;box-shadow:none;}
+body #toolbar button[onclick]:hover{background:#f1f5f9;color:var(--of-texto);opacity:1;}
+body #toolbar button[onclick].activo,body #toolbar button[onclick].activo:hover{background:var(--of-azul-claro);color:var(--of-azul-osc);border-color:#bfdbfe;box-shadow:inset 0 -2px 0 var(--of-azul);}
+body #toolbar button[onclick="logout()"]{border:1px solid var(--of-borde-fuerte);color:#475569;}
+body #toolbar button[onclick="logout()"]:hover{border-color:#fca5a5;color:#b91c1c;background:#fef2f2;}
+
+/* ---------- botones y campos ---------- */
+body button{border-radius:8px;font-weight:600;transition:background .15s,border-color .15s,box-shadow .15s;}
+body button:not(.secondary):not(.tab-btn):not(.btn-mini){box-shadow:0 1px 2px rgba(37,99,235,.25);}
+body button.secondary{background:#fff;color:#334155;border:1px solid var(--of-borde-fuerte);box-shadow:none;}
+body button.secondary:hover{background:#f8fafc;border-color:#94a3b8;opacity:1;}
+body input,body select,body textarea{border:1px solid var(--of-borde-fuerte);border-radius:8px;background:#fff;color:var(--of-texto);transition:border-color .15s,box-shadow .15s;}
+body input:focus,body select:focus,body textarea:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.18);}
+body input[type=checkbox],body input[type=radio]{accent-color:var(--of-azul);}
+
+/* ---------- bloque de filtros: tarjeta blanca ---------- */
+body .barra{background:var(--of-tarjeta);border:1px solid var(--of-borde);border-radius:var(--of-radio);box-shadow:var(--of-sombra);margin:16px 24px 10px;padding:14px 18px;gap:12px 14px;}
+body .barra label,body .campo-mini label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--of-suave);}
+body .barra label:has(input[type=checkbox]),body .campo-mini label:has(input[type=checkbox]){text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;color:#334155;}
+body .aviso-carga{padding:2px 28px 4px;font-size:12px;color:var(--of-suave);}
+body .leyenda-listado{padding:4px 28px 10px;font-size:11.5px;color:#475569;}
+
+/* ---------- tablas (Tabulator) ---------- */
+body .tabla-scroll{background:var(--of-tarjeta);border:1px solid var(--of-borde);border-radius:var(--of-radio);box-shadow:var(--of-sombra);overflow:hidden;}
+body .tabulator{border:none;background:transparent;font-size:13px;border-radius:0;}
+body .tabulator .tabulator-header{background:#f8fafc;border-bottom:1px solid var(--of-borde);color:var(--of-suave);}
+body .tabulator .tabulator-header .tabulator-col{background:#f8fafc;border-right:none;}
+body .tabulator .tabulator-header .tabulator-col .tabulator-col-content{padding:11px 8px;}
+body .tabulator .tabulator-header .tabulator-col .tabulator-col-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.2px;color:var(--of-suave);}
+body .tabulator .tabulator-header .tabulator-col.tabulator-sortable:hover{background:#f1f5f9;}
+body .tabulator .tabulator-header .tabulator-col input,body .tabulator .tabulator-header .tabulator-col select{padding:5px 7px;font-size:12px;}
+body .tabulator .tabulator-tableholder{background:#fff;}
+body .tabulator .tabulator-row{border-bottom:1px solid #eef2f7;background:#fff;}
+body .tabulator .tabulator-row.tabulator-row-even{background:#fcfdfe;}
+body .tabulator .tabulator-row:hover{background:#f1f5ff;}
+body .tabulator .tabulator-row .tabulator-cell{padding:10px 10px;border-right:none;}
+body .tabulator .tabulator-footer{background:#f8fafc;border-top:1px solid var(--of-borde);color:var(--of-suave);font-weight:500;}
+body .tabulator .tabulator-footer .tabulator-page{border-radius:6px;border-color:var(--of-borde);}
+body .tabulator .tabulator-footer .tabulator-page.active{background:var(--of-azul);color:#fff;border-color:var(--of-azul);}
+
+/* ---------- etiquetas de estado: más finas ---------- */
+body .estado-pill{font-size:11.5px;padding:3px 10px;letter-spacing:.2px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.06);}
+
+/* ---------- avisos desplegables (servicios adicionales, etc.) ---------- */
+body details#aviso_servicios{border-radius:var(--of-radio) !important;margin:16px 24px 0 !important;box-shadow:var(--of-sombra);}
+
+/* ---------- ventanas (modales) ---------- */
+body #modal_nueva_orden .card{border-radius:16px;box-shadow:0 30px 60px -20px rgba(15,23,42,.45);border:none;}
+
+/* ---------- barras de desplazamiento discretas ---------- */
+body ::-webkit-scrollbar{width:10px;height:10px;}
+body ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:8px;border:2px solid transparent;background-clip:padding-box;}
+body ::-webkit-scrollbar-thumb:hover{background:#94a3b8;background-clip:padding-box;border:2px solid transparent;}
+body ::-webkit-scrollbar-track{background:transparent;}
+
+/* ---------- pestañas internas de cada pantalla (Recepción, Facturas, Sistema, Rutas, Administración, Contabilidad…) ---------- */
+body .pestanas,body .cat-tabs,body .tabs:not(#panel_detalle .tabs){background:var(--of-tarjeta) !important;border-radius:0 !important;border-bottom:1px solid var(--of-borde);padding:10px 24px !important;margin-top:0;gap:6px;display:flex;flex-wrap:wrap;box-shadow:0 1px 3px rgba(15,23,42,.04);}
+body .pestanas button,body .tab-origen,body .cat-tab,body .tabs:not(#panel_detalle .tabs) .tab{background:transparent;color:#475569;border:1px solid transparent;border-radius:999px;padding:7px 16px;font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;box-shadow:none;border-bottom-width:1px;}
+body .pestanas button:hover,body .tab-origen:hover,body .cat-tab:hover,body .tabs:not(#panel_detalle .tabs) .tab:hover{background:#f1f5f9;color:var(--of-texto);opacity:1;}
+body .pestanas button.activa,body .tab-origen.activa,body .cat-tab.activa,body .tabs:not(#panel_detalle .tabs) .tab.activa,body .tabs:not(#panel_detalle .tabs) .tab.on{background:var(--of-azul);color:#fff;border-color:var(--of-azul);box-shadow:0 2px 6px -1px rgba(37,99,235,.45);}
+
+/* ---------- tarjetas y recuadros ---------- */
+body .card{border-radius:14px;border:1px solid var(--of-borde);box-shadow:var(--of-sombra);}
+body .tarjeta{border-radius:12px;box-shadow:var(--of-sombra);}
+body h1,body h2,body h3{letter-spacing:-.2px;}
+
+/* ---------- tablas propias (no Tabulator) ---------- */
+body .lineas-table{border-radius:10px;}

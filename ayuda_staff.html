@@ -8,10 +8,13 @@ h3{margin-bottom:4px}
 table{border-collapse:collapse;width:100%;margin:10px 0}td,th{border:1px solid #d1d5db;padding:6px 10px;text-align:left;vertical-align:top}th{background:#f3f4f6}
 code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 @media print{.noprint{display:none}body{margin:0}h2{page-break-after:avoid}}
-</style></head><body>
+</style><script src="volver.js" defer></script>
+</head><body>
 <p class="noprint"><a href="inicio.html">&larr; Volver al inicio</a> · <a href="#" onclick="window.print();return false">🖨 Imprimir / guardar PDF</a></p>
 <h1>ALMMA — Guía para almacén y oficina (staff)</h1>
 <p>Esta guía explica el trabajo diario: <b>recibir mercancía, seguir los pedidos, preparar rutas y resolver incidencias</b>. Se entra en <b>almma.es</b> con tu email y contraseña. La pantalla de inicio <b>«¿Qué quieres hacer?»</b> tiene un botón por cada tarea.</p>
+
+<div class="ok">En todas las pantallas (menos el Inicio) está, arriba en la barra de botones, <b>← Volver</b>: te lleva a la pantalla en la que estabas antes (como la flecha de atrás del navegador). Si no hay pantalla anterior (por ejemplo, si la abriste en una pestaña nueva), te lleva al Inicio. <b>🏠 Inicio</b> sigue estando al lado.</div>
 
 <h2>El ciclo de un pedido</h2>
 <ol>
@@ -62,17 +65,28 @@ code{background:#f3f4f6;padding:1px 5px;border-radius:4px}
 Si alguna vez necesitas una tienda antigua: en <b>Nueva orden</b> marca <b>«Incluir tiendas antiguas»</b>; en <b>Sistema → Tiendas</b>, <b>«Ver antiguas»</b>; en Administración, si escribes su nombre y no hay ninguna activa que coincida, salen las antiguas. La tienda que ya tiene una orden o un vendedor sigue saliendo aunque sea antigua.</div>
 
 <h2>3. Órdenes (oficina)</h2>
-<p>Botón <b>📋 Órdenes</b>. Es la pantalla más completa: la ficha de cada pedido tiene pestañas:</p>
+<p>Botón <b>📋 Órdenes</b>. Es la pantalla más completa. Al pulsar una orden se abre su ficha:</p>
+<ul>
+<li><b>Arriba, el resumen</b>: nº de orden, <b>estado</b> (con su color en la raya de arriba), si está facturada o pendiente de facturar, el <b>nombre del cliente</b> en grande, la dirección (al pulsarla se abre en Google Maps), los teléfonos (se pueden pulsar para llamar desde el móvil), la tienda y la referencia.</li>
+<li>Debajo, <b>cuatro pasos</b> con una barra que se va llenando: <b>Pedido</b> (fecha de alta), <b>Mercancía</b> (prevista, parte recibida o recibida), <b>Cita</b> (fecha, hora y equipo) y <b>Montaje</b> (montada y cuándo). De un vistazo se ve en qué punto está.</li>
+</ul>
+<p>Los datos están repartidos en pestañas:</p>
 <table>
 <tr><th>Pestaña</th><th>Qué contiene</th></tr>
-<tr><td>Cabecera</td><td>Cliente, tienda, referencia, estado, montador, fechas.</td></tr>
-<tr><td>Líneas</td><td>Artículos del pedido, cantidades, importes.</td></tr>
-<tr><td>Observaciones</td><td>Notas internas.</td></tr>
-<tr><td>Citas</td><td>Cita de montaje con el cliente.</td></tr>
-<tr><td>Incidencias</td><td>Problemas abiertos y su evolución.</td></tr>
-<tr><td>Historial</td><td>Quién cambió qué y cuándo.</td></tr>
-<tr><td>Llamadas</td><td>Registro de llamadas al cliente.</td></tr>
+<tr><td>👤 Cliente</td><td>Nombre, dirección (con los km desde la tienda), localidad, provincia, DNI y teléfonos.</td></tr>
+<tr><td>🏬 Pedido</td><td>Tienda, dependiente, referencia, tipo de orden, situación, fechas de recepción, bultos y peso. Abajo del todo, el botón <b>🗑 Eliminar esta orden</b> (aparte, para no pulsarlo sin querer; pide escribir el número de orden para confirmar).</td></tr>
+<tr><td>📦 Líneas</td><td>Artículos del pedido, cantidades, importes.</td></tr>
+<tr><td>🔧 Montaje</td><td>Montaje previsto y realizado, equipo de montadores, <b>servicios adicionales del montador</b> (agujeros, cortes, recogidas…), fotos y firma.</td></tr>
+<tr><td>💶 Importes</td><td>Importe total, entrega a cuenta, pendiente, forma de cobro, facturación, y textos de factura y albarán.</td></tr>
+<tr><td>📝 Observaciones</td><td>Notas internas.</td></tr>
+<tr><td>📎 Documentos</td><td>PDF o fotos del pedido y lo que se quiera adjuntar.</td></tr>
+<tr><td>⚠️ Incidencias</td><td>Problemas abiertos y su evolución.</td></tr>
+<tr><td>📞 Llamadas</td><td>Registro de llamadas, WhatsApp y emails con el cliente.</td></tr>
+<tr><td>💬 Chat tienda / 🔔 Avisos tienda</td><td>Mensajes con la tienda y avisos de «se puede agendar» / «orden completa».</td></tr>
+<tr><td>🕘 Historial</td><td>Quién cambió qué y cuándo.</td></tr>
 </table>
+<div class="ok">En <b>Cliente</b>, <b>Pedido</b>, <b>Montaje</b> e <b>Importes</b> sale abajo el botón <b>💾 Grabar cambios</b>: graba lo de las cuatro pestañas de una vez, así que puedes tocar varias y grabar al final.<br>
+La ficha sale al momento de pulsar la orden. Las líneas, fotos, documentos e historial tardan un instante más (pone «Cargando…»), y el botón <b>💾 Grabar cambios</b> se activa cuando ya ha cargado todo.</div>
 <ul>
 <li>Arriba, un desplegable <b>«Órdenes con servicios adicionales»</b> avisa de lo que el montador ha hecho de más (agujeros, cortes…). Desaparece al abrir la orden o pulsar <b>«Marcar visto»</b>. No genera factura solo.</li>
 <li>El <b>chat</b> con la tienda aparece en la orden; un 💬 rojo indica mensajes sin leer.</li>
