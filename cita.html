@@ -113,13 +113,19 @@ function pie(){ return '<div class="pie">¿Dudas? Llámenos al <a href="' + TEL_
 function pintarError(txt){ app.innerHTML = cabecera() + '<div class="estado aviso"><b class="g">⚠ ' + esc(txt) + '</b></div>' + pie(); }
 
 const logoOk = s => typeof s === "string" && /^data:image\/(png|jpe?g|webp);base64,/.test(s);   // como en tienda.html (SQL 107): nada de SVG
+// como en el WhatsApp: hasta 3 artículos, todos; más, los 2 primeros y «y otros artículos», SIN número (un pedido puede venir
+// desglosado en muchas líneas y el cliente creería que no es el suyo)
+function resumenArticulos(a){
+  if (a.length <= 3) return a.map(esc).join("<br>");
+  return a.slice(0, 2).map(esc).join("<br>") + '<br><span class="muted">y otros artículos</span>';
+}
 function bloqueCita(){
   return '<div class="tarjeta">' + (logoOk(cita.logo) ? '<div class="logo-t"><img src="' + esc(cita.logo) + '" alt="' + esc(cita.tienda || "Tienda") + '"></div>' : "") + '<h1>' + (cita.nombre ? "Hola, " + esc(cita.nombre) : "Su cita de montaje") + '</h1>' +
     '<div class="muted">Tenemos previsto instalar su pedido' + (cita.tienda ? " de <b>" + esc(cita.tienda) + "</b>" : "") + ':</div>' +
     '<div class="dato"><span class="ic">📅</span><div><b>' + fLarga(cita.fecha) + '</b></div></div>' +
     '<div class="dato"><span class="ic">🕘</span><div><b>' + franja(cita) + '</b><div class="muted">Hora de llegada aproximada</div></div></div>' +
     (cita.localidad ? '<div class="dato"><span class="ic">📍</span><div>' + esc(cita.localidad) + '</div></div>' : "") +
-    (cita.articulos && cita.articulos.length ? '<div class="dato"><span class="ic">📦</span><div>' + cita.articulos.map(esc).join("<br>") + '</div></div>' : "") +
+    (cita.articulos && cita.articulos.length ? '<div class="dato"><span class="ic">📦</span><div>' + resumenArticulos(cita.articulos) + '</div></div>' : "") +
     '</div>';
 }
 

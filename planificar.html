@@ -134,6 +134,19 @@ table.ag tr.libre td{color:#15803d;}
 .aviso-f.confirmada{border-left-color:#2563eb;background:#eff6ff;} .aviso-f.nueva{box-shadow:0 0 0 2px #a855f7 inset;}
 .resp{font-size:12.5px;margin-top:3px;padding:3px 7px;border-radius:6px;display:inline-block;}
 .resp.si{background:#dcfce7;color:#14532d;} .resp.no{background:#fee2e2;color:#7f1d1d;} .resp.nota{background:#ede9fe;color:#4c1d95;}
+.mz-cuerpo{display:grid;grid-template-columns:1fr 280px;gap:10px;margin:8px 0;}
+#mz_mapa{height:min(600px,66vh);border:1px solid #e2e8f0;border-radius:8px;}
+.mz-lista{max-height:min(600px,66vh);overflow-y:auto;font-size:12.5px;}
+.mz-zona{border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;margin-bottom:6px;cursor:pointer;background:#fff;}
+.mz-zona:hover{background:#f8fafc;border-color:#94a3b8;}
+.mz-cab{display:flex;align-items:center;gap:6px;} .mz-cab i{width:12px;height:12px;border-radius:3px;flex:none;}
+.mz-pobs{color:#475569;margin-top:3px;line-height:1.35;}
+.mz-buscar{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin:6px 0 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.mz-buscar input{flex:1;min-width:220px;} #mz_res{flex-basis:100%;font-size:13px;}
+.mz-chip{display:inline-block;color:#fff;font-weight:700;padding:3px 10px;border-radius:999px;margin-right:4px;}
+.mz-etq{font:800 13px system-ui;text-align:center;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;}
+@media(max-width:760px){.mz-cuerpo{grid-template-columns:1fr;}}
+#ventana:has(#mz_mapa){width:min(1180px,97vw);}
 .fila-grupo{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 8px;}
 .fila-grupo button[disabled]{opacity:.45;cursor:default;}
 .sel-aviso{width:17px;height:17px;vertical-align:middle;margin:0 4px 0 0;cursor:pointer;}
@@ -205,9 +218,10 @@ svg text{font-family:inherit;}
 <div class="barra">
   <input id="buscar" placeholder="Buscar nº, cliente, población, tienda…" style="min-width:250px" oninput="filtro=normBusq(this.value);pintarDiferido()">
   <label>Tienda <select id="f_tienda" onchange="pintar()"><option value="">Todas</option></select></label>
-  <label>Recibidas <select id="f_meses" onchange="pintar();situarEnMapa()"><option value="3">últimos 3 meses</option><option value="6" selected>últimos 6 meses</option><option value="12">último año</option><option value="0">todas (incluye antiguas)</option><option value="-6">solo antiguas (más de 6 meses)</option><option value="-12">solo antiguas (más de 1 año)</option></select></label>
+  <label>Recibidas <select id="f_meses" onchange="rellenarFiltros();pintar();situarEnMapa()"><option value="3">últimos 3 meses</option><option value="6" selected>últimos 6 meses</option><option value="12">último año</option><option value="0">todas (incluye antiguas)</option><option value="-6">solo antiguas (más de 6 meses)</option><option value="-12">solo antiguas (más de 1 año)</option></select></label>
   <label>Orden <select id="f_orden" onchange="pintar()"><option value="dist">Por cercanía a la nave</option><option value="espera">Por días esperando</option></select></label>
   <label><input type="checkbox" id="solo_sin" onchange="pintar()"> Solo sin tiempo de montaje</label>
+  <button class="secondary peq" onclick="verMapaZonas()" title="Mapa con las zonas y las poblaciones que entran en cada una">🗺 Mapa de zonas</button>
   <label title="Órdenes que se sacaron de la lista porque no se van a montar"><input type="checkbox" id="ver_sacadas" onchange="marcadas.clear();pintar()"> Ver las sacadas de la lista <span id="n_sacadas"></span></label>
 </div>
 <div id="progreso"></div>
@@ -280,6 +294,18 @@ function cerrarVentana(){ document.getElementById("fondo").style.display = docum
 function abrirVentana(html){ const v = document.getElementById("ventana"); v.innerHTML = '<button class="secondary bt-cerrar-v" onclick="cerrarVentana()" title="Cerrar (tecla Esc)">✕ Cerrar</button>' + html; document.getElementById("fondo").style.display = v.style.display = "block"; v.scrollTop = 0; }
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && document.getElementById("ventana").style.display === "block") cerrarVentana(); });
 async function logout(){ await client.auth.signOut(); location.href = "login.html"; }
+async function todoRapido(fabrica, paso = 300, aLaVez = 8){   // como todo(), pero pide varias tandas A LA VEZ (mucho más rápido)
+  let r = [], desde = 0;
+  for (;;) {
+    const tandas = await Promise.all(Array.from({ length: aLaVez }, (_, i) => fabrica().range(desde + i * paso, desde + (i + 1) * paso - 1)));
+    for (const { data, error } of tandas) {
+      if (error) throw error;
+      r = r.concat(data || []);
+      if (!data || data.length < paso) return r;
+    }
+    desde += aLaVez * paso;
+  }
+}
 async function todo(fabrica, paso = 1000){   // lee todas las filas, de `paso` en `paso`
   let r = [], desde = 0;
   for (;;) {
@@ -313,6 +339,8 @@ const pseudo = {};   // equipos que no están dados de alta (órdenes agendadas 
   const { data: st } = await client.from("staff").select("nombre, solo_deca, solo_montajes").eq("user_id", u.id).maybeSingle();
   if (!st || st.solo_deca || st.solo_montajes) { location.href = "inicio.html"; return; }
   document.getElementById("quien").textContent = st.nombre || u.email;
+  const descarga = descargarPendientes();   // las órdenes empiezan a bajar ya, mientras se cargan los catálogos
+  descarga.catch(() => {});                 // (si falla, el error se enseña en cargarTodo)
   try {
     await Promise.all([cargarCfg(), cargarEquipos(), cargarMontadores(), cargarTiendas(), cargarTiempos(), cargarGeo()]);
   } catch (e) {
@@ -320,7 +348,7 @@ const pseudo = {};   // equipos que no están dados de alta (órdenes agendadas 
       '<br>Si dice que no existe una tabla (planificacion_config, equipos_montaje…), falta pegar en Supabase el <b>SQL 126</b>.</div>';
     return;
   }
-  await cargarTodo();
+  await cargarTodo(descarga);
   if (!equipos.filter(e => e.activo).length) toast("Aún no hay equipos: créalos con el botón «👥 Equipos» (arriba a la derecha).");
   situarEnMapa();
   recalculoAutomatico();
@@ -362,25 +390,47 @@ function normOrden(r){
     lineas: lin.filter(l => l.tipolinea === 1 && clave(l.descripcion)).map(l => ({ fab: l.proveedor || 0, art: clave(l.descripcion), desc: l.descripcion, cant: Math.max(1, l.cantidad || 1) })),
   };
 }
-async function cargarTodo(){
+// Descarga de las órdenes pendientes (sin tocar nada más): se lanza al entrar, a la vez que los catálogos.
+// Primero solo las del año pasado y este (≈ 500): la pantalla sale enseguida. Las antiguas del programa viejo (≈ 1.000,
+// casi nunca se usan) se añaden después en segundo plano con cargarAntiguas().
+const ANYO_RECIENTE = +HOY.slice(0, 4) - 1;
+const qPendientes = () => client.from("ordenes").select(ORD_SEL).eq("estado", "recepcionado_total")
+  .or("fecha_prev_montaje.is.null,fecha_prev_montaje.gte." + HOY).order("anyo").order("orden");
+let cargaN = 0, antiguasListas = false;
+async function cargarAntiguas(n){
+  try {
+    const raw = await todoRapido(() => qPendientes().lt("anyo", ANYO_RECIENTE), 300, 4);
+    if (n !== cargaN) return;   // mientras tanto se ha vuelto a cargar todo: esto ya no vale
+    const ya = new Set(pend.map(o => o.n));
+    pend = pend.concat(raw.map(normOrden).filter(o => !ya.has(o.n) && !planificaLaTienda(o.tiendaId)));
+    antiguasListas = true;
+    await cargarFabricantes();
+    rellenarFiltros(); pintar(); situarEnMapa();
+  } catch (e) { console.warn("órdenes antiguas:", e); }
+}
+function descargarPendientes(){
+  return Promise.all([
+    todoRapido(() => qPendientes().gte("anyo", ANYO_RECIENTE), 300, 2),
+    // órdenes de incidencia sin montar ni fecha que ya tienen toda su mercancía (en casa del cliente o en el almacén)
+    todoRapido(() => client.from("ordenes").select(ORD_SEL).eq("estado", "incidencia")
+      .is("fecha_montaje", null).is("fecha_prev_montaje", null).order("anyo").order("orden"), 300, 2)]);
+}
+async function cargarTodo(descarga){
+  const n = ++cargaN; antiguasListas = false;
   document.getElementById("progreso").style.display = "block";
   document.getElementById("progreso").textContent = "Cargando órdenes…";
   try {
-    const raw = await todo(() => client.from("ordenes").select(ORD_SEL).eq("estado", "recepcionado_total")
-      .or("fecha_prev_montaje.is.null,fecha_prev_montaje.gte." + HOY).order("anyo").order("orden"), 300);
-    // órdenes de incidencia sin montar ni fecha que ya tienen toda su mercancía (en casa del cliente o en el almacén)
-    const rawInc = await todo(() => client.from("ordenes").select(ORD_SEL).eq("estado", "incidencia")
-      .is("fecha_montaje", null).is("fecha_prev_montaje", null).order("anyo").order("orden"), 300);
+    const [raw, rawInc] = await (descarga || descargarPendientes());
     pend = [...raw, ...rawInc.filter(todoRecibido)].map(normOrden).filter(o => !planificaLaTienda(o.tiendaId));
-    await Promise.all([cargarSacadas(), cargarDocs(), cargarTiendasFacturadas()]);
-    await cargarCitas();
-    await cargarAgenda(true);
+    // todo lo que no depende entre sí, a la vez
+    await Promise.all([cargarSacadas(), cargarDocs(), cargarTiendasFacturadas(), cargarAgenda(true), cargarCitas()]);
     await cargarFabricantes();
   } catch (e) {
     document.getElementById("lista").innerHTML = '<div class="ya-cita" style="color:#b91c1c">Error al cargar: ' + esc(e.message) + '</div>';
   }
   document.getElementById("progreso").style.display = "none";
   rellenarFiltros(); pintar();
+  cargarAntiguas(n);   // las antiguas, en segundo plano (la pantalla ya se puede usar)
 }
 async function cargarSacadas(){
   try {
@@ -399,28 +449,27 @@ async function cargarDocs(){
 }
 async function cargarCitas(){
   const BASE = "id, anyo, orden, fecha_hora, hora, equipo_id, estado, avisado_at", RESP = ", franja_desde, respuesta_cliente, respuesta_at, respuesta_preferencia, respuesta_comentario, nota_cliente, nota_cliente_at, respuesta_nueva";
-  let { data, error } = await client.from("citas_montaje").select(BASE + (hayRespuestas ? RESP : "")).in("estado", ["propuesta", "avisada"]);
+  // las abiertas y las respuestas sin ver (también de citas ya confirmadas por el cliente), a la vez
+  let [{ data, error }, r] = await Promise.all([
+    client.from("citas_montaje").select(BASE + (hayRespuestas ? RESP : "")).in("estado", ["propuesta", "avisada"]),
+    hayRespuestas ? client.from("citas_montaje").select(BASE + RESP).eq("respuesta_nueva", true).neq("estado", "cancelada") : { data: [] }]);
   if (error && hayRespuestas && error.code === "42703") {   // columna inexistente: el SQL 131 aún no está ejecutado
-    hayRespuestas = false;
+    hayRespuestas = false; r = { data: [] };
     ({ data, error } = await client.from("citas_montaje").select(BASE).in("estado", ["propuesta", "avisada"]));
   }
   if (error) throw error;
   const conFecha = c => ({ ...c, fecha: iso(new Date(c.fecha_hora)) });
   citasAbiertas = (data || []).map(conFecha);
-  citasResp = [];
-  if (hayRespuestas) {   // respuestas sin ver, también de citas ya confirmadas por el cliente
-    const r = await client.from("citas_montaje").select(BASE + RESP).eq("respuesta_nueva", true).neq("estado", "cancelada");
-    citasResp = (r.data || []).map(conFecha);
-  }
+  citasResp = hayRespuestas ? (r.data || []).map(conFecha) : [];
   // órdenes de las citas que no están en la lista de pendientes (p. ej. una agendada a la que se cambia el día)
   const conocidas = new Set(pend.map(o => o.n));
   const faltan = [...citasAbiertas, ...citasResp].filter(c => !conocidas.has(c.anyo + "/" + c.orden));
   ordenesCita = {};
   const porAnyo = {}; faltan.forEach(c => (porAnyo[c.anyo] ||= []).push(c.orden));
-  for (const [a, lst] of Object.entries(porAnyo)) {
+  await Promise.all(Object.entries(porAnyo).map(async ([a, lst]) => {
     const { data: os } = await client.from("ordenes").select(ORD_SEL).eq("anyo", +a).in("orden", lst);
     (os || []).forEach(r => { const o = normOrden(r); ordenesCita[o.n] = o; });
-  }
+  }));
 }
 // Agendadas: un rango que cubre la semana y el mes que se ven, y siempre las 3 próximas semanas (para las opciones)
 async function cargarAgenda(forzar){
@@ -428,29 +477,35 @@ async function cargarAgenda(forzar){
   const fin = [suma(lunes, 7), suma(lunesDe(mes + "-01"), 42), suma(HOY, 22)].sort().reverse()[0];
   if (!forzar && agendaDesde && ini >= agendaDesde && fin <= agendaHasta) return;
   agendaDesde = ini; agendaHasta = fin;
-  const raw = await todo(() => client.from("ordenes").select(ORD_SEL).gte("fecha_prev_montaje", ini).lt("fecha_prev_montaje", fin)
-    .neq("estado", "recepcionado_total").order("fecha_prev_montaje"), 300);
+  const [raw, { data: cc }] = await Promise.all([
+    todoRapido(() => client.from("ordenes").select(ORD_SEL).gte("fecha_prev_montaje", ini).lt("fecha_prev_montaje", fin)
+      .neq("estado", "recepcionado_total").order("fecha_prev_montaje"), 300, 3),
+    client.from("citas_montaje").select("id, anyo, orden, fecha_hora, hora, equipo_id, estado").eq("estado", "confirmada")
+      .gte("fecha_hora", ini).lt("fecha_hora", fin)]);
   agenda = raw.map(normOrden).filter(o => !planificaLaTienda(o.tiendaId));
-  const { data: cc } = await client.from("citas_montaje").select("id, anyo, orden, fecha_hora, hora, equipo_id, estado").eq("estado", "confirmada")
-    .gte("fecha_hora", ini).lt("fecha_hora", fin);
   citasConf = {}; (cc || []).forEach(c => citasConf[c.anyo + "/" + c.orden] = c);
 }
 async function cargarFabricantes(){
   const cods = [...new Set([...pend, ...agenda, ...Object.values(ordenesCita)].flatMap(o => o.lineas.map(l => l.fab)).filter(c => c && !(c in fabs)))];
-  for (let i = 0; i < cods.length; i += 200) {
-    const { data } = await client.from("fabricantes").select("codigo, nombre, nombre_comercial").in("codigo", cods.slice(i, i + 200));
+  const trozos = []; for (let i = 0; i < cods.length; i += 200) trozos.push(cods.slice(i, i + 200));
+  await Promise.all(trozos.map(async t => {
+    const { data } = await client.from("fabricantes").select("codigo, nombre, nombre_comercial").in("codigo", t);
     (data || []).forEach(f => fabs[f.codigo] = f.nombre_comercial || f.nombre);
-  }
+  }));
 }
 const nomFab = c => c ? (fabs[c] || "Fabricante " + c) : "Sin fabricante";
 const nomTienda = id => { const t = tiendas[id]; return t ? (t.nombre_comercial || t.nombre) : "Sin tienda"; };
 function rellenarFiltros(){
   const ft = document.getElementById("f_tienda"), ant = ft.value;
-  // Solo tiendas activas (tiendas_activas.js: órdenes en los últimos 3 meses o alta reciente) que tengan órdenes en la lista
+  // Tiendas con órdenes en la lista: las activas (tiendas_activas.js) y, además, TODA tienda con alguna orden que se ve ahora en
+  // «Sin agendar» con los demás filtros (antes Kauri, con órdenes en la lista, no salía por no contar como activa).
+  const conVisibles = new Set(pendientesVisibles(true).map(o => o.tiendaId));
   const ids = [...new Set(pend.map(o => o.tiendaId).filter(Boolean))]
-    .filter(id => !tiendasFacturadas || tiendasFacturadas.has(id) || id === ant)
+    .filter(id => !tiendasFacturadas || tiendasFacturadas.has(id) || conVisibles.has(id) || id === ant)
     .sort((a, b) => nomTienda(a).localeCompare(nomTienda(b)));
-  ft.innerHTML = '<option value="">Todas</option>' + ids.map(id => '<option value="' + id + '">' + esc(nomTienda(id)) + '</option>').join("");
+  // si el nombre comercial no es el de la tienda, salen los dos (p. ej. «prasdv · prueba 1000»)
+  const etiqueta = id => { const t = tiendas[id] || {}, a = nomTienda(id); return t.nombre && t.nombre_comercial && sinTildes(t.nombre) !== sinTildes(t.nombre_comercial) ? a + " · " + t.nombre : a; };
+  ft.innerHTML = '<option value="">Todas</option>' + ids.map(id => '<option value="' + id + '">' + esc(etiqueta(id)) + '</option>').join("");
   if (ids.includes(ant)) ft.value = ant;
   const fe = document.getElementById("f_eq"), antE = fe.value;
   fe.innerHTML = '<option value="">Todos los equipos</option>' + equipos.filter(e => e.activo).map(e => '<option value="' + e.id + '">' + esc(e.nombre) + '</option>').join("");
@@ -462,8 +517,60 @@ const posOrden = o => { const g = geo[claveLoc(o.loc)]; return g && g.lat != nul
 function claveTienda(t){ return "tienda:" + t.id + ":" + [t.direccion, t.cp, t.localidad].map(x => String(x || "").trim().toLowerCase()).join("|"); }
 const posTienda = id => { const t = tiendas[id]; if (!t) return null; const g = geo[claveTienda(t)]; return g && g.lat != null ? g : null; };
 const NAVE = () => cfg.nave_lat != null ? { lat: cfg.nave_lat, lon: cfg.nave_lon } : null;
+/* ---------- Valencia capital partida en 5 zonas (petición de Arturo, 23-11-2026; la Este se añadió después) ----------
+   Centro = hasta 2 km de la plaza del Ayuntamiento; fuera de ese círculo, según hacia dónde cae (cuartos iguales):
+   Norte (noroeste a noreste: Benicalap, Torrefiel, Orriols, Benimaclet…), Este (noreste a sureste, la parte del mar: Algirós,
+   Malvarrosa, Cabanyal, Grau, Ayora, Camins al Grau, Nazaret…), Sur (Quatre Carreres, Malilla, La Torre, Pinedo…) y Oeste.
+   De dónde sale la posición: 1) código postal escrito en la población o la dirección (tabla de abajo, no se envía nada);
+   2) si no, se busca SOLO el nombre de la calle (sin número, sin nombre ni teléfono del cliente) y se guarda en geo_lugares. */
+const VLC = { lat: 39.4699, lon: -0.3763 }, VLC_R_CENTRO = 2, VLC_R_MAX = 9;
+const ZONAS_VLC = ["Norte", "Este", "Centro", "Sur", "Oeste"];
+const COLOR_VLC = { Norte: "#2563eb", Este: "#ea580c", Centro: "#dc2626", Sur: "#16a34a", Oeste: "#9333ea" };
+const CP_ZONA_VLC = {   // aproximado: un código postal puede pisar dos zonas
+  "46001": "Centro", "46002": "Centro", "46003": "Centro", "46004": "Centro", "46005": "Centro", "46006": "Centro", "46007": "Centro", "46008": "Centro", "46010": "Centro",
+  "46009": "Norte", "46016": "Norte", "46019": "Norte", "46020": "Norte", "46025": "Norte",
+  "46011": "Este", "46021": "Este", "46022": "Este", "46023": "Este", "46024": "Este",
+  "46012": "Sur", "46013": "Sur", "46017": "Sur", "46026": "Sur",
+  "46014": "Oeste", "46015": "Oeste", "46018": "Oeste", "46035": "Oeste" };
+const BARRIOS_VLC = ["valencia", "benimaclet", "cabanal", "cabanyal", "malvarrosa", "nazaret", "el carmen", "carmen", "ruzafa", "russafa", "campanar", "patraix",
+  "benicalap", "orriols", "torrefiel", "el grao", "el grau", "grao", "pinedo", "el saler", "malilla", "marxalenes", "zaidia", "saidia", "benimamet", "la torre", "castellar",
+  "el cabanal", "el cabanyal", "la malvarrosa", "la zaidia", "la saidia", "russafa", "el carme"];
+const NO_VLC = ["emperador", "tavernes blanques", "alboraya", "alboraia", "burjassot", "burjasot", "mislata", "xirivella", "chirivella", "paterna"];   // otros municipios
+const sinTildes = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+function esValencia(loc){   // «Valencia», «46018 valencia», «valencia - 46009», «nazaret - valéncia», «benimaclet»… pero no «tavernes blanques (valencia)»
+  const s = sinTildes(loc).replace(/\([^)]*\)/g, " ").replace(/\b\d{5}\b/g, " ");
+  const partes = s.split(/[-–,\/]/).map(x => x.trim());
+  return partes.some(x => BARRIOS_VLC.includes(x)) && !partes.some(x => NO_VLC.includes(x));
+}
+const cpVlc = o => { const m = (o.loc + " " + o.dir).match(/\b(460[0-4]\d)\b/); return m && CP_ZONA_VLC[m[1]] ? m[1] : null; };
+function calleDe(dir){   // «C/ Poeta Serrano Clavero 55, 3ª» → «Calle Poeta Serrano Clavero»
+  let s = String(dir || "").split(/\d/)[0].split(",")[0];
+  s = s.replace(/\b(n[ºo°]?|num|número|numero|nro|s\/n)\.?\s*$/i, "").replace(/^\s*c\s*\/\s*/i, "Calle ").replace(/^\s*avd?a?\.?\s+/i, "Avenida ").replace(/^\s*pza?\.?\s+/i, "Plaza ").replace(/^\s*pl\.?\s+/i, "Plaza ");
+  s = s.replace(/\s+/g, " ").trim();
+  return s.length >= 4 && !/^(calle|avenida|plaza|paseo|camino|carrer)$/i.test(s) ? s : null;   // solo el tipo de vía no sirve
+}
+const claveCalle = c => "calle:valencia:" + sinTildes(c);
+function zonaPorPos(p){
+  const dy = (p.lat - VLC.lat) * 111.2, dx = (p.lon - VLC.lon) * 111.2 * Math.cos(VLC.lat * Math.PI / 180), d = Math.hypot(dx, dy);
+  if (d > VLC_R_MAX) return null;   // no está en Valencia capital
+  if (d <= VLC_R_CENTRO) return "Centro";
+  const b = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+  return b >= 315 || b < 45 ? "Norte" : b < 135 ? "Este" : b < 225 ? "Sur" : "Oeste";
+}
+const posCalle = o => { const c = calleDe(o.dir), g = c && geo[claveCalle(c)]; return g && g.lat != null ? g : null; };
+function zonaValencia(o){   // "Norte" / "Centro" / … ; "?" = aún buscando la calle; null = sin datos para situarla
+  const cp = cpVlc(o); if (cp) return CP_ZONA_VLC[cp];
+  const c = calleDe(o.dir); if (!c) return null;
+  const g = geo[claveCalle(c)]; if (!g) return "?";
+  return g.lat != null ? zonaPorPos(g) : null;
+}
 function zonaDe(o){
   if (!o.loc) return "📭 Sin población";
+  if (esValencia(o.loc)) {
+    const z = zonaValencia(o);
+    if (z === "?") return "⏳ Situando en el mapa…";
+    return z ? "Valencia · " + z : "Valencia · sin situar";
+  }
   const g = geo[claveLoc(o.loc)];
   if (!g) return "⏳ Situando en el mapa…";
   if (!g.encontrado) return "❓ Población no encontrada";
@@ -477,6 +584,19 @@ async function nominatim(q){
   const a = j[0].address || {};
   return { lat: +j[0].lat, lon: +j[0].lon, comarca: a.county || a.state_district || a.municipality || a.city || a.town || a.village || null };
 }
+// ¿El resultado del mapa es del municipio de Valencia? (Paterna, Torrent, Mislata… están a menos de 9 km pero NO son Valencia capital)
+const esMunVlc = a => [a.city, a.town, a.municipality, a.village].filter(Boolean).some(x => sinTildes(x) === "valencia");
+async function nominatimCalle(calle){   // SOLO el nombre de la calle (sin número) + Valencia. Nada más del cliente.
+  const pide = async url => { const r = await fetch(url + "&addressdetails=1", { headers: { "Accept-Language": "es" } }); if (!r.ok) throw new Error("mapa no disponible"); const j = await r.json();
+    return j && j[0] && esMunVlc(j[0].address || {}) ? { lat: +j[0].lat, lon: +j[0].lon, comarca: null } : null; };
+  let p = await pide("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&city=Valencia&street=" + encodeURIComponent(calle));
+  if (p && zonaPorPos(p)) return p;
+  // en el mapa las calles de Valencia están en valenciano («Carrer de…»): se prueba sin el tipo de vía y dentro del recuadro de la ciudad
+  const nombre = calle.replace(/^(calle|avenida|plaza|paseo|camino|carrer|avinguda|av|plaça)\b[\s\/.]*/i, "").replace(/^(de|del|de la|dels)\s+/i, "");
+  await espera(1100);
+  return await pide("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&bounded=1&viewbox=-0.47,39.55,-0.27,39.39&q=" + encodeURIComponent(nombre + ", València"));
+}
+const REINTENTO_CALLES = "2026-11-23T18:02:00Z";   // las calles guardadas antes de esta hora se buscan otra vez (búsqueda mejorada: comprueba que sea el municipio de Valencia)
 const espera = ms => new Promise(r => setTimeout(r, ms));
 let situando = false;
 const intentadas = new Set();   // lo ya buscado en esta visita (si el mapa falla, no se reintenta sin fin)
@@ -485,6 +605,11 @@ async function situarEnMapa(){
   const todas = [...pendientesVisibles(), ...agenda, ...Object.values(ordenesCita)];   // solo lo que se ve (no las ~1.400 antiguas)
   const tareas = [];
   [...new Set(todas.map(o => o.loc).filter(Boolean))].forEach(l => { if (!geo[claveLoc(l)]) tareas.push({ clave: claveLoc(l), q: l + ", España" }); });
+  // Valencia capital sin código postal: SOLO el nombre de la calle (sin número) para saber en qué zona cae
+  [...new Set(todas.filter(o => o.loc && esValencia(o.loc) && !cpVlc(o)).map(o => calleDe(o.dir)).filter(Boolean))].forEach(c => {
+    const g = geo[claveCalle(c)];
+    if (!g || String(g.actualizado_at || "") < REINTENTO_CALLES) tareas.push({ clave: claveCalle(c), calle: c });
+  });
   [...new Set(todas.map(o => o.tiendaId).filter(Boolean))].forEach(id => {
     const t = tiendas[id]; if (!t || t.sin_kilometraje || !(t.direccion || t.localidad)) return;
     const k = claveTienda(t); if (!geo[k]) tareas.push({ clave: k, q: [t.direccion, t.cp, t.localidad, "España"].filter(Boolean).join(", "), alt: [t.localidad, t.provincia, "España"].filter(Boolean).join(", ") });
@@ -496,7 +621,8 @@ async function situarEnMapa(){
     intentadas.add(t.clave);
     pr.style.display = "block"; pr.textContent = "🗺 Situando poblaciones en el mapa (solo la primera vez): " + (i + 1) + " de " + tareas.length + "…";
     try {
-      let p = await nominatim(t.q); await espera(1100);
+      let p = t.calle ? await nominatimCalle(t.calle) : await nominatim(t.q); await espera(1100);
+      if (p && t.calle && !zonaPorPos(p)) p = null;   // ha encontrado una calle con ese nombre fuera de Valencia capital
       if (!p && t.alt) { p = await nominatim(t.alt); await espera(1100); }
       const fila = { clave: t.clave, lat: p ? p.lat : null, lon: p ? p.lon : null, comarca: p ? p.comarca : null, encontrado: !!p, actualizado_at: new Date().toISOString() };
       geo[t.clave] = fila;
@@ -652,8 +778,8 @@ function vanPorZona(z){
 /* ======================= pintar ======================= */
 let tPintar = null;
 function pintarDiferido(){ clearTimeout(tPintar); tPintar = setTimeout(pintar, 250); }
-function pendientesVisibles(){
-  const meses = +document.getElementById("f_meses").value, ft = document.getElementById("f_tienda").value, soloSin = document.getElementById("solo_sin").checked;
+function pendientesVisibles(sinFiltroTienda){
+  const meses = +document.getElementById("f_meses").value, ft = sinFiltroTienda ? "" : document.getElementById("f_tienda").value, soloSin = document.getElementById("solo_sin").checked;
   const lim = meses ? iso(new Date(new Date().setMonth(new Date().getMonth() - Math.abs(meses)))) : null;
   const conCita = new Set(citasAbiertas.map(c => c.anyo + "/" + c.orden));
   const verSac = document.getElementById("ver_sacadas").checked;
@@ -909,6 +1035,139 @@ function cargarLeaflet(){
     js.onload = () => ok(); js.onerror = () => { leafletListo = null; mal(new Error("No se ha podido cargar el mapa (¿sin internet?)")); }; document.head.appendChild(js);
   });
 }
+/* ---------- mapa de ZONAS: cada zona con su color, su área y las poblaciones que engloba (petición de Arturo, 23-11-2026) ---------- */
+const PALETA_Z = ["#0ea5e9", "#f59e0b", "#14b8a6", "#e11d48", "#84cc16", "#6366f1", "#f97316", "#06b6d4", "#a855f7", "#65a30d", "#db2777", "#0891b2", "#ca8a04", "#7c3aed"];
+let mapaZonas = null, zonasMapa = [];
+function envolvente(pts){   // polígono que rodea los puntos (para dibujar el área de cada zona)
+  const p = [...new Map(pts.map(x => [x[0] + "," + x[1], x])).values()].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  if (p.length < 3) return p;
+  const cr = (o, a, b) => (a[1] - o[1]) * (b[0] - o[0]) - (a[0] - o[0]) * (b[1] - o[1]);
+  const lo = [], hi = [];
+  for (const x of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], x) <= 0) lo.pop(); lo.push(x); }
+  for (const x of [...p].reverse()) { while (hi.length >= 2 && cr(hi[hi.length - 2], hi[hi.length - 1], x) <= 0) hi.pop(); hi.push(x); }
+  return lo.slice(0, -1).concat(hi.slice(0, -1));
+}
+const puntoA = (km, grados) => { const r = grados * Math.PI / 180; return [VLC.lat + km * Math.cos(r) / 111.2, VLC.lon + km * Math.sin(r) / (111.2 * Math.cos(VLC.lat * Math.PI / 180))]; };
+async function verMapaZonas(){
+  const conAg = document.getElementById("mz_ag") ? document.getElementById("mz_ag").checked : false;
+  const ords = [...pendientesVisibles(), ...(conAg ? agenda.filter(o => o.fprev >= HOY && o.estado !== "completado") : [])];
+  // zonas → poblaciones (con su posición y cuántas órdenes)
+  const zs = {};
+  ords.forEach(o => {
+    const z = zonaDe(o); if (/^[📭⏳❓]/u.test(z)) return;
+    const Z = zs[z] ||= { nombre: z, pobs: {}, n: 0, pts: [] }; Z.n++;
+    const vlc = z.startsWith("Valencia · ");
+    const nom = vlc ? (cpVlc(o) ? "CP " + cpVlc(o) : (calleDe(o.dir) || "Valencia")) : capFrase(o.loc.replace(/\b\d{5}\b/g, "").replace(/\([^)]*\)/g, "").replace(/^[\s\-–]+|[\s\-–]+$/g, ""));
+    const k = sinTildes(nom), P = Z.pobs[k] ||= { nom, n: 0, pos: vlc ? posCalle(o) : posOrden(o) };
+    P.n++;
+    if (P.pos && P.n === 1) Z.pts.push([P.pos.lat, P.pos.lon]);
+  });
+  let iCol = 0;
+  zonasMapa = Object.values(zs).sort((a, b) => b.n - a.n).map(Z => ({ ...Z,
+    color: Z.nombre.startsWith("Valencia · ") ? (COLOR_VLC[Z.nombre.slice(11)] || "#64748b") : PALETA_Z[iCol++ % PALETA_Z.length] }));
+  const lista = zonasMapa.map((Z, i) => '<div class="mz-zona" onclick="enfocarZona(' + i + ')"><div class="mz-cab"><i style="background:' + Z.color + '"></i><b>' + esc(Z.nombre) + '</b> <span class="muted">' + Z.n + ' orden' + (Z.n > 1 ? "es" : "") + '</span></div>' +
+    '<div class="mz-pobs">' + Object.values(Z.pobs).sort((a, b) => b.n - a.n || a.nom.localeCompare(b.nom)).map(P => esc(P.nom) + (P.n > 1 ? ' <span class="muted">(' + P.n + ')</span>' : "")).join(" · ") + '</div></div>').join("");
+  abrirVentana('<h3>🗺 Mapa de zonas</h3>' +
+    '<div class="mz-buscar"><b>¿En qué zona está?</b> <input id="mz_q" placeholder="Código postal, calle o población (p. ej. 46022, Calle Sueca, Alboraya)" onkeydown="if(event.key===\'Enter\')buscarZona()">' +
+      '<button class="peq" onclick="buscarZona()">🔎 Buscar</button><div id="mz_res"></div></div>' +
+    '<div class="muted">Cada color es una zona y su área rodea las poblaciones que engloba. <b>Valencia capital</b> va partida en 5: <b style="color:' + COLOR_VLC.Centro + '">Centro</b> (2 km alrededor de la plaza del Ayuntamiento), ' +
+      '<b style="color:' + COLOR_VLC.Norte + '">Norte</b>, <b style="color:' + COLOR_VLC.Este + '">Este</b> (la parte del mar: Malvarrosa, Cabanyal, Grau, Nazaret…), <b style="color:' + COLOR_VLC.Sur + '">Sur</b> y <b style="color:' + COLOR_VLC.Oeste + '">Oeste</b>. ' +
+      'Salen las órdenes de «Sin agendar» con los filtros de arriba. Pulsa una zona de la lista para verla en el mapa.</div>' +
+    '<div class="fila2"><label class="muted"><input type="checkbox" id="mz_ag" ' + (conAg ? "checked" : "") + ' onchange="verMapaZonas()"> Incluir también las ya agendadas (desde hoy)</label></div>' +
+    '<div class="mz-cuerpo"><div id="mz_mapa"></div><div class="mz-lista">' + (lista || '<div class="muted">No hay órdenes situadas con estos filtros.</div>') + '</div></div>' +
+    '<div class="muted" style="font-size:11.5px">En Valencia capital cada punto es la calle (o el código postal) del cliente; fuera, la población. Para saber la zona solo se busca el nombre de la calle, sin número ni datos del cliente.</div>');
+  try { await cargarLeaflet(); } catch (err) { document.getElementById("mz_mapa").innerHTML = '<div class="muted" style="padding:12px;color:#b91c1c">' + esc(err.message) + '</div>'; return; }
+  if (mapaZonas) { mapaZonas.remove(); mapaZonas = null; }
+  const div = document.getElementById("mz_mapa"); if (!div) return;
+  mapaZonas = L.map(div);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(mapaZonas);
+  // Valencia capital: círculo del Centro y las 3 líneas que separan Norte / Sur / Oeste, con sus nombres
+  L.circle([VLC.lat, VLC.lon], { radius: VLC_R_CENTRO * 1000, color: COLOR_VLC.Centro, weight: 2, fillOpacity: .08 }).addTo(mapaZonas);
+  [45, 135, 225, 315].forEach(gr => L.polyline([puntoA(VLC_R_CENTRO, gr), puntoA(5.5, gr)], { color: "#334155", weight: 2, dashArray: "6 5" }).addTo(mapaZonas));
+  const etiquetas = L.layerGroup([["Centro", 0, 0], ["Norte", 3.6, 0], ["Este", 3.6, 90], ["Sur", 3.6, 180], ["Oeste", 3.6, 270]].map(([z, km, gr]) =>
+    L.marker(km ? puntoA(km, gr) : [VLC.lat, VLC.lon], { interactive: false, icon: L.divIcon({ className: "", iconSize: [70, 18], iconAnchor: [35, 9],
+      html: '<div class="mz-etq" style="color:' + COLOR_VLC[z] + '">' + z + '</div>' }) })));
+  const verEtq = () => mapaZonas.getZoom() >= 11 ? etiquetas.addTo(mapaZonas) : etiquetas.remove();   // los nombres, solo de cerca
+  mapaZonas.on("zoomend", verEtq);
+  const todos = [];
+  zonasMapa.forEach(Z => {
+    const env = envolvente(Z.pts);
+    if (env.length >= 3 && !Z.nombre.startsWith("Valencia · ")) L.polygon(env, { color: Z.color, weight: 2, fillOpacity: .13 }).addTo(mapaZonas).bindTooltip(Z.nombre, { sticky: true });
+    Object.values(Z.pobs).forEach(P => { if (!P.pos) return;
+      L.circleMarker([P.pos.lat, P.pos.lon], { radius: 5 + Math.min(P.n, 6), color: "#fff", weight: 1.5, fillColor: Z.color, fillOpacity: .95 }).addTo(mapaZonas)
+        .bindTooltip("<b>" + esc(P.nom) + "</b><br>" + esc(Z.nombre) + " · " + P.n + " orden" + (P.n > 1 ? "es" : ""));
+      todos.push([P.pos.lat, P.pos.lon]); });
+  });
+  // se empieza por lo de alrededor de Valencia (hasta 60 km); lo lejano se ve alejando el mapa o pulsando su zona en la lista
+  const cerca = todos.filter(p => Math.hypot((p[0] - VLC.lat) * 111.2, (p[1] - VLC.lon) * 85.8) <= 60);
+  const vista = cerca.length ? cerca : todos;
+  if (vista.length) mapaZonas.fitBounds(vista, { padding: [25, 25], maxZoom: 12 }); else mapaZonas.setView([VLC.lat, VLC.lon], 11);
+  verEtq();
+  setTimeout(() => mapaZonas && mapaZonas.invalidateSize(), 50);
+}
+/* «¿En qué zona está?»: código postal, calle o población. Para las calles se manda solo el nombre (sin número). */
+let marcaBusca = null;
+async function buscarZona(){
+  const q = (document.getElementById("mz_q").value || "").trim(), res = document.getElementById("mz_res");
+  if (!q) return;
+  const pinta = (zona, detalle, pos) => {
+    const vlc = zona.startsWith("Valencia · "), col = vlc ? COLOR_VLC[zona.slice(11)] : ((zonasMapa.find(Z => Z.nombre === zona) || {}).color || "#475569");
+    res.innerHTML = '<span class="mz-chip" style="background:' + col + '">' + esc(zona) + '</span> <span class="muted">' + esc(detalle) + '</span>';
+    if (mapaZonas && pos) {
+      if (marcaBusca) marcaBusca.remove();
+      marcaBusca = L.marker([pos.lat, pos.lon]).addTo(mapaZonas).bindTooltip(zona, { permanent: true, direction: "top", offset: [-15, -10] });
+      mapaZonas.setView([pos.lat, pos.lon], vlc ? 13 : 11);
+    }
+  };
+  res.innerHTML = '<span class="muted">Buscando…</span>';
+  try {
+    const cp = q.match(/^\s*(\d{5})\s*$/);
+    if (cp) {   // código postal
+      if (CP_ZONA_VLC[cp[1]]) return pinta("Valencia · " + CP_ZONA_VLC[cp[1]], "código postal " + cp[1] + " (Valencia capital; la zona por código postal es aproximada)", null);
+      const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=es&postalcode=" + cp[1], { headers: { "Accept-Language": "es" } });
+      const j = await r.json(); if (!j || !j[0]) { res.innerHTML = '<span class="muted">No se ha encontrado el código postal ' + esc(cp[1]) + '.</span>'; return; }
+      const a = j[0].address || {}, p = { lat: +j[0].lat, lon: +j[0].lon }, pob = a.city || a.town || a.village || a.municipality || "";
+      const zv = esMunVlc(a) ? zonaPorPos(p) : null;
+      return pinta(zv ? "Valencia · " + zv : (a.county || a.state_district || pob || "?"), "código postal " + cp[1] + (pob ? " · " + pob : ""), p);
+    }
+    const limpio = q.replace(/\b\d+\s*[a-zºª°]?\b/gi, " ").replace(/\s+/g, " ").replace(/\s*,\s*$/, "").trim();   // fuera los números
+    const partes = limpio.split(",").map(s => s.trim()).filter(Boolean);
+    const otraPob = partes.length > 1 && !esValencia(partes[partes.length - 1]);
+    const pareceCalle = /^\s*(c\s*\/|calle|cl\b|avda?\b|avenida|av\.|pza|plaza|plaça|pl\.|paseo|passeig|camino|cami|carrer|avinguda|ronda|gran via|travesia|pasaje|passatge)/i.test(partes[0] || "");
+    // 0) si no parece una calle: ¿es una población? (Alboraya, Torrent…) — sin esto «Alboraya» se tomaría por la calle Alboraia de Valencia
+    if (!pareceCalle && partes.length === 1) {
+      const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=es&featureType=settlement&q=" + encodeURIComponent(limpio), { headers: { "Accept-Language": "es" } });
+      const j = await r.json(); await espera(1100);
+      if (j && j[0]) {
+        const a = j[0].address || {}, p = { lat: +j[0].lat, lon: +j[0].lon };
+        if (esMunVlc(a)) { res.innerHTML = '<span class="muted">Es <b>Valencia capital</b>, que va partida en 5 zonas: escribe la <b>calle</b> o el <b>código postal</b> para saber cuál.</span>'; return; }
+        return pinta(a.county || a.state_district || a.city || a.town || a.village || limpio, (a.city || a.town || a.village || a.municipality || limpio), p);
+      }
+    }
+    // 1) como calle de Valencia capital (si no se ha escrito otra población detrás)
+    if (!otraPob) {
+      const calle = calleDe(partes[0]) || partes[0], k = claveCalle(calle);
+      let g = geo[k];
+      if (!g || g.lat == null) {
+        const p = await nominatimCalle(calle);
+        if (p && zonaPorPos(p)) { g = { clave: k, lat: p.lat, lon: p.lon, comarca: null, encontrado: true, actualizado_at: new Date().toISOString() }; geo[k] = g; client.from("geo_lugares").upsert(g).then(() => {}); }
+        await espera(1100);
+      }
+      if (g && g.lat != null && zonaPorPos(g)) return pinta("Valencia · " + zonaPorPos(g), calle + " (Valencia capital)", g);
+    }
+    // 2) «calle, población» de fuera de Valencia (o lo que no se ha encontrado antes): la zona es la comarca, como las poblaciones de las órdenes
+    const r2 = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=es&q=" + encodeURIComponent(limpio + ", España"), { headers: { "Accept-Language": "es" } });
+    const j2 = await r2.json();
+    if (!j2 || !j2[0]) { res.innerHTML = '<span class="muted">No se ha encontrado «' + esc(q) + '». Prueba con el código postal o revisa cómo está escrito.</span>'; return; }
+    const a2 = j2[0].address || {}, p2 = { lat: +j2[0].lat, lon: +j2[0].lon };
+    const zv = esMunVlc(a2) ? zonaPorPos(p2) : null;
+    pinta(zv ? "Valencia · " + zv : (a2.county || a2.state_district || a2.city || a2.town || a2.village || limpio), limpio + (a2.city || a2.town || a2.village ? " · " + (a2.city || a2.town || a2.village) : ""), p2);
+  } catch (e) { res.innerHTML = '<span class="muted" style="color:#b91c1c">El mapa no responde ahora mismo. Prueba en un rato.</span>'; }
+}
+function enfocarZona(i){
+  const Z = zonasMapa[i]; if (!mapaZonas || !Z || !Z.pts.length) return;
+  if (Z.pts.length === 1) mapaZonas.setView(Z.pts[0], 13); else mapaZonas.fitBounds(Z.pts, { padding: [40, 40], maxZoom: 14 });
+}
 const colorParada = s => s.estado === "realizada" ? (s.inc ? "#dc2626" : "#15803d") : s.estado === "incidencia" ? "#dc2626" : s.estado === "confirmada" ? "#2563eb" : s.estado === "avisada" ? "#f59e0b" : "#94a3b8";
 async function verMapaRuta(e, f){
   const p = dia(e, f), nave = NAVE();
@@ -1076,7 +1335,8 @@ async function quitar(anyo, orden, citaId, estado){
 }
 async function confirmar(id){
   const c = citasAbiertas.find(x => x.id === id); if (!c) return;
-  if (!confirm("¿El cliente de " + c.anyo + "/" + c.orden + " ha confirmado el " + fdia(c.fecha) + " a las " + c.hora + " h?\n\nLa orden pasará a «Agendada» con esa fecha, hora y los montadores de " + nomEq(c.equipo_id) + ".")) return;
+  const fr = c.franja_desde != null ? "de " + frH(c.franja_desde) + " a " + frH(c.franja_desde + FRANJA_MIN) + " h" : "a las " + c.hora + " h";
+  if (!confirm("¿El cliente de " + c.anyo + "/" + c.orden + " ha confirmado el " + fdia(c.fecha) + " " + fr + "?\n\nLa orden pasará a «Agendada» con esa fecha, esa franja de llegada y los montadores de " + nomEq(c.equipo_id) + ".")) return;
   const { error } = await client.rpc("confirmar_cita", { p_id: id });
   if (error) { alert("No se ha podido confirmar: " + error.message); return; }
   await cargarTodo();
@@ -1113,11 +1373,20 @@ function ponerFranja(desde){
   document.querySelectorAll("#av_franjas .franja").forEach(b => b.classList.toggle("on", +b.dataset.m === desde));
   const h = document.getElementById("av_franja_h"); if (h) h.value = pad(Math.floor(desde / 60)) + ":" + pad(desde % 60);
 }
+/* Lo que se monta, en corto para el WhatsApp (Arturo: con muchas líneas no quiere un mensaje largo).
+   Hasta 3 artículos distintos: todos; más: los 2 primeros y «y otros artículos». Cada descripción, como mucho 32 letras.
+   SIN el número de artículos (Arturo): un pedido puede venir desglosado en muchas líneas y el cliente creería que no es el suyo. */
+function resumenPedido(lineas){
+  const corta = s => { s = capFrase(String(s || "").replace(/\s+/g, " ")); return s.length > 32 ? s.slice(0, 30).replace(/[\s,.\-–]+\S*$/, "") + "…" : s; };
+  const arts = [...new Map(lineas.map(l => [sinTildes(l.desc).trim(), corta(l.desc)])).values()].filter(Boolean);
+  if (!arts.length) return "su pedido";
+  if (arts.length <= 3) return arts.length === 1 ? arts[0] : arts.slice(0, -1).join(", ") + " y " + arts[arts.length - 1];
+  return arts.slice(0, 2).join(", ") + " y otros artículos";
+}
 function mensajeAviso(o, c, token){
   const fecha = flargo(c.fecha), Fecha = fecha[0].toUpperCase() + fecha.slice(1);
   const nombre = capFrase((o.cli || "").trim().split(/\s+/)[0] || "");
-  const arts = o.lineas.map(l => capFrase(l.desc));
-  const pedido = arts.length ? arts.slice(0, 3).join(", ") + (arts.length > 3 ? " y " + (arts.length - 3) + " artículo" + (arts.length > 4 ? "s" : "") + " más" : "") : "su pedido";
+  const pedido = resumenPedido(o.lineas);
   return "*ALMMA* almacén y montaje\n*" + nomTienda(o.tiendaId) + "*\n\n" +   // cabecera pedida por Arturo (23-11-2026): ALMMA y debajo la tienda
     "Hola *" + nombre + "*, le escribimos del servicio de entrega y montaje.\n\n" +
     "Tenemos previsto instalar su pedido:\n📦 *" + pedido + "*\n\n" +

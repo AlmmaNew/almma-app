@@ -181,6 +181,7 @@ function claveEquipo(o){
   return n.length ? n.join("/") : SIN_EQ;
 }
 const porHora = (a,b) => (a.horamont || "99").localeCompare(b.horamont || "99") || a.orden - b.orden;
+const horaPdf = h => h ? String(h).replace(/:00/g, "").replace(/^0(\d)/, "$1").replace(/-0(\d)/, "-$1") : "-";   // «16:00-18:00» → «16-18» (la columna del PDF es estrecha)
 // ya montada: completada (o el estado antiguo terminado_incidencia) o con fecha de montaje real
 const montada = o => o.estado === "completado" || o.estado === "terminado_incidencia" || !!o.fecha_montaje;
 // números de factura de la orden (línea a línea si se facturó desde la web; si no, el de la cabecera del programa antiguo)
@@ -306,7 +307,7 @@ async function imprimirListado(){
           const cli = envolver(F, 8.5, o.nombre_cli || "", 205), loc = envolver(F, 8.5, o.localidad_cli || "", 112);
           const mon = envolver(F, 8.5, o.ordenes_montadores.map(a => nom[a.montador_id] || "?").join(", ") || "Sin montador", 142), cob = cobroTxt(cobroOrden(o));
           const n = Math.max(cli.length, loc.length, mon.length, cob.length, 1); hay(n * 10.5 + 4);
-          t(o.horamont || "-", X.hora, y, 8.5, B); t(o.anyo + "/" + o.orden, X.orden, y, 8.5);
+          t(horaPdf(o.horamont), X.hora, y, 8.5, B); t(o.anyo + "/" + o.orden, X.orden, y, 8.5);
           cli.forEach((s,i) => t(s, X.cli, y - i*10.5)); loc.forEach((s,i) => t(s, X.loc, y - i*10.5)); mon.forEach((s,i) => t(s, X.mon, y - i*10.5));
           t(fmt(importeOrden(o)), X.imp, y); (cob.length ? cob : ["-"]).forEach((s,i) => t(s, X.cob, y - i*10.5));
           y -= n * 10.5 + 3; page.drawLine({ start:{x:M,y:y+5}, end:{x:W-M,y:y+5}, thickness:.3, color:rgb(.8,.8,.8) });
@@ -402,7 +403,7 @@ async function imprimirHoja(dia, equipo, btn, enviar){
       const lineas = o.linorden.filter(l => l.tipolinea !== 4).sort((a,b) => a.linea - b.linea).map(l => ({ ubi: l.ubicacion || "", desc: envolver(F, 8.5, l.descripcion || "", 320), cant: l.cantidad ?? "", fab: envolver(F, 8.5, fab[l.proveedor] || "", 210), bul: l.bultos ?? "" }));
       const hCab = 12 + (nom.length + dir.length + obs.length) * 10.5, hLin = lineas.reduce((s,l) => s + Math.max(l.desc.length, l.fab.length) * 10.5, 0);
       if (y - (hCab + hLin + 30) < 36 && y < H-130) nueva();
-      t(o.horamont || "-", COL.hora, y, 9, B); t(o.anyo + "/" + o.orden, COL.orden, y, 9, B);
+      t(horaPdf(o.horamont), COL.hora, y, 9, B); t(o.anyo + "/" + o.orden, COL.orden, y, 9, B);
       ped.forEach((s,i) => t(s, COL.pedido, y - i*10.5, 8.5));
       nom.forEach((s,i) => t(s, COL.cli, y - i*10.5, 9, B));
       [o.telefono_cli, o.telefono2_cli].filter(Boolean).forEach((s,i) => t(s, COL.tel, y - i*10.5, 8.5));
