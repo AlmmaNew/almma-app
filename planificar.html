@@ -346,6 +346,7 @@ const abiertoOps = new Set(), zonasAbiertas = new Set();   // las zonas salen pl
 let tiendasFacturadas = null;           // ids de tiendas activas (tiendas_activas.js; null = no se pudo saber: salen todas)
 let docs = {};                       // documentos que ha adjuntado la tienda (pedido, planos, fotos), por "anyo/orden"
 let sacadas = {}, haySacadas = true;   // órdenes sacadas de la lista (SQL 127), por "anyo/orden"
+let ent2448 = {};   // entregas 24h–48h confirmadas (SQL 136), por "anyo/orden"
 let urgentes = {}, hayUrgentes = true; // órdenes marcadas como urgentes (SQL 135), por "anyo/orden"
 const marcadas = new Set();             // órdenes con la casilla marcada, para sacar o devolver varias a la vez
 const pseudo = {};   // equipos que no están dados de alta (órdenes agendadas desde Órdenes/Rutas con otros montadores)
@@ -462,6 +463,24 @@ async function cargarUrgentes(){
     const data = await todo(() => client.from("planificar_urgentes").select("anyo, orden, motivo, marcada_at"));
     urgentes = Object.fromEntries(data.map(s => [s.anyo + "/" + s.orden, s])); hayUrgentes = true;
   } catch (e) { urgentes = {}; hayUrgentes = false; }   // sin el SQL 135 la pantalla sigue funcionando, sin urgentes
+  try {   // 🚚 entregas 24h–48h confirmadas a la tienda (SQL 136): salen también en Urgentes, las primeras, por plazo
+    const data = await todo(() => client.from("entregas_24_48").select("anyo, orden, limite_desde, limite_hasta, importe").eq("estado", "confirmada"));
+    ent2448 = Object.fromEntries(data.map(s => [s.anyo + "/" + s.orden, s]));
+    if (data.length) { const { data: f } = await client.from("festivos").select("fecha"); fest2448 = new Set((f || []).map(x => x.fecha)); }
+  } catch (e) { ent2448 = {}; }   // sin el SQL 136, nada
+}
+let fest2448 = new Set();
+// horas de días laborables (sin sábados, domingos ni festivos) que quedan hasta «hasta»; negativo si ya pasó
+function horasLab2448(hasta) {
+  const ahora = new Date(), pasado = hasta < ahora;
+  let t = new Date(pasado ? hasta : ahora), fin = pasado ? ahora : hasta, h = 0;
+  while (t < fin) {
+    const sig = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1), tope = sig < fin ? sig : fin;
+    const iso = t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+    if (t.getDay() !== 0 && t.getDay() !== 6 && !fest2448.has(iso)) h += (tope - t) / 36e5;
+    t = tope;
+  }
+  return pasado ? -h : h;
 }
 async function cargarTiendasFacturadas(){
   tiendasFacturadas = await idsTiendasActivas(client);   // regla común de tiendas_activas.js
@@ -823,7 +842,7 @@ function pintar(){
   const proximas = agenda.filter(o => o.fprev >= HOY).length;
   document.getElementById("tarjetas").innerHTML =
     '<div class="tarjeta nar"><div class="n">' + vis.length + '</div><div class="t">sin agendar · ' + hm(vis.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h de montaje conocido</div></div>' +
-    (vis.some(o => urgentes[o.n]) ? '<div class="tarjeta clic t-urg" onclick="const b=document.getElementById(\'bloque_urg\'); if(b) b.scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="n">⚡ ' + vis.filter(o => urgentes[o.n]).length + '</div><div class="t">urgentes sin agendar</div></div>' : "") +
+    (vis.some(o => urgentes[o.n] || ent2448[o.n]) ? '<div class="tarjeta clic t-urg" onclick="const b=document.getElementById(\'bloque_urg\'); if(b) b.scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="n">⚡ ' + vis.filter(o => urgentes[o.n] || ent2448[o.n]).length + '</div><div class="t">urgentes sin agendar</div></div>' : "") +
     '<div class="tarjeta gris clic" onclick="cambiarVista(\'avisos\')"><div class="n">' + nP + '</div><div class="t">propuestas sin avisar al cliente</div></div>' +
     '<div class="tarjeta amb clic" onclick="cambiarVista(\'avisos\')"><div class="n">' + nA + '</div><div class="t">avisadas, esperando respuesta</div></div>' +
     (citasResp.length ? '<div class="tarjeta clic resp-nueva" onclick="cambiarVista(\'avisos\')"><div class="n">🔔 ' + citasResp.length + '</div><div class="t">respuesta' + (citasResp.length > 1 ? "s" : "") + ' nueva' + (citasResp.length > 1 ? "s" : "") + ' de clientes</div></div>' : "") +
@@ -839,7 +858,8 @@ function pintarLista(vis){
   const orden = document.getElementById("f_orden").value, nave = NAVE();
   // ⚡ Urgentes: arriba del todo y fuera de sus zonas (SQL 135)
   const verSac = document.getElementById("ver_sacadas").checked;
-  const urg = verSac ? [] : vis.filter(o => urgentes[o.n]).sort((a, b) => String(urgentes[a.n].marcada_at).localeCompare(String(urgentes[b.n].marcada_at)));
+  const clvUrg = o => ent2448[o.n] ? "0" + ent2448[o.n].limite_hasta : "1" + urgentes[o.n].marcada_at;   // primero las 🚚 24h–48h por plazo, luego las ⚡ por llegada
+  const urg = verSac ? [] : vis.filter(o => urgentes[o.n] || ent2448[o.n]).sort((a, b) => clvUrg(a).localeCompare(clvUrg(b)));
   const porZona = {};
   vis.filter(o => !urg.includes(o)).forEach(o => (porZona[zonaDe(o)] ||= []).push(o));
   const distZ = z => { if (!nave) return 0; const ds = porZona[z].map(o => kmAprox(nave, posOrden(o))).filter(x => x != null); return ds.length ? Math.min(...ds) : 99999; };
@@ -849,7 +869,7 @@ function pintarLista(vis){
   let h = zs.length > 1 && !filtro ? '<div style="text-align:right;margin:0 0 6px"><button class="secondary peq" onclick="plegarTodas(' + (zs.some(cerrada) ? "true" : "false") + ')">' + (zs.some(cerrada) ? "▾ Abrir todas" : "▸ Plegar todas") + '</button></div>' : "";
   zonasVisibles = zs;
   if (urg.length) h = '<div class="urgentes" id="bloque_urg"><div class="urg-cab">⚡ <b>Urgentes</b><span class="dato">' + urg.length + ' orden' + (urg.length > 1 ? "es" : "") + '</span>' +
-    '<span class="dato">⏱ ' + hm(urg.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h</span><span class="muted" style="margin-left:auto">por orden de llegada a urgentes</span></div>' +
+    '<span class="dato">⏱ ' + hm(urg.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h</span><span class="muted" style="margin-left:auto">primero las 🚚 entregas 24h–48h por plazo; luego por orden de llegada</span></div>' +
     '<table>' + urg.map(filaPendiente).join("") + '</table></div>' + h;
   for (const z of zs) {
     const ords = porZona[z], porPob = {};
@@ -979,8 +999,9 @@ function filaPendiente(o){
     '<button class="' + (x.tipo === "lleno" ? "rojo" : "") + '" onclick="proponer(' + o.anyo + ',' + o.orden + ',\'' + x.e + '\',\'' + x.f + '\',\'' + x.h + '\')">' + (x.tipo === "lleno" ? "Usar igual" : "Usar") + '</button></div>';
   const kmTxt = km.sin ? '<span class="sinkm">Sin kilometraje (' + esc(nomTienda(o.tiendaId)) + ')</span>' : km.km != null ? "🚗 " + (km.exacto ? "" : "≈ ") + km.km + " km desde la tienda" : "";
   const tTxt = T.sinLineas ? "Sin artículos" : T.t != null ? hm(T.t) + " h" : T.parcial ? hm(T.parcial) + " h + ?" : "Poner tiempo";
-  const sac = sacadas[o.n], urg = urgentes[o.n];
-  return '<tr class="fila' + (sac ? " sacada" : "") + (urg ? " urgente" : "") + '"><td style="width:96px" rowspan="2">' +
+  const sac = sacadas[o.n], urg = urgentes[o.n], e48 = ent2448[o.n];
+  const h48 = e48 ? (new Date(e48.limite_hasta) < new Date() ? -1 : Math.floor(horasLab2448(new Date(e48.limite_hasta)))) : 0;
+  return '<tr class="fila' + (sac ? " sacada" : "") + (urg || e48 ? " urgente" : "") + '"><td style="width:96px" rowspan="2">' +
       (haySacadas ? '<input type="checkbox" class="marca" title="Marcar" ' + (marcadas.has(o.n) ? "checked" : "") + ' onchange="marcar(\'' + o.n + '\', this.checked)">' : "") +
       '<a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a>' +
       (o.inc ? '<div><span class="est incidencia" title="Orden de incidencia: ya tiene todo lo necesario (en casa del cliente o en el almacén), se puede hacer">⚠ Incidencia</span></div>' : "") +
@@ -991,6 +1012,7 @@ function filaPendiente(o){
                                             : '<button class="burg" title="Pasar a la tabla de urgentes, arriba del todo" onclick="pasarUrgentes([\'' + o.n + '\'])">⚡ Urgente</button>') + '</div>' : "") + '</td>' +
     '<td>' + esc(o.cli) + '<div class="muted">' + esc(o.dir) + '</div><div class="km">' + kmTxt + '</div>' + botonDocs(o) +
       (urg ? '<div class="urg-info">⚡ Urgente desde el ' + fdia(String(urg.marcada_at).slice(0, 10)) + (urg.motivo ? ": " + esc(urg.motivo) : "") + ' · ' + esc(zonaDe(o)) + '</div>' : "") +
+      (e48 ? '<div class="urg-info" style="color:' + (h48 < 0 ? "#dc2626" : "#1d4ed8") + '">🚚 Entrega 24h–48h: hasta el ' + new Date(e48.limite_hasta).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + (h48 < 0 ? " · ⛔ fuera de plazo" : " · quedan " + h48 + " h laborables") + '</div>' : "") +
       (sac ? '<div class="sacada-info">🚫 Sacada el ' + fdia(String(sac.sacada_at).slice(0, 10)) + (sac.motivo ? ": " + esc(sac.motivo) : "") + '</div>' : "") + '</td>' +
     '<td>' + esc(o.lineas.map(l => capFrase(l.desc)).slice(0, 3).join(" + ") + (o.lineas.length > 3 ? " …" : "")) + '<div class="muted">' + esc(nomTienda(o.tiendaId)) + (o.bultos ? " · " + o.bultos + " bultos" : "") + '</div></td>' +
     '<td><button class="tbtn ' + (T.t == null ? "vacio" : "") + '" onclick="abrirTiempo(' + o.anyo + ',' + o.orden + ')" title="Tiempo de montaje por artículo">⏱ ' + tTxt + '</button>' +

@@ -259,7 +259,11 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
   <button class="secondary" onclick="logout()">Salir</button>
 </div>
 
-<details id="aviso_servicios" style="display:none;margin:12px 24px 0;background:#fffbeb;border:1px solid #f59e0b;border-radius:8px;padding:8px 14px;">
+<details id="aviso_e2448" style="display:none;margin:12px 24px 0;background:#eff6ff;border:1px solid #3b82f6;border-radius:8px;padding:8px 14px;">
+  <summary style="cursor:pointer;font-weight:600;color:#1e3a8a;" id="aviso_e2448_t"></summary>
+  <div id="aviso_e2448_l" style="margin-top:8px;font-size:13px;"></div>
+</details>
+<details id="aviso_servicios"style="display:none;margin:12px 24px 0;background:#fffbeb;border:1px solid #f59e0b;border-radius:8px;padding:8px 14px;">
   <summary style="cursor:pointer;font-weight:600;color:#92400e;" id="aviso_servicios_t"></summary>
   <div id="aviso_servicios_l" style="margin-top:8px;font-size:13px;"></div>
 </details>
@@ -508,6 +512,11 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
         <div class="campo"><label>Bultos (total líneas)</label><div class="dato" id="ch_bultos">0</div></div>
         <div class="campo"><label>Peso kg (total líneas)</label><div class="dato" id="ch_peso">0</div></div>
       </div>
+    </div>
+    <!-- Servicio «Entrega 24h–48h» (SQL 136): solo oficina; las tiendas no lo ven todavía (se ofrecerá en 2027) -->
+    <div class="tarjeta" id="tarjeta_e2448" style="display:none;">
+      <div class="tarjeta-titulo">🚚 Entrega 24h–48h <span class="meta" style="font-weight:normal;font-size:12px;">· servicio con precio especial · de momento solo lo ve la oficina</span></div>
+      <div id="e2448_cuerpo" style="font-size:13px;"></div>
     </div>
     <!-- Eliminar: lejos del botón de cerrar para que no se pulse sin querer (petición de Arturo) -->
     <div class="tarjeta tarjeta-peligro">
@@ -827,6 +836,7 @@ async function comprobarSesion() {
     document.getElementById("filtro_tienda").innerHTML = '<option value="">Todas las tiendas</option>' + ts.map(t => `<option value="${t.id}">${escMont(t.nombre)}</option>`).join("");
   } catch (_) {}
   cargarAvisoServicios();
+  cargarAvisoE2448();
   await cargarPedidos();   // sin filtros no carga nada: avisa de que hay que buscar
   document.getElementById("anyo_desde").value = new Date().getFullYear();   // "Año desde" ya puesto; solo hay que pulsar Buscar
 
@@ -1643,7 +1653,7 @@ async function abrirPanel(orden) {
     llenarSelectTipoLinea().then(() => mostrarNuevaLinea(false)),
     cargarDetallesMontaje(),
     cargarDocumentosOrden(),
-    cargarLineas(),
+    cargarLineas().then(() => cargarE2448(o, miApertura)),   // el recuadro 🚚 necesita las líneas (botón ✂ Separar)
     cargarIncidencias(),
     cargarHistorial(o),
     cargarLlamadas(),
@@ -1761,6 +1771,206 @@ async function cargarAvisoServicios(){
 async function marcarServiciosVistos(anyo, orden){
   await client.from("servicios_orden").update({ revisado: true }).eq("anyo", anyo).eq("orden", orden);
   cargarAvisoServicios();
+}
+/* ---------- 🚚 Entrega 24h–48h (SQL 136) ----------
+   Servicio con precio especial (fijo o %), valorado en cada pedido. Solo oficina: las tiendas no lo ven todavía.
+   propuesta (precio indicado a la tienda) → aceptada (la tienda acepta el precio) → confirmada (se lo confirmamos:
+   empieza el plazo de 24 h a 48 h y se añade la línea «SERVICIO ENTREGA 24-48H»). Cumplida = la orden ya tiene fecha de montaje. */
+let e2448 = null, e2448Orden = null, hayE2448 = true, festivos2448 = null;
+const LINEA_E2448 = "SERVICIO ENTREGA 24-48H";
+// El plazo cuenta solo días laborables: ni sábados, ni domingos, ni los festivos (tabla `festivos`, Administración → Festivos)
+async function cargarFestivos2448() {
+  if (festivos2448) return festivos2448;
+  const { data } = await client.from("festivos").select("fecha");
+  return festivos2448 = new Set((data || []).map(f => f.fecha));
+}
+const diaISO = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+function horasLaborables(desde, hasta) {   // horas de días laborables entre dos momentos (negativo si «hasta» ya pasó)
+  if (hasta < desde) return -horasLaborables(hasta, desde);
+  let t = new Date(desde), h = 0;
+  while (t < hasta) {
+    const fin = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
+    const tope = fin < hasta ? fin : hasta;
+    if (t.getDay() !== 0 && t.getDay() !== 6 && !(festivos2448 || new Set()).has(diaISO(t))) h += (tope - t) / 36e5;
+    t = tope;
+  }
+  return h;
+}
+const E2448_MERC = { exposicion: "Mercancía de exposición", almacen: "Ya está en nuestro almacén", llega_pronto: "Llega en breve", otra: "Otra" };
+const eurE = v => Number(v || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+const fhE = v => v ? new Date(v).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+function plazoE2448(e, o) {
+  if (o && o.fecha_montaje) return { txt: "✔ Cumplida: montada el " + new Date(o.fecha_montaje).toLocaleDateString("es-ES"), color: "#15803d" };
+  const ahora = new Date();
+  if (new Date(e.limite_hasta) < ahora) return { txt: "⛔ Plazo pasado hace " + Math.max(1, Math.round(-horasLaborables(ahora, new Date(e.limite_hasta)))) + " h laborables", color: "#dc2626" };
+  const h = horasLaborables(ahora, new Date(e.limite_hasta)), d = horasLaborables(ahora, new Date(e.limite_desde));
+  return { txt: "⏱ Quedan " + Math.floor(h) + " h laborables" + (d > 0 ? " (lo ideal, a partir de dentro de " + Math.ceil(d) + " h laborables)" : ""), color: h < 12 ? "#d97706" : "#1d4ed8" };
+}
+function precioE2448(e) {
+  return e.tipo_precio === "porcentaje" ? "<b>" + eurE(e.importe) + "</b> (" + Number(e.porcentaje).toLocaleString("es-ES") + " % de " + eurE(e.base) + ")" : "<b>" + eurE(e.importe) + "</b> (precio fijo)";
+}
+async function cargarE2448(o, miApertura) {
+  const tarjeta = document.getElementById("tarjeta_e2448");
+  const [{ data, error }] = await Promise.all([client.from("entregas_24_48").select("*").eq("anyo", o.anyo).eq("orden", o.orden).maybeSingle(), cargarFestivos2448()]);
+  if (miApertura !== aperturaPanel) return;
+  if (error) { hayE2448 = false; tarjeta.style.display = "none"; return; }   // sin el SQL 136 no sale nada
+  e2448 = data; e2448Orden = o; tarjeta.style.display = "";
+  pintarE2448();
+}
+function pintarE2448(formulario) {
+  const c = document.getElementById("e2448_cuerpo"), e = e2448, o = e2448Orden;
+  const abierta = e && !["rechazada", "cancelada"].includes(e.estado);
+  if (formulario || !abierta) {
+    let h = "";
+    if (e && !abierta && !formulario) h += '<div class="meta" style="margin-bottom:8px;">La última propuesta (' + precioE2448(e) + ') quedó <b>' + (e.estado === "rechazada" ? "rechazada por la tienda" : "anulada") + '</b> el ' + fhE(e.cerrada_at) + (e.cerrada_motivo ? ": " + escMont(e.cerrada_motivo) : "") + '.</div>';
+    const merc = (window._lineasOrden || []).filter(l => l.tipolinea !== 4);
+    const sePuedeSeparar = merc.length > 1 && !(o && o.fecha_montaje);
+    if (!formulario) {
+      c.innerHTML = h + '<p class="meta" style="margin:0 0 8px;">Para mercancía de exposición, que ya está en el almacén o que llega en breve. El plazo (24 h a 48 h, solo días laborables) empieza cuando le confirmamos el servicio a la tienda, después de que ella acepte el precio.</p>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;"><button class="secondary" onclick="pintarE2448(true)">🚚 Proponer entrega 24h–48h</button>' +
+        (sePuedeSeparar ? '<button class="secondary" onclick="pintarE2448(\'separar\')" title="Si la tienda quiere ya lo que está en el almacén y el resto del pedido va a tardar">✂ Separar líneas a una orden nueva 24h–48h</button>' : "") + '</div>';
+      return;
+    }
+    const separar = formulario === "separar";
+    const v = (!separar && abierta && e) || {};
+    c.innerHTML = (separar ? '<p class="meta" style="margin:0 0 6px;">Marca las líneas que se entregan ya. Se <b>mueven</b> a una orden nueva del mismo cliente (con su recepción y ubicación), que nace con esta propuesta de entrega 24h–48h. Las demás se quedan en esta orden. El importe del montaje de cada orden lo ajustas tú después.</p>' +
+        '<div id="e2448_lineas" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin-bottom:10px;max-height:220px;overflow:auto;">' +
+        merc.map(l => '<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;cursor:pointer;"><input type="checkbox" value="' + l.linea + '"' + ((l.recibido_at || l.recibido === "S") ? " checked" : "") + '>' +
+          '<span>' + (l.cantidad ?? 1) + ' × ' + escMont(l.descripcion || "") + ' <span class="meta">' + ((l.recibido_at || l.recibido === "S") ? "· ✅ recibida" + (l.ubicacion ? " (" + escMont(l.ubicacion) + ")" : "") : "· ⏳ sin recibir") + '</span></span></label>').join("") + '</div>' : "") +
+      '<div class="form-grid">' +
+      '<div class="campo"><label>Precio especial</label><select id="e2448_tipo" onchange="recalcE2448()"><option value="fijo">Importe fijo (€)</option><option value="porcentaje">Porcentaje sobre un importe</option></select></div>' +
+      '<div class="campo e2448-fijo"><label>Importe (€)</label><input id="e2448_fijo" type="number" step="0.01" min="0" oninput="recalcE2448()"></div>' +
+      '<div class="campo e2448-pct"><label>Sobre el importe de (€)</label><input id="e2448_base" type="number" step="0.01" min="0" oninput="recalcE2448()"></div>' +
+      '<div class="campo e2448-pct"><label>Porcentaje (%)</label><input id="e2448_pct" type="number" step="0.01" min="0" oninput="recalcE2448()"></div>' +
+      '<div class="campo"><label>Se cobra a la tienda</label><div class="dato" id="e2448_total">-</div></div>' +
+      '<div class="campo"><label>La mercancía</label><select id="e2448_merc"><option value="">—</option>' + Object.entries(E2448_MERC).map(([k, t]) => '<option value="' + k + '">' + t + '</option>').join("") + '</select></div>' +
+      '<div class="campo" style="grid-column:1/-1;"><label>Notas</label><input id="e2448_notas" placeholder="Opcional"></div></div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;">' + (separar ? '<button onclick="separarE2448()">✂ Separar y crear la orden nueva</button>' : '<button onclick="guardarPropuestaE2448()">💾 Guardar propuesta</button>') +
+      '<button class="secondary" onclick="pintarE2448()">Cancelar</button></div>';
+    document.getElementById("e2448_tipo").value = v.tipo_precio || "fijo";
+    document.getElementById("e2448_fijo").value = v.tipo_precio === "fijo" ? v.importe : "";
+    document.getElementById("e2448_pct").value = v.porcentaje ?? "";
+    document.getElementById("e2448_merc").value = v.mercancia || "";
+    document.getElementById("e2448_notas").value = v.notas || "";
+    const base = document.getElementById("e2448_base");
+    if (v.base != null) base.value = v.base;
+    else {   // por defecto, el importe de la línea de importes principal de la orden (el valor del servicio)
+      const l4 = (window._lineasOrden || []).find(l => l.tipolinea === 4 && l.descripcion !== LINEA_E2448 && Number(l.importe));
+      if (l4) base.value = Number(l4.importe).toFixed(2);
+    }
+    recalcE2448();
+    return;
+  }
+  let h = '<div style="display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:8px;"><span>Precio: ' + precioE2448(e) + '</span>' +
+    (e.mercancia ? '<span>' + E2448_MERC[e.mercancia] + '</span>' : "") + (e.notas ? '<span class="meta">' + escMont(e.notas) + '</span>' : "") + '</div>';
+  const paso = (ok, t) => '<div style="padding:2px 0;' + (ok ? "" : "color:var(--muted)") + '">' + (ok ? "✅ " : "⬜ ") + t + '</div>';
+  h += paso(true, "Precio indicado a la tienda el " + fhE(e.propuesta_at));
+  h += paso(!!e.aceptada_at, e.aceptada_at ? "La tienda acepta el precio" + (e.aceptada_quien ? " (" + escMont(e.aceptada_quien) + ")" : "") + " · " + escMont(e.aceptada_canal || "") + " · " + fhE(e.aceptada_at) : "La tienda acepta el precio");
+  h += paso(!!e.confirmada_at, e.confirmada_at ? "Servicio confirmado a la tienda el " + fhE(e.confirmada_at) + " → entregar entre el <b>" + fhE(e.limite_desde) + "</b> y el <b>" + fhE(e.limite_hasta) + "</b>" : "Confirmamos el servicio a la tienda (empieza el plazo)");
+  if (e.estado === "confirmada") { const p = plazoE2448(e, o); h += '<div style="margin-top:6px;font-weight:700;color:' + p.color + '">' + p.txt + '</div>'; }
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:flex-end;">';
+  if (e.estado === "propuesta") {
+    h += '<div class="campo" style="margin:0"><label>Quién de la tienda</label><input id="e2448_quien" placeholder="Nombre" style="width:160px"></div>' +
+      '<div class="campo" style="margin:0"><label>Por dónde</label><select id="e2448_canal"><option value="llamada">Llamada</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="presencial">En persona</option></select></div>' +
+      '<button onclick="aceptarE2448()">✅ La tienda acepta el precio</button>' +
+      '<button class="secondary" onclick="cancelarE2448(true)">✗ No lo acepta</button>' +
+      '<button class="secondary" onclick="pintarE2448(true)">✎ Cambiar precio</button>';
+  } else if (e.estado === "aceptada") {
+    h += '<button onclick="confirmarE2448()">🚚 Confirmar el servicio a la tienda</button>';
+  }
+  h += '<button class="secondary ph-del" onclick="cancelarE2448(false)">Anular</button></div>';
+  if (e.estado === "confirmada") h += '<div class="meta" style="font-size:11px;margin-top:6px;">En la pestaña Líneas está la línea de importes «SERVICIO ENTREGA 24-48H» con el precio: se factura con el resto de la orden y en la factura sale dentro de esta orden, junto al montaje. Al anular, se quita (si aún no está facturada).</div>';
+  c.innerHTML = h;
+}
+function recalcE2448() {
+  const pct = document.getElementById("e2448_tipo").value === "porcentaje";
+  document.querySelectorAll(".e2448-fijo").forEach(x => x.style.display = pct ? "none" : "");
+  document.querySelectorAll(".e2448-pct").forEach(x => x.style.display = pct ? "" : "none");
+  const t = importeE2448();
+  document.getElementById("e2448_total").textContent = t == null ? "-" : eurE(t);
+}
+function importeE2448() {
+  const num = id => parseFloat(String(document.getElementById(id).value).replace(",", "."));
+  if (document.getElementById("e2448_tipo").value === "porcentaje") {
+    const b = num("e2448_base"), p = num("e2448_pct");
+    return isNaN(b) || isNaN(p) ? null : Math.round(b * p) / 100;
+  }
+  const f = num("e2448_fijo"); return isNaN(f) ? null : Math.round(f * 100) / 100;
+}
+async function guardarPropuestaE2448() {
+  const pct = document.getElementById("e2448_tipo").value === "porcentaje", importe = importeE2448();
+  if (importe == null || importe <= 0) { alert(pct ? "Escribe el importe y el porcentaje." : "Escribe el importe del servicio."); return; }
+  const fila = {
+    anyo: pedidoActivo.anyo, orden: pedidoActivo.orden, estado: "propuesta", tipo_precio: pct ? "porcentaje" : "fijo",
+    base: pct ? parseFloat(document.getElementById("e2448_base").value) : null, porcentaje: pct ? parseFloat(document.getElementById("e2448_pct").value) : null,
+    importe, mercancia: document.getElementById("e2448_merc").value || null, notas: document.getElementById("e2448_notas").value.trim() || null,
+    propuesta_at: new Date().toISOString(), propuesta_por: staffUserId, aceptada_at: null, aceptada_quien: null, aceptada_canal: null,
+    confirmada_at: null, confirmada_por: null, limite_desde: null, limite_hasta: null, linea: null, cerrada_at: null, cerrada_motivo: null,
+  };
+  const { data, error } = await client.from("entregas_24_48").upsert(fila).select().single();
+  if (error) { alert("No se ha podido guardar: " + error.message); return; }
+  e2448 = data; pintarE2448(); cargarAvisoE2448();
+}
+// ✂ Separar: las líneas marcadas pasan a una orden nueva (mismo cliente) que nace con la propuesta de entrega 24h–48h
+async function separarE2448() {
+  const lineas = [...document.querySelectorAll("#e2448_lineas input:checked")].map(x => +x.value);
+  const total = document.querySelectorAll("#e2448_lineas input").length;
+  if (!lineas.length) { alert("Marca las líneas que se entregan ya."); return; }
+  if (lineas.length === total) { alert("Has marcado todas las líneas: no hace falta separar. Pulsa «Cancelar» y usa «🚚 Proponer entrega 24h–48h» en esta misma orden."); return; }
+  const pct = document.getElementById("e2448_tipo").value === "porcentaje", importe = importeE2448();
+  if (importe == null || importe <= 0) { alert(pct ? "Escribe el importe y el porcentaje." : "Escribe el importe del servicio."); return; }
+  if (!confirm("Se crea una orden nueva del mismo cliente con " + lineas.length + " línea" + (lineas.length > 1 ? "s" : "") + " (se quitan de esta orden) y la propuesta de entrega 24h–48h de " + eurE(importe) + ".\n\n¿Seguir?")) return;
+  const { data, error } = await client.rpc("separar_entrega_24_48", {
+    p_anyo: pedidoActivo.anyo, p_orden: pedidoActivo.orden, p_lineas: lineas, p_tipo_precio: pct ? "porcentaje" : "fijo",
+    p_base: pct ? parseFloat(document.getElementById("e2448_base").value) : null, p_porcentaje: pct ? parseFloat(document.getElementById("e2448_pct").value) : null,
+    p_importe: importe, p_mercancia: document.getElementById("e2448_merc").value || null, p_notas: document.getElementById("e2448_notas").value.trim() || null });
+  if (error) { alert("No se ha podido separar: " + error.message); return; }
+  const nueva = Array.isArray(data) ? data[0] : data;
+  cargarAvisoE2448();
+  alert("✅ Creada la orden " + nueva.anyo + "/" + nueva.orden + " con las líneas separadas y la propuesta de entrega 24h–48h.\n\nAhora se abre. Acuérdate de repartir el importe del montaje entre las dos órdenes (pestaña Líneas).");
+  irAOrden(nueva.anyo, nueva.orden);
+}
+async function aceptarE2448() {
+  const quien = document.getElementById("e2448_quien").value.trim(), canal = document.getElementById("e2448_canal").value;
+  const { data, error } = await client.from("entregas_24_48").update({ estado: "aceptada", aceptada_at: new Date().toISOString(), aceptada_quien: quien || null, aceptada_canal: canal })
+    .eq("anyo", pedidoActivo.anyo).eq("orden", pedidoActivo.orden).eq("estado", "propuesta").select().single();
+  if (error) { alert("No se ha podido guardar: " + error.message); return; }
+  await client.from("llamadas_orden").insert({ anyo: pedidoActivo.anyo, orden: pedidoActivo.orden, canal, creado_por: staffUserId,
+    notas: "🚚 Entrega 24h-48h: la tienda" + (quien ? " (" + quien + ")" : "") + " acepta el precio de " + eurE(data.importe) + "." });
+  e2448 = data; pintarE2448(); cargarLlamadas(); cargarAvisoE2448();
+}
+async function confirmarE2448() {
+  if (!confirm("¿Confirmar a la tienda la entrega 24h–48h?\n\nEmpieza el plazo AHORA: hay que entregar en 48 h laborables como mucho (no cuentan fines de semana ni festivos).\nSe añade a la orden la línea «SERVICIO ENTREGA 24-48H» de " + eurE(e2448.importe) + ".")) return;
+  const { data, error } = await client.rpc("confirmar_entrega_24_48", { p_anyo: pedidoActivo.anyo, p_orden: pedidoActivo.orden });
+  if (error) { alert("No se ha podido confirmar: " + error.message); return; }
+  e2448 = data; pintarE2448(); cargarLineas(); cargarLlamadas(); cargarAvisoE2448();
+}
+async function cancelarE2448(rechazada) {
+  const motivo = prompt(rechazada ? "La tienda no acepta el precio. ¿Algún comentario? (opcional)" : "¿Anular la entrega 24h–48h?" + (e2448.linea ? " Se quitará la línea «SERVICIO ENTREGA 24-48H» de la orden." : "") + "\nMotivo (opcional):", "");
+  if (motivo === null) return;
+  const { data, error } = await client.rpc("cancelar_entrega_24_48", { p_anyo: pedidoActivo.anyo, p_orden: pedidoActivo.orden, p_motivo: motivo, p_rechazada: !!rechazada });
+  if (error) { alert("No se ha podido anular: " + error.message); return; }
+  e2448 = data; pintarE2448(); cargarLineas(); cargarLlamadas(); cargarAvisoE2448();
+}
+/* Aviso encima de los filtros: entregas 24h–48h en marcha (propuestas sin respuesta, aceptadas sin confirmar y confirmadas sin montar). */
+async function cargarAvisoE2448() {
+  const box = document.getElementById("aviso_e2448");
+  const { data, error } = await client.from("entregas_24_48").select("anyo, orden, estado, importe, propuesta_at, limite_desde, limite_hasta, ordenes(nombre_cli, fecha_montaje, tiendas(nombre))")
+    .in("estado", ["propuesta", "aceptada", "confirmada"]).order("limite_hasta", { nullsFirst: false });
+  const vivas = (data || []).filter(e => !(e.estado === "confirmada" && e.ordenes?.fecha_montaje));
+  if (error || !vivas.length) { box.style.display = "none"; return; }
+  await cargarFestivos2448();
+  const conf = vivas.filter(e => e.estado === "confirmada");
+  const pasadas = conf.filter(e => new Date(e.limite_hasta) < Date.now()).length;
+  document.getElementById("aviso_e2448_t").textContent = "🚚 Entregas 24h–48h en marcha (" + vivas.length + ")" + (pasadas ? " · ⛔ " + pasadas + " fuera de plazo" : "");
+  const est = { propuesta: "Precio indicado, falta que la tienda acepte", aceptada: "Aceptada por la tienda, falta confirmársela" };
+  document.getElementById("aviso_e2448_l").innerHTML = vivas.map(e => {
+    const p = e.estado === "confirmada" ? plazoE2448(e, e.ordenes) : null;
+    return '<div style="padding:3px 0"><a href="#" onclick="irAOrden(' + e.anyo + ',' + e.orden + ');return false"><b>' + e.anyo + '/' + e.orden + '</b></a> — ' +
+      escMont(e.ordenes?.nombre_cli || "") + (e.ordenes?.tiendas?.nombre ? ' · ' + escMont(e.ordenes.tiendas.nombre) : "") + ' · ' + eurE(e.importe) + ' · ' +
+      (p ? '<b style="color:' + p.color + '">' + p.txt + '</b> (hasta el ' + fhE(e.limite_hasta) + ')' : '<span class="meta">' + est[e.estado] + '</span>') + '</div>';
+  }).join("");
+  box.style.display = "block";
 }
 function escMont(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 

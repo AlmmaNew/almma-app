@@ -74,7 +74,7 @@ Si alguna vez necesitas una tienda antigua: en <b>Nueva orden</b> marca <b>«Inc
 <table>
 <tr><th>Pestaña</th><th>Qué contiene</th></tr>
 <tr><td>👤 Cliente</td><td>Nombre, dirección (con los km desde la tienda), localidad, provincia, DNI y teléfonos.</td></tr>
-<tr><td>🏬 Pedido</td><td>Tienda, dependiente, referencia, tipo de orden, situación, fechas de recepción, bultos y peso. Abajo del todo, el botón <b>🗑 Eliminar esta orden</b> (aparte, para no pulsarlo sin querer; pide escribir el número de orden para confirmar).</td></tr>
+<tr><td>🏬 Pedido</td><td>Tienda, dependiente, referencia, tipo de orden, situación, fechas de recepción, bultos y peso. El recuadro <b>🚚 Entrega 24h–48h</b> (ver más abajo). Abajo del todo, el botón <b>🗑 Eliminar esta orden</b> (aparte, para no pulsarlo sin querer; pide escribir el número de orden para confirmar).</td></tr>
 <tr><td>📦 Líneas</td><td>Artículos del pedido, cantidades, importes.</td></tr>
 <tr><td>🔧 Montaje</td><td>Montaje previsto y realizado, equipo de montadores, <b>servicios adicionales del montador</b> (agujeros, cortes, recogidas…), fotos y firma.</td></tr>
 <tr><td>💶 Importes</td><td>Importe total, entrega a cuenta, pendiente, forma de cobro, facturación, y textos de factura y albarán.</td></tr>
@@ -90,7 +90,17 @@ La ficha sale al momento de pulsar la orden. Las líneas, fotos, documentos e hi
 <ul>
 <li>Arriba, un desplegable <b>«Órdenes con servicios adicionales»</b> avisa de lo que el montador ha hecho de más (agujeros, cortes…). Desaparece al abrir la orden o pulsar <b>«Marcar visto»</b>. No genera factura solo.</li>
 <li>El <b>chat</b> con la tienda aparece en la orden; un 💬 rojo indica mensajes sin leer.</li>
+<li>Arriba, otro desplegable azul, <b>«🚚 Entregas 24h–48h en marcha»</b>, enseña las que están esperando respuesta de la tienda y las confirmadas que aún no se han montado, con las horas que quedan (en rojo, las que se han pasado de plazo).</li>
 </ul>
+<h3>🚚 Entrega 24h–48h (servicio con precio especial)</h3>
+<p>Es un servicio nuevo que se ofrecerá a las tiendas en 2027. <b>De momento solo lo ve la oficina</b>: las tiendas no ven el recuadro ni la línea en su pantalla. Sirve sobre todo para mercancía de exposición, que ya está en nuestro almacén o que llega en breve. Está en la ficha de la orden, pestaña <b>🏬 Pedido</b>, y va en tres pasos:</p>
+<ol>
+<li><b>🚚 Proponer entrega 24h–48h</b>: pones el precio especial de este pedido, que puede ser un <b>importe fijo</b> (€) o un <b>porcentaje sobre un importe</b> (sale ya puesto el valor del servicio de la orden, se puede cambiar). Abajo sale lo que se cobrará a la tienda. Opcional: de dónde sale la mercancía y unas notas. Pulsa <b>💾 Guardar propuesta</b> y díselo a la tienda.</li>
+<li>Cuando la tienda <b>acepta el precio</b>: escribe quién de la tienda lo acepta, por dónde (llamada, WhatsApp, email, en persona) y pulsa <b>✅ La tienda acepta el precio</b>. Si no lo acepta, <b>✗ No lo acepta</b>. Con <b>✎ Cambiar precio</b> se corrige la propuesta.</li>
+<li><b>🚚 Confirmar el servicio a la tienda</b>: en ese momento <b>empieza el plazo</b>. Hay que entregar entre las 24 h y las 48 h siguientes, <b>contando solo días laborables</b>: no cuentan sábados, domingos ni festivos (por ejemplo, confirmada el viernes a las 10:00 → entre el lunes a las 10:00 y el martes a las 10:00). Los festivos se ponen en <b>🔐 Administración → Festivos</b>. Se añade sola a la orden la línea de importes <b>«SERVICIO ENTREGA 24-48H»</b> con el precio. Se factura con el resto y <b>en la factura sale dentro de esa orden, junto al concepto del montaje</b>, con su importe.</li>
+</ol>
+<p><b>Si solo una parte del pedido se entrega ya</b> (por ejemplo, lo que está en el almacén, y el resto va a tardar): pulsa <b>✂ Separar líneas a una orden nueva 24h–48h</b>. Marca las líneas que se entregan ya (salen marcadas las recibidas), pon el precio y pulsa <b>✂ Separar y crear la orden nueva</b>. Esas líneas <b>se mueven</b> (con su recepción, ubicación y albarán) a una orden nueva del mismo cliente, que nace con la propuesta de entrega 24h–48h; las demás se quedan en la orden original. La orden nueva se abre sola y sigue los mismos pasos 2 y 3. Las dos quedan enlazadas en <b>🕘 Historial</b> («Viene de» / «Continúa en»). La orden nueva lleva su línea «Montaje» vacía: <b>reparte tú el importe del montaje</b> entre las dos.</p>
+<p>El recuadro enseña las horas laborables que quedan, y en rojo si se ha pasado el plazo. Cuando la orden tiene fecha de montaje, sale <b>✔ Cumplida</b>. En <b>Planificar montajes</b>, las órdenes confirmadas salen las primeras en el recuadro <b>⚡ Urgentes</b> con su plazo. Cada paso queda apuntado en <b>📞 Llamadas</b>. <b>Anular</b> lo cancela en cualquier momento y, si ya estaba confirmado, quita la línea (si aún no está facturada).</p>
 <h3>Colores de la lista de órdenes</h3>
 <p>Cada fila sale con el <b>color de su estado</b> (fondo y raya a la izquierda). Son los mismos colores en <b>Órdenes</b>, en la lista del <b>montador</b>, en la de las tiendas y en la etiqueta de estado de la <b>Galería de fotos</b>. Debajo de la lista hay una leyenda.</p>
 <table>
@@ -137,7 +147,7 @@ La ficha sale al momento de pulsar la orden. Las líneas, fotos, documentos e hi
 <li><b>🚚 Días posibles</b>: días en los que un equipo <b>ya tiene algo agendado</b> cerca. Verde = va a su zona y cabe; verde claro = pasa cerca; rojo = va por la zona pero no cabe (<b>Usar igual</b>). Pulsa <b>Usar</b> para proponer ese día con la hora aproximada.</li>
 <li>Si prefieres otra cosa: <b>✍ Fecha a mano</b> (fecha, hora y equipo) y pulsa <b>📅</b>.</li>
 <li><b>Órdenes que no se van a montar nunca</b> (muchas antiguas del programa viejo): pulsa <b>🚫 Sacar</b> debajo del número de la orden, o marca varias con su casilla <b>☐</b> (o <b>☑ Marcar todas</b>) y pulsa <b>🚫 Sacar de la lista</b>. Te pide un motivo (opcional). Para encontrar las viejas, elige en «Recibidas» <b>solo antiguas</b>. <b>La orden no cambia</b> (ni estado ni fechas): solo deja de salir aquí.</li>
-<li><b>⚡ Urgentes</b>: para dar prioridad a una orden, pulsa <b>⚡ Urgente</b> debajo de su número (o marca varias con su casilla y pulsa <b>⚡ Pasar a urgentes</b>). Pide un motivo (opcional) y la orden sale <b>arriba del todo</b>, en el recuadro naranja <b>⚡ Urgentes</b>, antes de las zonas, con la fecha, el motivo y su zona. Arriba sale también la tarjeta «⚡ urgentes sin agendar». La orden NO cambia; <b>Quitar ⚡</b> la devuelve a su zona. Cuando se le da cita deja de salir ahí, como cualquier otra.</li>
+<li><b>⚡ Urgentes</b>: para dar prioridad a una orden, pulsa <b>⚡ Urgente</b> debajo de su número (o marca varias con su casilla y pulsa <b>⚡ Pasar a urgentes</b>). Pide un motivo (opcional) y la orden sale <b>arriba del todo</b>, en el recuadro naranja <b>⚡ Urgentes</b>, antes de las zonas, con la fecha, el motivo y su zona. Arriba sale también la tarjeta «⚡ urgentes sin agendar». La orden NO cambia; <b>Quitar ⚡</b> la devuelve a su zona. Cuando se le da cita deja de salir ahí, como cualquier otra. Las <b>🚚 entregas 24h–48h</b> ya confirmadas a la tienda salen también aquí, <b>las primeras</b>, con la hora límite y las horas que quedan.</li>
 <li>Para verlas o arrepentirte: casilla <b>Ver las sacadas de la lista</b> y <b>↩ Devolver</b> (una) o <b>↩ Devolver a la lista</b> (las marcadas).</li>
 </ul>
 <h3>Derecha: agendadas</h3>
@@ -200,7 +210,7 @@ La ficha sale al momento de pulsar la orden. Las líneas, fotos, documentos e hi
 <tr><td>🧾 Facturación</td><td>Pendientes, borradores y emitidas. Normalmente solo oficina/dirección.</td></tr>
 <tr><td>🛠️ DeCA</td><td>Pantalla específica de DeCA (hoja de ruta de sus montajes).</td></tr>
 <tr><td>⚙️ Sistema</td><td>Catálogos: tiendas, fabricantes, dependientes, montadores, artículos.</td></tr>
-<tr><td>🔐 Administración</td><td>Solo administradores: cuentas, permisos y quitar acceso.</td></tr>
+<tr><td>🔐 Administración</td><td>Solo administradores: cuentas, permisos y quitar acceso. En la pestaña <b>Festivos</b>, los días que no cuentan para el plazo de la entrega 24h–48h.</td></tr>
 </table>
 
 <h2>Reglas de oro</h2>
