@@ -1118,11 +1118,12 @@ function mensajeAviso(o, c, token){
   const nombre = capFrase((o.cli || "").trim().split(/\s+/)[0] || "");
   const arts = o.lineas.map(l => capFrase(l.desc));
   const pedido = arts.length ? arts.slice(0, 3).join(", ") + (arts.length > 3 ? " y " + (arts.length - 3) + " artículo" + (arts.length > 4 ? "s" : "") + " más" : "") : "su pedido";
-  return "Hola *" + nombre + "*, le escribimos de *ALMMA*, el servicio de entrega y montaje de *" + nomTienda(o.tiendaId) + "*.\n\n" +
-    "Tenemos previsto llevarle y montarle su pedido:\n📦 *" + pedido + "*\n\n" +
+  return "*ALMMA* almacén y montaje\n*" + nomTienda(o.tiendaId) + "*\n\n" +   // cabecera pedida por Arturo (23-11-2026): ALMMA y debajo la tienda
+    "Hola *" + nombre + "*, le escribimos del servicio de entrega y montaje.\n\n" +
+    "Tenemos previsto instalar su pedido:\n📦 *" + pedido + "*\n\n" +
     "📅 *" + Fecha + "*\n" + lineaFranja(franjaDe(c)) + "\n📍 " + [o.dir, o.loc].filter(Boolean).join(", ") + "\n\n" +
     (token
-      ? "👉 *Confirme su cita aquí* (o díganos si le va mal):\n" + URL_CITA + token + "\n\nSi no puede abrir el enlace, responda a este mensaje con *SÍ* o díganos qué otro día le vendría mejor.\n\n"
+      ? "👉 *Confirme su cita aquí:*\n" + URL_CITA + token + "\n\nSi no puede abrir el enlace, responda a este mensaje con *SÍ* o díganos qué otro día le vendría mejor.\n\n"
       : "Por favor, *responda a este mensaje*:\n✅ *SÍ* para confirmar el día y la hora\n📆 o díganos qué otro día le vendría mejor\n\n") +
     "Para que todo vaya bien:\n• Tiene que haber una persona mayor de edad en casa.\n• Deje despejada la zona donde se va a montar.\n• Si no hay ascensor o el acceso es complicado, avísenos.\n\n" +
     "Muchas gracias,\n*ALMMA* · Entregas y montajes\n📞 613 037 899";

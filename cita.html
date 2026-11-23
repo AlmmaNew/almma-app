@@ -115,7 +115,7 @@ function pintarError(txt){ app.innerHTML = cabecera() + '<div class="estado avis
 const logoOk = s => typeof s === "string" && /^data:image\/(png|jpe?g|webp);base64,/.test(s);   // como en tienda.html (SQL 107): nada de SVG
 function bloqueCita(){
   return '<div class="tarjeta">' + (logoOk(cita.logo) ? '<div class="logo-t"><img src="' + esc(cita.logo) + '" alt="' + esc(cita.tienda || "Tienda") + '"></div>' : "") + '<h1>' + (cita.nombre ? "Hola, " + esc(cita.nombre) : "Su cita de montaje") + '</h1>' +
-    '<div class="muted">Tenemos previsto llevarle y montarle su pedido' + (cita.tienda ? " de <b>" + esc(cita.tienda) + "</b>" : "") + ':</div>' +
+    '<div class="muted">Tenemos previsto instalar su pedido' + (cita.tienda ? " de <b>" + esc(cita.tienda) + "</b>" : "") + ':</div>' +
     '<div class="dato"><span class="ic">📅</span><div><b>' + fLarga(cita.fecha) + '</b></div></div>' +
     '<div class="dato"><span class="ic">🕘</span><div><b>' + franja(cita) + '</b><div class="muted">Hora de llegada aproximada</div></div></div>' +
     (cita.localidad ? '<div class="dato"><span class="ic">📍</span><div>' + esc(cita.localidad) + '</div></div>' : "") +

@@ -201,7 +201,11 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 .msg.mio{align-self:flex-end;background:#dbeafe;color:#1e3a8a}
 .msg.otro{align-self:flex-start;background:#f1f5f9;color:#1f2430;border:1px solid #e2e4eb}
 .chat-form{display:flex;gap:8px}.chat-form textarea{flex:1;padding:8px;border:1px solid #93c5fd;border-radius:6px;font:inherit;font-size:13px;resize:vertical;min-height:40px}
-.muted{color:#6b7280}</style>
+.muted{color:#6b7280}
+.tr-tipo{border:2px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:10px 12px;margin:10px 0;}
+.tr-op{display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:8px;cursor:pointer;margin:2px 0;}
+.tr-op:hover{background:#fef3c7;} .tr-op input{width:auto;margin-top:3px;}
+.tr-op:has(input:checked){background:#fff;outline:2px solid #2563eb;}</style>
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
 <script src="campana.js"></script>
 <link rel="stylesheet" href="estilo_oficina.css">
@@ -323,7 +327,12 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
     <button class="secondary" onclick="cerrarTraspaso()" style="float:right;">✕</button>
     <h3 style="margin-top:0;">Traspasar a incidencia</h3>
     <p class="meta" style="font-size:13px;">Elige las líneas de la orden <strong id="tr_orden"></strong> que se <strong>copian</strong> a la nueva orden de incidencia.
-      La orden original <strong>conserva todas sus líneas</strong> y se marca como "incidencia". Las líneas copiadas llegan a la nueva orden como pendientes de recibir.</p>
+      La orden original <strong>conserva todas sus líneas</strong> y se marca como "incidencia".</p>
+    <div class="tr-tipo">
+      <div style="font-weight:700;margin-bottom:6px;">¿Qué hay que hacer en esta incidencia?</div>
+      <label class="tr-op"><input type="radio" name="tr_tipo" value="servicio"> <span><b>🔧 Un servicio a realizar</b><br><span class="meta">La mercancía ya está (en casa del cliente o en el almacén). Las líneas llegan <b>recibidas</b> y la incidencia sale en <b>Planificar montajes</b> para darle cita.</span></span></label>
+      <label class="tr-op"><input type="radio" name="tr_tipo" value="pendiente"> <span><b>📦 Mercancía pendiente de recibir</b><br><span class="meta">Hay que esperar piezas del fabricante. Las líneas llegan <b>sin recibir</b>; saldrá en Planificar cuando se reciban en Entradas Almacén.</span></span></label>
+    </div>
     <label style="display:flex;gap:6px;align-items:center;font-weight:600;margin:10px 0 6px;"><input type="checkbox" id="tr_todas" style="width:auto;" onchange="marcarTodasTraspaso(this.checked)"> Seleccionar todas</label>
     <div id="tr_lista" class="mini-list"></div>
     <p id="tr_error" class="error"></p>
@@ -2276,6 +2285,7 @@ async function traspasarAIncidencia() {
   document.getElementById("tr_orden").textContent = `${pedidoActivo.anyo}/${pedidoActivo.orden}`;
   document.getElementById("tr_error").style.display = "none";
   document.getElementById("tr_todas").checked = false;
+  document.querySelectorAll('input[name="tr_tipo"]').forEach(r => { r.checked = false; });   // hay que elegir cada vez
   const tipos = { 1: "Mercancía", 2: "Devolución", 3: "Texto", 4: "Servicio" };
   document.getElementById("tr_lista").innerHTML = (lineas || []).length ? lineas.map(l => `
     <label class="item" style="display:flex;gap:10px;align-items:center;cursor:pointer;">
@@ -2292,8 +2302,15 @@ function cerrarTraspaso() { document.getElementById("modal_traspaso").style.disp
 async function confirmarTraspaso() {
   if (!pedidoActivo) return;
   const lineas = [...document.querySelectorAll(".tr_check:checked")].map(c => parseInt(c.value, 10));
+  const tipo = document.querySelector('input[name="tr_tipo"]:checked')?.value;
+  if (!tipo) {
+    const caja = document.getElementById("tr_error");
+    caja.textContent = "Elige primero qué hay que hacer: un servicio a realizar o mercancía pendiente de recibir."; caja.style.display = "block";
+    document.querySelector(".tr-tipo").scrollIntoView({ block: "center", behavior: "smooth" });
+    return;
+  }
   if (!lineas.length && !confirm("No has elegido ninguna línea: se creará una orden de incidencia VACÍA vinculada a esta.\n\n¿Continuar?")) return;
-  const { data, error } = await client.rpc("traspasar_a_incidencia", { p_anyo: pedidoActivo.anyo, p_orden: pedidoActivo.orden, p_lineas: lineas.length ? lineas : null });
+  const { data, error } = await client.rpc("traspasar_a_incidencia", { p_anyo: pedidoActivo.anyo, p_orden: pedidoActivo.orden, p_lineas: lineas.length ? lineas : null, p_recibidas: tipo === "servicio" });
   if (error) {
     const caja = document.getElementById("tr_error");
     caja.textContent = "No se pudo traspasar: " + error.message; caja.style.display = "block";
@@ -2301,7 +2318,10 @@ async function confirmarTraspaso() {
   }
   const nueva = data[0];
   cerrarTraspaso();
-  alert(`Creada la orden de incidencia ${nueva.anyo}/${nueva.orden}` + (lineas.length ? ` con ${lineas.length} línea(s) copiadas de la ${pedidoActivo.anyo}/${pedidoActivo.orden}, que sigue con todas sus líneas y queda marcada como incidencia.` : " (vacía).") + "\nQueda enlazada en el Historial.");
+  alert(`Creada la orden de incidencia ${nueva.anyo}/${nueva.orden}` + (lineas.length ? ` con ${lineas.length} línea(s) copiadas de la ${pedidoActivo.anyo}/${pedidoActivo.orden}, que sigue con todas sus líneas y queda marcada como incidencia.` : " (vacía).") +
+    (tipo === "servicio" ? "\n\n🔧 Servicio a realizar: las líneas están recibidas y ya sale en Planificar montajes para darle cita."
+                         : "\n\n📦 Mercancía pendiente: las líneas están sin recibir. Saldrá en Planificar cuando se reciban en Entradas Almacén.") +
+    "\nQueda enlazada en el Historial.");
   const { data: ord } = await client.from("ordenes").select("estado, pendiente_facturar").eq("anyo", pedidoActivo.anyo).eq("orden", pedidoActivo.orden).maybeSingle();
   if (ord) { document.getElementById("ch_estado").value = ord.estado; document.getElementById("ch_pendiente_facturar").checked = !!ord.pendiente_facturar; }
   cargarPedidos();
