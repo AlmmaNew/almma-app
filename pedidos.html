@@ -791,11 +791,16 @@ function pintarResumenOrden(o) {
   const fMont = v("ch_fecha_montaje");
   const equipo = [...document.querySelectorAll("#ch_montadores input:checked")].map(i => i.parentElement.textContent.trim()).join(" / ");
   const paso = (t, clase, texto) => `<div class="ph-paso ${clase}"><div class="barra-p"></div><div class="t">${t}</div><div class="v ${texto ? "" : "nada"}">${texto || "—"}</div></div>`;
+  // cita de Planificar sin confirmar todavía (la orden aún no tiene fecha prevista)
+  const cp = citaPendiente;
+  const textoCitaPend = cp ? `<span style="color:#b45309">${cp.estado === "avisada" ? "📲 Avisado, sin confirmar" : "Propuesta, sin avisar"}</span><br>` +
+    esc(fechaCorta(new Date(cp.fecha_hora).toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" }))) + (cp.hora ? " · " + esc(cp.hora) : "") +
+    (cp.equipos_montaje && cp.equipos_montaje.nombre ? "<br><span style='color:var(--muted)'>" + esc(cp.equipos_montaje.nombre) + "</span>" : "") : "";
   document.getElementById("d_pasos").innerHTML =
     paso("Pedido", "hecho", esc(fechaCorta(o.fecha_creacion))) +
     paso("Mercancía", recibidoTotal ? "hecho" : recibidoParcial ? "parcial" : "",
       recibidoTotal ? "Recibida" + (fRec ? " · " + esc(fechaCorta(fRec)) : "") : recibidoParcial ? "Parte recibida" : fPrevRec ? "Prevista " + esc(fechaCorta(fPrevRec)) : "") +
-    paso("Cita", fPrevMont || fMont ? "hecho" : "", fPrevMont ? esc(fechaCorta(fPrevMont)) + (hora ? " · " + esc(hora) : "") + (equipo ? "<br><span style='color:var(--muted)'>" + esc(equipo) + "</span>" : "") : "") +
+    paso("Cita", fPrevMont || fMont ? "hecho" : cp ? "parcial" : "", fPrevMont ? esc(fechaCorta(fPrevMont)) + (hora ? " · " + esc(hora) : "") + (equipo ? "<br><span style='color:var(--muted)'>" + esc(equipo) + "</span>" : "") : textoCitaPend) +
     paso("Montaje", fMont ? "hecho" : "", fMont ? "Montada · " + esc(fechaCorta(fMont)) : "");
 }
 
@@ -1519,6 +1524,16 @@ function marcarFechaVacia(inputId) {
 }
 
 let aperturaPanel = 0;   // cada vez que se abre una orden; sirve para no mezclar cargas de dos órdenes
+// Cita de Planificar montajes aún sin confirmar (propuesta o avisada por WhatsApp): no toca la orden hasta que el
+// cliente confirma, pero se enseña en el paso «Cita» de la ficha para que se sepa que está en marcha.
+let citaPendiente = null;
+async function cargarCitaPendiente(o, miApertura) {
+  const { data, error } = await client.from("citas_montaje").select("estado, fecha_hora, hora, avisado_at, equipos_montaje(nombre)")
+    .eq("anyo", o.anyo).eq("orden", o.orden).in("estado", ["propuesta", "avisada"]).order("created_at", { ascending: false }).limit(1);
+  if (error || miApertura !== aperturaPanel) return;
+  citaPendiente = (data && data[0]) || null;
+  if (citaPendiente) pintarResumenOrden(o);
+}
 async function abrirPanel(orden) {
   // recargamos la fila completa por si el listado no trae todos los campos
   const { data: full, error: errFull } = await client.from("ordenes").select("*").eq("anyo", orden.anyo).eq("orden", orden.orden).maybeSingle();
@@ -1547,6 +1562,7 @@ async function abrirPanel(orden) {
 
   // Mientras carga lo que va aparte, no se puede grabar (el dependiente y el equipo aún no están puestos)
   const miApertura = ++aperturaPanel;
+  citaPendiente = null;
   const btnGrabar = document.querySelector("#pie_grabar button");
   btnGrabar.disabled = true;
   const cargando = '<div class="meta">Cargando…</div>';
@@ -1614,6 +1630,7 @@ async function abrirPanel(orden) {
   await Promise.all([
     llenarSelectDependiente(o.tienda_id, o.dependiente_id),
     pintarMontadores(o).then(() => pintarResumenOrden(o)),
+    cargarCitaPendiente(o, miApertura),
     llenarSelectTipoLinea().then(() => mostrarNuevaLinea(false)),
     cargarDetallesMontaje(),
     cargarDocumentosOrden(),

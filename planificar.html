@@ -131,6 +131,14 @@ table.ag tr.libre td{color:#15803d;}
 .detalle{border:2px solid #facc15;background:#fffef5;border-radius:8px;padding:10px;font-size:13px;margin-top:10px;}
 .aviso-f{display:grid;grid-template-columns:88px 1fr auto;gap:8px;align-items:center;padding:8px;border:1px solid #e2e8f0;border-left:5px solid;border-radius:8px;margin-bottom:6px;font-size:12.5px;}
 .aviso-f.propuesta{border-left-color:#94a3b8;} .aviso-f.avisada{border-left-color:#f59e0b;background:#fffbeb;}
+.aviso-f.confirmada{border-left-color:#2563eb;background:#eff6ff;} .aviso-f.nueva{box-shadow:0 0 0 2px #a855f7 inset;}
+.resp{font-size:12.5px;margin-top:3px;padding:3px 7px;border-radius:6px;display:inline-block;}
+.resp.si{background:#dcfce7;color:#14532d;} .resp.no{background:#fee2e2;color:#7f1d1d;} .resp.nota{background:#ede9fe;color:#4c1d95;}
+.fila-grupo{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 8px;}
+.fila-grupo button[disabled]{opacity:.45;cursor:default;}
+.sel-aviso{width:17px;height:17px;vertical-align:middle;margin:0 4px 0 0;cursor:pointer;}
+.cola-aviso{background:#fef3c7;border:1px solid #fcd34d;color:#78350f;border-radius:8px;padding:6px 10px;margin:0 90px 8px 0;font-size:13.5px;}
+.tarjeta.resp-nueva{border-color:#a855f7;background:#faf5ff;} .tarjeta.resp-nueva .n{color:#7e22ce;}
 .aviso-f .cuando{font-weight:700;color:#1e3a8a;font-size:12px;}
 .aviso-f .bts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
 .aviso-f .bts button{padding:4px 8px;font-size:11.5px;}
@@ -151,7 +159,8 @@ table.ag tr.libre td{color:#15803d;}
 .leyenda i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:3px;}
 #fondo{display:none;position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:40;}
 #ventana{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(880px,96vw);max-height:94vh;overflow-y:auto;background:#fff;border-radius:10px;box-shadow:0 20px 50px -20px rgba(0,0,0,.5);z-index:41;padding:18px;}
-#ventana h3{margin:0 0 4px;color:#1e3a8a;}
+#ventana h3{margin:0 0 4px;color:#1e3a8a;padding-right:90px;}
+#ventana .bt-cerrar-v{position:sticky;top:0;float:right;margin:-6px -6px 0 8px;z-index:1100;width:auto;padding:4px 10px;font-size:12.5px;}
 #ventana .fila2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0;}
 #ventana label.campo{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);}
 .aviso-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0;}
@@ -267,8 +276,9 @@ const capFrase = s => { s = String(s || "").trim().toLowerCase(); return s ? s[0
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 function toast(t){ const el = document.getElementById("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = "none", 5000); }
-function cerrarVentana(){ document.getElementById("fondo").style.display = document.getElementById("ventana").style.display = "none"; }
-function abrirVentana(html){ const v = document.getElementById("ventana"); v.innerHTML = html; document.getElementById("fondo").style.display = v.style.display = "block"; }
+function cerrarVentana(){ document.getElementById("fondo").style.display = document.getElementById("ventana").style.display = "none"; if (colaAviso) terminarCola(); }
+function abrirVentana(html){ const v = document.getElementById("ventana"); v.innerHTML = '<button class="secondary bt-cerrar-v" onclick="cerrarVentana()" title="Cerrar (tecla Esc)">✕ Cerrar</button>' + html; document.getElementById("fondo").style.display = v.style.display = "block"; v.scrollTop = 0; }
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && document.getElementById("ventana").style.display === "block") cerrarVentana(); });
 async function logout(){ await client.auth.signOut(); location.href = "login.html"; }
 async function todo(fabrica, paso = 1000){   // lee todas las filas, de `paso` en `paso`
   let r = [], desde = 0;
@@ -284,9 +294,11 @@ async function todo(fabrica, paso = 1000){   // lee todas las filas, de `paso` e
 /* ======================= estado ======================= */
 let user, cfg = {}, equipos = [], montadores = [], tiendas = {}, fabs = {}, tiempos = {}, geo = {};
 let pend = [], agenda = [], citasAbiertas = [], citasConf = {}, ordenesCita = {};
+let citasResp = [], hayRespuestas = true;   // respuestas de clientes desde cita.html (SQL 131); false = SQL aún sin ejecutar
 let agendaDesde = null, agendaHasta = null;
 let filtro = "", vista = "tabla", lunes = lunesDe(HOY), mes = HOY.slice(0,7), sel = null, editando = null;
-const abiertoOps = new Set(), zonasCerradas = new Set();
+let zonasVisibles = [];
+const abiertoOps = new Set(), zonasAbiertas = new Set();   // las zonas salen plegadas; al buscar se abren solas
 let tiendasFacturadas = null;           // ids de tiendas activas (tiendas_activas.js; null = no se pudo saber: salen todas)
 let docs = {};                       // documentos que ha adjuntado la tienda (pedido, planos, fotos), por "anyo/orden"
 let sacadas = {}, haySacadas = true;   // órdenes sacadas de la lista (SQL 127), por "anyo/orden"
@@ -312,6 +324,13 @@ const pseudo = {};   // equipos que no están dados de alta (órdenes agendadas 
   if (!equipos.filter(e => e.activo).length) toast("Aún no hay equipos: créalos con el botón «👥 Equipos» (arriba a la derecha).");
   situarEnMapa();
   recalculoAutomatico();
+  // cada 3 minutos mira si hay respuestas nuevas de clientes (sin repintar si se está editando o hay una ventana abierta)
+  if (hayRespuestas) setInterval(async () => {
+    if (document.hidden || editando || document.getElementById("ventana").style.display === "block") return;
+    const { data } = await client.from("citas_montaje").select("id").eq("respuesta_nueva", true).neq("estado", "cancelada");
+    const ids = (data || []).map(c => c.id).sort().join();
+    if (ids !== citasResp.map(c => c.id).sort().join()) { await recargarCitas(); if (data && data.length) toast("🔔 Hay respuestas nuevas de clientes en «Avisar y confirmar»."); }
+  }, 180000);
 })();
 
 async function cargarCfg(){ const { data, error } = await client.from("planificacion_config").select("*").eq("id", 1).maybeSingle(); if (error) throw error; cfg = data || {}; }
@@ -327,13 +346,16 @@ function planificaLaTienda(id){ const t = tiendas[id]; return !!t && TIENDAS_PLA
 async function cargarTiempos(){ const data = await todo(() => client.from("tiempos_montaje").select("*")); tiempos = Object.fromEntries(data.map(t => [t.fabricante + "|" + t.articulo, t])); }
 async function cargarGeo(){ const data = await todo(() => client.from("geo_lugares").select("*")); geo = Object.fromEntries(data.map(g => [g.clave, g])); }
 
-const ORD_SEL = "anyo, orden, nombre_cli, domicilio_cli, localidad_cli, telefono_cli, telefono2_cli, tienda_id, estado, con_incidencia, fecha_recepcion, fecha_prev_montaje, horamont, bultos, linorden(tipolinea, proveedor, descripcion, cantidad, recibido_at), ordenes_montadores(montador_id)";
+const ORD_SEL = "anyo, orden, nombre_cli, domicilio_cli, localidad_cli, telefono_cli, telefono2_cli, tienda_id, estado, con_incidencia, fecha_recepcion, fecha_prev_montaje, horamont, bultos, linorden(tipolinea, proveedor, descripcion, cantidad, recibido, recibido_at), ordenes_montadores(montador_id)";
+// mercancía de la orden toda recibida (o ninguna que recibir); las de incidencia copian sus líneas ya recibidas (SQL 130)
+const todoRecibido = r => (r.linorden || []).filter(l => l.tipolinea === 1).every(l => l.recibido_at || l.recibido === "S");
 function normOrden(r){
   const lin = r.linorden || [];
   const rec = [r.fecha_recepcion, ...lin.map(l => l.recibido_at)].filter(Boolean).map(x => String(x).slice(0,10)).sort();
   return {
     anyo: r.anyo, orden: r.orden, n: r.anyo + "/" + r.orden, cli: r.nombre_cli || "", dir: r.domicilio_cli || "", loc: (r.localidad_cli || "").trim(),
     tel: r.telefono_cli || "", tel2: r.telefono2_cli || "", tiendaId: r.tienda_id, estado: r.estado, conInc: !!r.con_incidencia, bultos: r.bultos,
+    inc: r.estado === "incidencia",
     ultRec: rec.length ? rec[rec.length-1] : null,
     fprev: r.fecha_prev_montaje ? String(r.fecha_prev_montaje).slice(0,10) : null, hora: r.horamont || "",
     mont: (r.ordenes_montadores || []).map(a => a.montador_id),
@@ -346,7 +368,10 @@ async function cargarTodo(){
   try {
     const raw = await todo(() => client.from("ordenes").select(ORD_SEL).eq("estado", "recepcionado_total")
       .or("fecha_prev_montaje.is.null,fecha_prev_montaje.gte." + HOY).order("anyo").order("orden"), 300);
-    pend = raw.map(normOrden).filter(o => !planificaLaTienda(o.tiendaId));
+    // órdenes de incidencia sin montar ni fecha que ya tienen toda su mercancía (en casa del cliente o en el almacén)
+    const rawInc = await todo(() => client.from("ordenes").select(ORD_SEL).eq("estado", "incidencia")
+      .is("fecha_montaje", null).is("fecha_prev_montaje", null).order("anyo").order("orden"), 300);
+    pend = [...raw, ...rawInc.filter(todoRecibido)].map(normOrden).filter(o => !planificaLaTienda(o.tiendaId));
     await Promise.all([cargarSacadas(), cargarDocs(), cargarTiendasFacturadas()]);
     await cargarCitas();
     await cargarAgenda(true);
@@ -373,12 +398,23 @@ async function cargarDocs(){
   } catch (e) { docs = {}; }
 }
 async function cargarCitas(){
-  const { data, error } = await client.from("citas_montaje").select("id, anyo, orden, fecha_hora, hora, equipo_id, estado, avisado_at").in("estado", ["propuesta", "avisada"]);
+  const BASE = "id, anyo, orden, fecha_hora, hora, equipo_id, estado, avisado_at", RESP = ", franja_desde, respuesta_cliente, respuesta_at, respuesta_preferencia, respuesta_comentario, nota_cliente, nota_cliente_at, respuesta_nueva";
+  let { data, error } = await client.from("citas_montaje").select(BASE + (hayRespuestas ? RESP : "")).in("estado", ["propuesta", "avisada"]);
+  if (error && hayRespuestas && error.code === "42703") {   // columna inexistente: el SQL 131 aún no está ejecutado
+    hayRespuestas = false;
+    ({ data, error } = await client.from("citas_montaje").select(BASE).in("estado", ["propuesta", "avisada"]));
+  }
   if (error) throw error;
-  citasAbiertas = (data || []).map(c => ({ ...c, fecha: iso(new Date(c.fecha_hora)) }));
+  const conFecha = c => ({ ...c, fecha: iso(new Date(c.fecha_hora)) });
+  citasAbiertas = (data || []).map(conFecha);
+  citasResp = [];
+  if (hayRespuestas) {   // respuestas sin ver, también de citas ya confirmadas por el cliente
+    const r = await client.from("citas_montaje").select(BASE + RESP).eq("respuesta_nueva", true).neq("estado", "cancelada");
+    citasResp = (r.data || []).map(conFecha);
+  }
   // órdenes de las citas que no están en la lista de pendientes (p. ej. una agendada a la que se cambia el día)
   const conocidas = new Set(pend.map(o => o.n));
-  const faltan = citasAbiertas.filter(c => !conocidas.has(c.anyo + "/" + c.orden));
+  const faltan = [...citasAbiertas, ...citasResp].filter(c => !conocidas.has(c.anyo + "/" + c.orden));
   ordenesCita = {};
   const porAnyo = {}; faltan.forEach(c => (porAnyo[c.anyo] ||= []).push(c.orden));
   for (const [a, lst] of Object.entries(porAnyo)) {
@@ -623,7 +659,8 @@ function pendientesVisibles(){
   const verSac = document.getElementById("ver_sacadas").checked;
   return pend.filter(o => !conCita.has(o.n)
     && !!sacadas[o.n] === verSac
-    && (!lim || (meses > 0 ? (o.ultRec && o.ultRec >= lim) : (!o.ultRec || o.ultRec < lim)))
+    // las de incidencia cuentan siempre como recientes (su mercancía puede no tener fecha de recepción)
+    && (!lim || (meses > 0 ? (o.inc || (o.ultRec && o.ultRec >= lim)) : (!o.inc && (!o.ultRec || o.ultRec < lim))))
     && (!ft || o.tiendaId === ft)
     && (!soloSin || tiempoOrden(o).t == null)
     && (!filtro || normBusq(o.n + " " + o.cli + " " + o.loc + " " + nomTienda(o.tiendaId) + " " + o.dir).includes(filtro)));
@@ -637,9 +674,10 @@ function pintar(){
     '<div class="tarjeta nar"><div class="n">' + vis.length + '</div><div class="t">sin agendar · ' + hm(vis.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h de montaje conocido</div></div>' +
     '<div class="tarjeta gris clic" onclick="cambiarVista(\'avisos\')"><div class="n">' + nP + '</div><div class="t">propuestas sin avisar al cliente</div></div>' +
     '<div class="tarjeta amb clic" onclick="cambiarVista(\'avisos\')"><div class="n">' + nA + '</div><div class="t">avisadas, esperando respuesta</div></div>' +
+    (citasResp.length ? '<div class="tarjeta clic resp-nueva" onclick="cambiarVista(\'avisos\')"><div class="n">🔔 ' + citasResp.length + '</div><div class="t">respuesta' + (citasResp.length > 1 ? "s" : "") + ' nueva' + (citasResp.length > 1 ? "s" : "") + ' de clientes</div></div>' : "") +
     '<div class="tarjeta"><div class="n">' + proximas + '</div><div class="t">agendadas desde hoy (' + fdia(HOY) + ' en adelante)</div></div>' +
     '<div class="tarjeta amb"><div class="n">' + vis.filter(o => tiempoOrden(o).t == null).length + '</div><div class="t">sin tiempo de montaje completo</div></div>';
-  document.getElementById("n_avisos").textContent = (nP + nA) ? "(" + (nP + nA) + ")" : "";
+  document.getElementById("n_avisos").textContent = ((nP + nA) ? "(" + (nP + nA) + ")" : "") + (citasResp.length ? " 🔔" + citasResp.length : "");
   pintarSeleccion(vis);
   pintarLista(vis);
   ["tabla", "avisos", "cal"].forEach(v => document.getElementById("b_" + v).classList.toggle("on", vista === v));
@@ -652,7 +690,9 @@ function pintarLista(vis){
   const distZ = z => { if (!nave) return 0; const ds = porZona[z].map(o => kmAprox(nave, posOrden(o))).filter(x => x != null); return ds.length ? Math.min(...ds) : 99999; };
   const especial = z => /^[📭⏳❓]/u.test(z) ? 1 : 0;
   const zs = Object.keys(porZona).sort((a, b) => especial(a) - especial(b) || distZ(a) - distZ(b) || porZona[b].length - porZona[a].length || a.localeCompare(b));
-  let h = "";
+  const cerrada = z => !filtro && !zonasAbiertas.has(z);
+  let h = zs.length > 1 && !filtro ? '<div style="text-align:right;margin:0 0 6px"><button class="secondary peq" onclick="plegarTodas(' + (zs.some(cerrada) ? "true" : "false") + ')">' + (zs.some(cerrada) ? "▾ Abrir todas" : "▸ Plegar todas") + '</button></div>' : "";
+  zonasVisibles = zs;
   for (const z of zs) {
     const ords = porZona[z], porPob = {};
     ords.forEach(o => (porPob[o.loc || "—"] ||= []).push(o));
@@ -666,7 +706,7 @@ function pintarLista(vis){
       lst = [...lst].sort(orden === "espera" ? (a, b) => (a.ultRec || "") < (b.ultRec || "") ? -1 : 1 : (a, b) => a.orden - b.orden);
       cuerpo += '<div class="pob">📍 ' + esc(p) + ' <span>' + lst.length + ' orden' + (lst.length > 1 ? "es" : "") + ' · ' + hm(lst.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h</span></div><table>' + lst.map(filaPendiente).join("") + '</table>';
     }
-    h += '<div class="zona ' + (zonasCerradas.has(z) ? "cerrada" : "") + '"><div class="zona-cab" onclick="plegar(this)" data-z="' + esc(z) + '"><b>' + esc(z) + '</b><span class="dato">' + ords.length + ' órdenes</span><span class="dato">⏱ ' + hm(mz) + ' h</span><span class="muted" style="margin-left:auto">' + (zonasCerradas.has(z) ? "▸ abrir" : "▾ plegar") + '</span></div><div class="zona-cuerpo">' + cuerpo + '</div></div>';
+    h += '<div class="zona ' + (cerrada(z) ? "cerrada" : "") + '"><div class="zona-cab" onclick="plegar(this)" data-z="' + esc(z) + '"><b>' + esc(z) + '</b><span class="dato">' + ords.length + ' órdenes</span><span class="dato">⏱ ' + hm(mz) + ' h</span><span class="muted" style="margin-left:auto">' + (cerrada(z) ? "▸ abrir" : "▾ plegar") + '</span></div><div class="zona-cuerpo">' + cuerpo + '</div></div>';
   }
   document.getElementById("lista").innerHTML = h || (document.getElementById("ver_sacadas").checked
     ? '<div class="ya-cita">No hay órdenes sacadas de la lista con estos filtros (mira también «Recibidas: todas»).</div>'
@@ -742,7 +782,8 @@ async function devolver(lista){
 const sacarMarcadas = () => sacar(marcadasVisibles());
 const devolverMarcadas = () => devolver(marcadasVisibles());
 
-function plegar(el){ const z = el.dataset.z; zonasCerradas.has(z) ? zonasCerradas.delete(z) : zonasCerradas.add(z); pintar(); }
+function plegar(el){ if (filtro) return; const z = el.dataset.z; zonasAbiertas.has(z) ? zonasAbiertas.delete(z) : zonasAbiertas.add(z); pintar(); }
+function plegarTodas(abrir){ abrir ? zonasVisibles.forEach(z => zonasAbiertas.add(z)) : zonasAbiertas.clear(); pintar(); }
 const diasDesde = f => f ? Math.round((Date.now() - D(f)) / 864e5) : null;
 function filaPendiente(o){
   const T = tiempoOrden(o), km = kmTienda(o), d = diasDesde(o.ultRec);
@@ -759,6 +800,7 @@ function filaPendiente(o){
   return '<tr class="fila' + (sac ? " sacada" : "") + '"><td style="width:96px" rowspan="2">' +
       (haySacadas ? '<input type="checkbox" class="marca" title="Marcar" ' + (marcadas.has(o.n) ? "checked" : "") + ' onchange="marcar(\'' + o.n + '\', this.checked)">' : "") +
       '<a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a>' +
+      (o.inc ? '<div><span class="est incidencia" title="Orden de incidencia: ya tiene todo lo necesario (en casa del cliente o en el almacén), se puede hacer">⚠ Incidencia</span></div>' : "") +
       (d != null ? '<div><span class="espera ' + (d >= 10 ? "mucho" : "") + '" title="Días desde que llegó la última mercancía">' + d + ' días</span></div>' : "") +
       (haySacadas ? '<div>' + (sac ? '<button class="bsacar" style="color:#1e40af" title="Devolver a la lista" onclick="devolver([\'' + o.n + '\'])">↩ Devolver</button>'
                                    : '<button class="bsacar" title="Sacar de la lista: no se va a montar" onclick="sacar([\'' + o.n + '\'])">🚫 Sacar</button>') + '</div>' : "") + '</td>' +
@@ -834,7 +876,7 @@ function paradaHtml(s, e, f){
     '<span class="acc">' + bts + ((docs[o.n] || []).length ? '<button class="ic" title="Pedido y planos que ha enviado la tienda (' + docs[o.n].length + ')" onclick="verDocs(' + o.anyo + ',' + o.orden + ')">📎</button>' : "") +
     (hecha ? "" :   // una orden ya montada no se cambia de día ni se quita
     '<button class="ic" title="Cambiar fecha, hora o equipo" onclick="editando=\'' + idp + '\';pintar()">✎</button>' +
-    '<button class="ic" title="Quitar de este día" onclick="quitar(' + o.anyo + ',' + o.orden + ',\'' + (s.cita ? s.cita.id : "") + '\',\'' + s.estado + '\')">🗑</button>') + '</span></div>';
+    '<button class="ic" title="Quitar de este día" onclick="quitar(' + o.anyo + ',' + o.orden + ',\'' + (s.cita ? s.cita.id : "") + '\',\'' + (s.cita ? s.cita.estado : s.estado) + '\')">🗑</button>') + '</span></div>';
 }
 function detalle(e, f){
   const p = dia(e, f), nave = NAVE();
@@ -919,20 +961,43 @@ async function verMapaRuta(e, f){
 }
 
 /* ---------- derecha: avisar y confirmar ---------- */
+const fHoraCorta = ts => new Date(ts).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+function txtRespuesta(c){   // lo que ha contestado el cliente desde cita.html (SQL 131)
+  let h = "";
+  if (c.respuesta_cliente === "si") h += '<div class="resp si">✅ El cliente confirmó desde el enlace' + (c.respuesta_at ? " el " + fHoraCorta(c.respuesta_at) : "") + '</div>';
+  if (c.respuesta_cliente === "no") h += '<div class="resp no">📆 NO le va bien' + (c.respuesta_at ? " (" + fHoraCorta(c.respuesta_at) + ")" : "") +
+    (c.respuesta_preferencia ? '. Prefiere: <b>' + esc(c.respuesta_preferencia) + '</b>' : "") + (c.respuesta_comentario ? ' · «' + esc(c.respuesta_comentario) + '»' : "") + '</div>';
+  if (c.nota_cliente) h += '<div class="resp nota">💬 Avisa: «' + esc(c.nota_cliente) + '»' + (c.nota_cliente_at ? ' (' + fHoraCorta(c.nota_cliente_at) + ')' : "") + '</div>';
+  return h;
+}
+async function marcarVista(id){
+  const { error } = await client.rpc("marcar_respuesta_vista", { p_id: id });
+  if (error) { alert("No se ha podido marcar: " + error.message); return; }
+  await recargarCitas();
+}
 function avisos(){
   const fe = document.getElementById("f_eq").value;
   const lista = citasAbiertas.filter(c => !fe || c.equipo_id === fe).sort((a, b) => (a.fecha + (a.hora || "")).localeCompare(b.fecha + (b.hora || "")));
   const ord = c => pend.find(x => x.anyo === c.anyo && x.orden === c.orden) || ordenesCita[c.anyo + "/" + c.orden] || agenda.find(x => x.anyo === c.anyo && x.orden === c.orden);
-  const fila = c => { const o = ord(c); if (!o) return "";
-    return '<div class="aviso-f ' + c.estado + '"><div class="cuando">' + fdia(c.fecha) + '<br>' + esc(c.hora) + ' h<div class="muted">' + esc(corto(c.equipo_id)) + '</div></div>' +
+  const fila = c => { const o = ord(c) || { anyo: c.anyo, orden: c.orden, n: c.anyo + "/" + c.orden, cli: "", loc: "", tiendaId: null };
+    const visto = c.respuesta_nueva ? '<button class="secondary" title="Quitar el aviso de respuesta nueva" onclick="marcarVista(\'' + c.id + '\')">👁 Visto</button>' : "";
+    const casilla = c.estado === "propuesta" ? '<input type="checkbox" class="sel-aviso" title="Marcar para avisar en grupo" ' + (selAviso.has(c.id) ? "checked" : "") + ' onchange="marcarAviso(\'' + c.id + '\', this.checked)"> ' : "";
+    return '<div class="aviso-f ' + c.estado + (c.respuesta_nueva ? " nueva" : "") + '"><div class="cuando">' + casilla + fdia(c.fecha) + '<br>' + esc(c.hora) + ' h<div class="muted">' + esc(corto(c.equipo_id)) + '</div></div>' +
       '<div><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> · ' + esc(o.cli) + ' <span class="muted">📞 ' + esc(o.tel || o.tel2 || "sin teléfono") + '</span><div class="muted">' + esc(o.loc) + ' · ' + esc(nomTienda(o.tiendaId)) + '</div>' +
-      (c.estado === "avisada" && c.avisado_at ? '<div class="muted" style="color:#92400e">Avisado por WhatsApp el ' + new Date(c.avisado_at).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + '</div>' : "") + '</div>' +
-      '<div class="bts">' + (c.estado === "propuesta" ? '<button class="ambar" onclick="abrirAviso(\'' + c.id + '\')">📲 Avisar</button>' :
-        '<button class="verde" onclick="confirmar(\'' + c.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + c.id + '\')">✖ No le va bien</button><button class="secondary" onclick="abrirAviso(\'' + c.id + '\')">Reenviar</button>') +
+      (c.estado === "avisada" && c.avisado_at ? '<div class="muted" style="color:#92400e">Avisado por WhatsApp el ' + fHoraCorta(c.avisado_at) + '</div>' : "") + txtRespuesta(c) + '</div>' +
+      '<div class="bts">' + (c.estado === "confirmada" ? '<span class="est confirmada">Confirmada</span>' : c.estado === "propuesta" ? '<button class="ambar" onclick="abrirAviso(\'' + c.id + '\')">📲 Avisar</button>' :
+        '<button class="verde" onclick="confirmar(\'' + c.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + c.id + '\')">✖ No le va bien</button><button class="secondary" onclick="abrirAviso(\'' + c.id + '\')">Reenviar</button>') + visto +
         '<button class="secondary" title="Quitar la cita: la orden vuelve a «Sin agendar»" onclick="quitar(' + c.anyo + ',' + c.orden + ',\'' + c.id + '\',\'' + c.estado + '\')">↩ Devolver a Sin agendar</button></div></div>'; };
   const p = lista.filter(c => c.estado === "propuesta"), a = lista.filter(c => c.estado === "avisada");
-  return '<div class="muted" style="margin-bottom:6px">Citas que aún no ha confirmado el cliente, de la más próxima a la más lejana.</div>' +
-    '<div class="grupo">Sin avisar (' + p.length + ')</div>' + (p.map(fila).join("") || '<div class="muted">Nada pendiente.</div>') +
+  const rn = citasResp.filter(c => !fe || c.equipo_id === fe).sort((x, y) => (y.respuesta_at || y.nota_cliente_at || "").localeCompare(x.respuesta_at || x.nota_cliente_at || ""));
+  return (rn.length ? '<div class="grupo">🔔 Respuestas nuevas de clientes (' + rn.length + ')</div><div class="muted" style="margin-bottom:4px">Lo que han contestado desde el enlace del WhatsApp. Si dicen «Sí», la cita ya está confirmada sola. Pulsa <b>👁 Visto</b> cuando lo hayas revisado.</div>' + rn.map(fila).join("") : "") +
+    '<div class="muted" style="margin:6px 0">Citas que aún no ha confirmado el cliente, de la más próxima a la más lejana.</div>' +
+    '<div class="grupo">Sin avisar (' + p.length + ')</div>' +
+    (p.length > 1 ? (() => { const n = p.filter(c => selAviso.has(c.id)).length, todas = n === p.length;
+      return '<div class="fila-grupo"><button class="secondary peq" onclick="marcarAvisoTodas([' + p.map(c => "'" + c.id + "'").join(",") + '], ' + !todas + ')">' + (todas ? "☐ Desmarcar todas" : "☑ Marcar todas") + '</button>' +
+        '<button class="ambar peq" ' + (n ? "" : "disabled") + ' onclick="avisarMarcadas([' + p.filter(c => selAviso.has(c.id)).map(c => "'" + c.id + "'").join(",") + '])">📲 Avisar las marcadas (' + n + ')</button>' +
+        '<span class="muted">Marca varias (o filtra por equipo arriba y «Marcar todas») y se abren una detrás de otra.</span></div>'; })() : "") +
+    (p.map(fila).join("") || '<div class="muted">Nada pendiente.</div>') +
     '<div class="grupo">Esperando respuesta del cliente (' + a.length + ')</div>' + (a.map(fila).join("") || '<div class="muted">Nada pendiente.</div>');
 }
 /* ---------- derecha: calendario del mes ---------- */
@@ -1032,15 +1097,23 @@ async function rechazar(id){
 const FRANJA_MIN = 120, FRANJAS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 const frH = m => Math.floor(m / 60) + (m % 60 ? ":" + pad(m % 60) : "");
 const lineaFranja = desde => "🕘 *Llegamos de " + frH(desde) + " a " + frH(desde + FRANJA_MIN) + " h* (hora aproximada)";
-const franjaDe = c => Math.floor((minHora(c.hora) ?? 540) / 60) * 60;
+const franjaDe = c => c.franja_desde != null ? c.franja_desde : Math.floor((minHora(c.hora) ?? 540) / 60) * 60;   // la ya avisada, o la hora en punto de la cita
+let avisoAbierto = null;   // { id, franja, token } de la ventana «Avisar por WhatsApp»
+/* Enlace para que el cliente responda (cita.html, SQL 131). Siempre a almma.es: el cliente no puede abrir un enlace de este ordenador. */
+const URL_CITA = "https://almma.es/cita.html?c=";
+async function guardarFranja(){   // la franja que ve el cliente en el enlace = la del mensaje
+  if (!avisoAbierto || !avisoAbierto.token) return;
+  await client.rpc("token_cita", { p_id: avisoAbierto.id, p_franja: avisoAbierto.franja });
+}
 function ponerFranja(desde){
   const ta = document.getElementById("av_msg"); if (!ta || desde == null || isNaN(desde)) return;
+  if (avisoAbierto) avisoAbierto.franja = desde;
   ta.value = /🕘 [^\n]*/.test(ta.value) ? ta.value.replace(/🕘 [^\n]*/, lineaFranja(desde)) : ta.value;
   document.getElementById("burbuja").innerHTML = aWhats(ta.value);
   document.querySelectorAll("#av_franjas .franja").forEach(b => b.classList.toggle("on", +b.dataset.m === desde));
   const h = document.getElementById("av_franja_h"); if (h) h.value = pad(Math.floor(desde / 60)) + ":" + pad(desde % 60);
 }
-function mensajeAviso(o, c){
+function mensajeAviso(o, c, token){
   const fecha = flargo(c.fecha), Fecha = fecha[0].toUpperCase() + fecha.slice(1);
   const nombre = capFrase((o.cli || "").trim().split(/\s+/)[0] || "");
   const arts = o.lineas.map(l => capFrase(l.desc));
@@ -1048,18 +1121,34 @@ function mensajeAviso(o, c){
   return "Hola *" + nombre + "*, le escribimos de *ALMMA*, el servicio de entrega y montaje de *" + nomTienda(o.tiendaId) + "*.\n\n" +
     "Tenemos previsto llevarle y montarle su pedido:\n📦 *" + pedido + "*\n\n" +
     "📅 *" + Fecha + "*\n" + lineaFranja(franjaDe(c)) + "\n📍 " + [o.dir, o.loc].filter(Boolean).join(", ") + "\n\n" +
-    "Por favor, *responda a este mensaje*:\n✅ *SÍ* para confirmar el día y la hora\n📆 o díganos qué otro día le vendría mejor\n\n" +
+    (token
+      ? "👉 *Confirme su cita aquí* (o díganos si le va mal):\n" + URL_CITA + token + "\n\nSi no puede abrir el enlace, responda a este mensaje con *SÍ* o díganos qué otro día le vendría mejor.\n\n"
+      : "Por favor, *responda a este mensaje*:\n✅ *SÍ* para confirmar el día y la hora\n📆 o díganos qué otro día le vendría mejor\n\n") +
     "Para que todo vaya bien:\n• Tiene que haber una persona mayor de edad en casa.\n• Deje despejada la zona donde se va a montar.\n• Si no hay ascensor o el acceso es complicado, avísenos.\n\n" +
     "Muchas gracias,\n*ALMMA* · Entregas y montajes\n📞 613 037 899";
 }
 const aWhats = s => esc(s).replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
 function telWhats(t){ let d = String(t || "").replace(/\D/g, ""); if (d.startsWith("0034")) d = d.slice(4); if (d.length === 11 && d.startsWith("34")) d = d.slice(2); return d.length === 9 && /^[67]/.test(d) ? "34" + d : null; }   // solo móviles (los fijos no tienen WhatsApp)
-function abrirAviso(id){
+async function abrirAviso(id){
   const c = citasAbiertas.find(x => x.id === id); if (!c) return;
   const o = buscarOrden(c.anyo, c.orden); if (!o) return;
-  const msg = mensajeAviso(o, c);
+  let token = null;
+  if (hayRespuestas) {   // sin el SQL 131 el mensaje sigue como antes («responda a este mensaje»)
+    const { data, error } = await client.rpc("token_cita", { p_id: id, p_franja: franjaDe(c) });
+    if (!error) token = data; else console.warn("token_cita:", error.message);
+  }
+  avisoAbierto = { id, franja: franjaDe(c), token };
+  const msg = mensajeAviso(o, c, token);
   const tels = [o.tel, o.tel2].filter(t => telWhats(t));
-  abrirVentana('<h3>📲 Avisar por WhatsApp · ' + esc(o.cli) + '</h3><div class="muted">Orden ' + o.n + ' · ' + esc(nomTienda(o.tiendaId)) + ' · ' + esc(fdia(c.fecha)) + ' ' + esc(c.hora) + ' h · ' + esc(nomEq(c.equipo_id)) + '</div>' +
+  const enCola = colaAviso && colaAviso.ids[colaAviso.i] === id;
+  const botones = enCola
+    ? (tels.length ? '<button class="verde" onclick="whatsYSiguiente(\'' + id + '\')">🟢 Abrir WhatsApp y pasar a la siguiente</button>' : "") +
+      '<button class="ambar" onclick="marcarAvisado(\'' + id + '\', true)">Marcar como avisado y siguiente</button>' +
+      '<button class="secondary" onclick="siguienteAviso()">Saltar esta ▸</button><button class="secondary" onclick="cerrarVentana()">Parar</button>'
+    : (tels.length ? '<button class="verde" onclick="abrirWhatsApp()">🟢 Abrir WhatsApp</button>' : "") +
+      '<button class="ambar" onclick="marcarAvisado(\'' + id + '\')">Marcar como avisado</button><button class="secondary" onclick="cerrarVentana()">Cancelar</button>';
+  abrirVentana((enCola ? '<div class="cola-aviso">📲 Avisando en grupo: <b>' + (colaAviso.i + 1) + ' de ' + colaAviso.ids.length + '</b>' + (colaAviso.hechas ? ' · ' + colaAviso.hechas + ' avisada' + (colaAviso.hechas > 1 ? "s" : "") : "") + '</div>' : "") +
+    '<h3>📲 Avisar por WhatsApp · ' + esc(o.cli) + '</h3><div class="muted">Orden ' + o.n + ' · ' + esc(nomTienda(o.tiendaId)) + ' · ' + esc(fdia(c.fecha)) + ' ' + esc(c.hora) + ' h · ' + esc(nomEq(c.equipo_id)) + '</div>' +
     '<div class="fila2"><label class="muted">Enviar al:</label>' + (tels.length ? '<select id="av_tel">' + tels.map(t => '<option value="' + telWhats(t) + '">' + esc(t) + '</option>').join("") + '</select>' :
       '<b style="color:#b91c1c">La orden no tiene un teléfono válido.</b> <span class="muted">Avisa por otro medio y luego pulsa «Marcar como avisado».</span>') +
       '<span class="muted">Puedes retocar el texto antes de enviarlo.</span></div>' +
@@ -1068,17 +1157,47 @@ function abrirAviso(id){
       '<label class="muted">o desde las <input type="time" id="av_franja_h" class="pq" step="900" value="' + pad(Math.floor(franjaDe(c) / 60)) + ':00" onchange="ponerFranja(minHora(this.value))"></label></div>' +
     '<div class="aviso-2col"><textarea id="av_msg" oninput="document.getElementById(\'burbuja\').innerHTML=aWhats(this.value)">' + esc(msg) + '</textarea>' +
     '<div class="whats"><div class="whats-cab">🟢 ' + esc(o.cli) + '</div><div class="whats-fondo"><div class="burbuja" id="burbuja">' + aWhats(msg) + '</div></div></div></div>' +
-    '<div class="fila2">' + (tels.length ? '<button class="verde" onclick="abrirWhatsApp()">🟢 Abrir WhatsApp</button>' : "") +
-    '<button class="ambar" onclick="marcarAvisado(\'' + id + '\')">Marcar como avisado</button><button class="secondary" onclick="cerrarVentana()">Cancelar</button></div>' +
-    '<div class="muted">«Abrir WhatsApp» abre WhatsApp (o WhatsApp Web) con el número y el mensaje escritos: solo hay que pulsar Enviar. Después, «Marcar como avisado»: queda anotado en la pestaña «Llamadas» de la orden con el texto enviado.</div>');
+    '<div class="fila2">' + botones + '</div>' +
+    '<div class="muted">' + (enCola
+      ? "«Abrir WhatsApp y pasar a la siguiente» abre WhatsApp con el mensaje de este cliente, la marca como avisada y aquí sale ya la siguiente. En WhatsApp solo hay que pulsar Enviar y volver a esta pestaña. WhatsApp no deja mandar varios mensajes de golpe: hay que enviarlos de uno en uno."
+      : "«Abrir WhatsApp» abre WhatsApp (o WhatsApp Web) con el número y el mensaje escritos: solo hay que pulsar Enviar. Después, «Marcar como avisado»: queda anotado en la pestaña «Llamadas» de la orden con el texto enviado.") + '</div>');
 }
-function abrirWhatsApp(){ window.open("https://wa.me/" + document.getElementById("av_tel").value + "?text=" + encodeURIComponent(document.getElementById("av_msg").value), "_blank"); }
-async function marcarAvisado(id){
+function abrirWhatsApp(){ guardarFranja(); window.open("https://wa.me/" + document.getElementById("av_tel").value + "?text=" + encodeURIComponent(document.getElementById("av_msg").value), "_blank"); }
+/* ---------- avisar en grupo: las citas marcadas se abren una detrás de otra ---------- */
+const selAviso = new Set();
+let colaAviso = null;   // { ids, i, hechas }
+function marcarAviso(id, si){ si ? selAviso.add(id) : selAviso.delete(id); pintar(); }
+function marcarAvisoTodas(ids, si){ ids.forEach(id => si ? selAviso.add(id) : selAviso.delete(id)); pintar(); }
+function avisarMarcadas(ids){
+  ids = ids.filter(id => citasAbiertas.some(c => c.id === id && c.estado === "propuesta"));
+  if (!ids.length) return;
+  colaAviso = { ids, i: 0, hechas: 0 };
+  abrirAviso(ids[0]);
+}
+function whatsYSiguiente(id){ abrirWhatsApp(); marcarAvisado(id, true); }   // WhatsApp se abre ya (si no, el navegador lo bloquearía)
+function siguienteAviso(){
+  if (!colaAviso) return;
+  colaAviso.i++;
+  if (colaAviso.i < colaAviso.ids.length) abrirAviso(colaAviso.ids[colaAviso.i]);
+  else cerrarVentana();
+}
+async function terminarCola(){
+  const q = colaAviso; colaAviso = null; if (!q) return;
+  await recargarCitas();
+  toast("📲 Avisadas " + q.hechas + " de " + q.ids.length + " citas." + (q.hechas < q.ids.length ? " Las que no, siguen en «Sin avisar»." : ""));
+}
+async function marcarAvisado(id, enCola){
   const texto = document.getElementById("av_msg").value;
+  await guardarFranja();
   const { error } = await client.rpc("marcar_cita_avisada", { p_id: id, p_texto: texto });
   if (error) { alert("No se ha podido marcar: " + error.message); return; }
+  selAviso.delete(id);
+  if (enCola && colaAviso) {
+    const c = citasAbiertas.find(x => x.id === id); if (c) { c.estado = "avisada"; c.avisado_at = new Date().toISOString(); }
+    colaAviso.hechas++; siguienteAviso(); return;
+  }
   cerrarVentana(); await recargarCitas();
-  toast("📲 Avisado. Cuando el cliente conteste, pulsa ✅ Confirmar o ✖.");
+  toast(avisoAbierto && avisoAbierto.token ? "📲 Avisado. Si el cliente contesta desde el enlace, saldrá aquí arriba (🔔); si contesta por WhatsApp, pulsa ✅ Confirmar o ✖." : "📲 Avisado. Cuando el cliente conteste, pulsa ✅ Confirmar o ✖.");
 }
 
 /* ---------- tiempo de montaje por artículo ---------- */
