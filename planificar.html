@@ -68,7 +68,7 @@ tr.ops td{padding:0 8px 10px;border-top:none;}
 .doc span{color:#6b7280;font-size:11px;}
 #selbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;font-size:13px;}
 #selbar .cuenta{background:#eef2ff;color:#1e3a8a;border-radius:6px;padding:4px 10px;font-weight:600;}
-.marca{width:16px;height:16px;vertical-align:middle;margin:0 4px 0 0;cursor:pointer;}
+input.marca{width:16px;height:16px;vertical-align:middle;margin:0 4px 0 0;cursor:pointer;}
 .bsacar{background:none;border:none;color:#9ca3af;cursor:pointer;padding:2px;font-size:13px;}
 .bsacar:hover{color:#b91c1c;}
 .sacada-info{font-size:12px;color:#b91c1c;margin-top:3px;}
@@ -134,7 +134,7 @@ table.ag tr.libre td{color:#15803d;}
 .aviso-f.confirmada{border-left-color:#2563eb;background:#eff6ff;} .aviso-f.nueva{box-shadow:0 0 0 2px #a855f7 inset;}
 .resp{font-size:12.5px;margin-top:3px;padding:3px 7px;border-radius:6px;display:inline-block;}
 .resp.si{background:#dcfce7;color:#14532d;} .resp.no{background:#fee2e2;color:#7f1d1d;} .resp.nota{background:#ede9fe;color:#4c1d95;}
-.mz-cuerpo{display:grid;grid-template-columns:1fr 280px;gap:10px;margin:8px 0;}
+.mz-cuerpo{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:10px;margin:8px 0;}
 #mz_mapa{height:min(600px,66vh);border:1px solid #e2e8f0;border-radius:8px;}
 .mz-lista{max-height:min(600px,66vh);overflow-y:auto;font-size:12.5px;}
 .mz-zona{border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;margin-bottom:6px;cursor:pointer;background:#fff;}
@@ -145,6 +145,26 @@ table.ag tr.libre td{color:#15803d;}
 .urg-cab{display:flex;align-items:center;gap:8px;font-size:15px;color:#92400e;margin-bottom:6px;}
 .urgentes table{width:100%;}
 tr.fila.urgente > td:first-child{box-shadow:inset 4px 0 0 #f59e0b;}
+/* 🚚 entregas 24h–48h: recuadro aparte (no es lo mismo que urgente) */
+.urgentes.e48{border-color:#3b82f6;background:#eff6ff;} .urgentes.e48 .urg-cab{color:#1e3a8a;}
+tr.fila.e48 > td:first-child{box-shadow:inset 4px 0 0 #3b82f6;}
+.tarjeta.t-e48{border-color:#3b82f6;background:#eff6ff;} .tarjeta.t-e48 .n{color:#1d4ed8;}
+.etq-urg{display:inline-block;background:#f59e0b;color:#451a03;font-size:10.5px;font-weight:800;border-radius:9px;padding:1px 7px;white-space:nowrap;}
+.ordag.urg{outline:2px solid #f59e0b;outline-offset:-1px;background:#fef3c7;}
+/* 🧭 lista de ruta (mapa de zonas) */
+.rl{border:2px solid #1d4ed8;border-radius:10px;background:#f8fbff;padding:8px;margin-bottom:8px;}
+.rl-cab{display:flex;align-items:center;gap:6px;font-size:13.5px;color:#1e3a8a;font-weight:700;}
+.rl-it{display:flex;gap:6px;align-items:flex-start;border-top:1px solid #dbeafe;padding:5px 0;}
+.rl-it.fuera{opacity:.6;}
+.rl-num{flex:none;width:20px;height:20px;border-radius:50%;background:#1d4ed8;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.rl-tx{flex:1;min-width:0;line-height:1.3;}
+.rl-bt{display:flex;gap:2px;} .rl-bt button{background:#fff;color:#1e3a8a;border:1px solid #bfdbfe;padding:1px 6px;font-size:11px;} .rl-bt button[disabled]{opacity:.35;cursor:default;}
+.rl-form{border-top:1px solid #bfdbfe;margin-top:6px;padding-top:6px;display:grid;gap:5px;} .rl-form select,.rl-form input{width:100%;padding:5px 7px;font-size:12.5px;}
+.rl-acc{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+.rl-marca{display:flex;align-items:center;gap:6px;background:#eff6ff;border:1px solid #93c5fd;border-radius:7px;padding:4px 8px;margin:4px 0;font-weight:700;color:#1e3a8a;cursor:pointer;}
+.rl-marca input{width:17px;height:17px;margin:0;cursor:pointer;}
+.rl-punto{width:22px;height:22px;border-radius:50%;background:#1d4ed8;color:#fff;font:700 12px system-ui;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);}
+.urg-punto{font-size:17px;line-height:1;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff);}
 .burg{background:#fef3c7;color:#92400e;border:1px solid #fcd34d;padding:2px 7px;font-size:11.5px;margin-top:3px;}
 .burg.quitar{background:#fff;color:#64748b;border-color:#cbd5e1;}
 button.urg{background:#f59e0b;color:#fff;}
@@ -239,7 +259,7 @@ svg text{font-family:inherit;}
   <label>Recibidas <select id="f_meses" onchange="rellenarFiltros();pintar();situarEnMapa()"><option value="3">últimos 3 meses</option><option value="6" selected>últimos 6 meses</option><option value="12">último año</option><option value="0">todas (incluye antiguas)</option><option value="-6">solo antiguas (más de 6 meses)</option><option value="-12">solo antiguas (más de 1 año)</option></select></label>
   <label>Orden <select id="f_orden" onchange="pintar()"><option value="dist">Por cercanía a la nave</option><option value="espera">Por días esperando</option></select></label>
   <label><input type="checkbox" id="solo_sin" onchange="pintar()"> Solo sin tiempo de montaje</label>
-  <button class="secondary peq" onclick="verMapaZonas()" title="Mapa con las zonas y las poblaciones que entran en cada una">🗺 Mapa de zonas</button>
+  <button class="secondary peq" onclick="verMapaZonas()" title="Mapa con las zonas y las poblaciones que entran en cada una">🗺 Mapa de zonas <span id="n_ruta"></span></button>
   <label title="Órdenes que se sacaron de la lista porque no se van a montar"><input type="checkbox" id="ver_sacadas" onchange="marcadas.clear();pintar()"> Ver las sacadas de la lista <span id="n_sacadas"></span></label>
 </div>
 <div id="progreso"></div>
@@ -469,6 +489,8 @@ async function cargarUrgentes(){
     if (data.length) { const { data: f } = await client.from("festivos").select("fecha"); fest2448 = new Set((f || []).map(x => x.fecha)); }
   } catch (e) { ent2448 = {}; }   // sin el SQL 136, nada
 }
+const solo48 = o => !!ent2448[o.n] && !urgentes[o.n];
+const etqUrg = n => urgentes[n] ? '<span class="etq-urg" title="Pedido urgente' + (urgentes[n].motivo ? ": " + esc(urgentes[n].motivo) : "") + '">⚡ URGENTE</span>' : "";
 let fest2448 = new Set();
 // horas de días laborables (sin sábados, domingos ni festivos) que quedan hasta «hasta»; negativo si ya pasó
 function horasLab2448(hasta) {
@@ -829,8 +851,8 @@ function pendientesVisibles(sinFiltroTienda){
   const verSac = document.getElementById("ver_sacadas").checked;
   return pend.filter(o => !conCita.has(o.n)
     && !!sacadas[o.n] === verSac
-    // las de incidencia cuentan siempre como recientes (su mercancía puede no tener fecha de recepción)
-    && (!lim || (meses > 0 ? (o.inc || (o.ultRec && o.ultRec >= lim)) : (!o.inc && (!o.ultRec || o.ultRec < lim))))
+    // las de incidencia cuentan siempre como recientes (su mercancía puede no tener fecha de recepción); las urgentes y las 24h–48h salen siempre
+    && (!lim || (meses > 0 ? (o.inc || urgentes[o.n] || ent2448[o.n] || (o.ultRec && o.ultRec >= lim)) : (!o.inc && (!o.ultRec || o.ultRec < lim))))
     && (!ft || o.tiendaId === ft)
     && (!soloSin || tiempoOrden(o).t == null)
     && (!filtro || normBusq(o.n + " " + o.cli + " " + o.loc + " " + nomTienda(o.tiendaId) + " " + o.dir).includes(filtro)));
@@ -842,14 +864,15 @@ function pintar(){
   const proximas = agenda.filter(o => o.fprev >= HOY).length;
   document.getElementById("tarjetas").innerHTML =
     '<div class="tarjeta nar"><div class="n">' + vis.length + '</div><div class="t">sin agendar · ' + hm(vis.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h de montaje conocido</div></div>' +
-    (vis.some(o => urgentes[o.n] || ent2448[o.n]) ? '<div class="tarjeta clic t-urg" onclick="const b=document.getElementById(\'bloque_urg\'); if(b) b.scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="n">⚡ ' + vis.filter(o => urgentes[o.n] || ent2448[o.n]).length + '</div><div class="t">urgentes sin agendar</div></div>' : "") +
+    (vis.some(o => urgentes[o.n]) ? '<div class="tarjeta clic t-urg" onclick="const b=document.getElementById(\'bloque_urg\'); if(b) b.scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="n">⚡ ' + vis.filter(o => urgentes[o.n]).length + '</div><div class="t">urgentes sin agendar</div></div>' : "") +
+    (vis.some(solo48) ? '<div class="tarjeta clic t-e48" onclick="const b=document.getElementById(\'bloque_48\'); if(b) b.scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="n">🚚 ' + vis.filter(solo48).length + '</div><div class="t">entregas 24h–48h sin agendar</div></div>' : "") +
     '<div class="tarjeta gris clic" onclick="cambiarVista(\'avisos\')"><div class="n">' + nP + '</div><div class="t">propuestas sin avisar al cliente</div></div>' +
     '<div class="tarjeta amb clic" onclick="cambiarVista(\'avisos\')"><div class="n">' + nA + '</div><div class="t">avisadas, esperando respuesta</div></div>' +
     (citasResp.length ? '<div class="tarjeta clic resp-nueva" onclick="cambiarVista(\'avisos\')"><div class="n">🔔 ' + citasResp.length + '</div><div class="t">respuesta' + (citasResp.length > 1 ? "s" : "") + ' nueva' + (citasResp.length > 1 ? "s" : "") + ' de clientes</div></div>' : "") +
     '<div class="tarjeta"><div class="n">' + proximas + '</div><div class="t">agendadas desde hoy (' + fdia(HOY) + ' en adelante)</div></div>' +
     '<div class="tarjeta amb"><div class="n">' + vis.filter(o => tiempoOrden(o).t == null).length + '</div><div class="t">sin tiempo de montaje completo</div></div>';
   document.getElementById("n_avisos").textContent = ((nP + nA) ? "(" + (nP + nA) + ")" : "") + (citasResp.length ? " 🔔" + citasResp.length : "");
-  pintarSeleccion(vis);
+  pintarContadorRuta(); pintarSeleccion(vis);
   pintarLista(vis);
   ["tabla", "avisos", "cal"].forEach(v => document.getElementById("b_" + v).classList.toggle("on", vista === v));
   document.getElementById("derecha").innerHTML = vista === "tabla" ? tabla() : vista === "avisos" ? avisos() : calendario();
@@ -858,18 +881,23 @@ function pintarLista(vis){
   const orden = document.getElementById("f_orden").value, nave = NAVE();
   // ⚡ Urgentes: arriba del todo y fuera de sus zonas (SQL 135)
   const verSac = document.getElementById("ver_sacadas").checked;
-  const clvUrg = o => ent2448[o.n] ? "0" + ent2448[o.n].limite_hasta : "1" + urgentes[o.n].marcada_at;   // primero las 🚚 24h–48h por plazo, luego las ⚡ por llegada
-  const urg = verSac ? [] : vis.filter(o => urgentes[o.n] || ent2448[o.n]).sort((a, b) => clvUrg(a).localeCompare(clvUrg(b)));
+  // Son dos cosas distintas, cada una en su recuadro: ⚡ urgentes (por orden de llegada) y 🚚 entregas 24h–48h (por plazo).
+  // Una orden que es las dos cosas sale en ⚡ Urgentes, con su plazo.
+  const urg = verSac ? [] : vis.filter(o => urgentes[o.n]).sort((a, b) => String(urgentes[a.n].marcada_at).localeCompare(String(urgentes[b.n].marcada_at)));
+  const e48s = verSac ? [] : vis.filter(solo48).sort((a, b) => String(ent2448[a.n].limite_hasta).localeCompare(String(ent2448[b.n].limite_hasta)));
   const porZona = {};
-  vis.filter(o => !urg.includes(o)).forEach(o => (porZona[zonaDe(o)] ||= []).push(o));
+  vis.filter(o => !urg.includes(o) && !e48s.includes(o)).forEach(o => (porZona[zonaDe(o)] ||= []).push(o));
   const distZ = z => { if (!nave) return 0; const ds = porZona[z].map(o => kmAprox(nave, posOrden(o))).filter(x => x != null); return ds.length ? Math.min(...ds) : 99999; };
   const especial = z => /^[📭⏳❓]/u.test(z) ? 1 : 0;
   const zs = Object.keys(porZona).sort((a, b) => especial(a) - especial(b) || distZ(a) - distZ(b) || porZona[b].length - porZona[a].length || a.localeCompare(b));
   const cerrada = z => !filtro && !zonasAbiertas.has(z);
   let h = zs.length > 1 && !filtro ? '<div style="text-align:right;margin:0 0 6px"><button class="secondary peq" onclick="plegarTodas(' + (zs.some(cerrada) ? "true" : "false") + ')">' + (zs.some(cerrada) ? "▾ Abrir todas" : "▸ Plegar todas") + '</button></div>' : "";
   zonasVisibles = zs;
+  if (e48s.length) h = '<div class="urgentes e48" id="bloque_48"><div class="urg-cab">🚚 <b>Entregas 24h–48h</b><span class="dato">' + e48s.length + ' orden' + (e48s.length > 1 ? "es" : "") + '</span>' +
+    '<span class="dato">⏱ ' + hm(e48s.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h</span><span class="muted" style="margin-left:auto">por plazo: primero la que antes vence</span></div>' +
+    '<table>' + e48s.map(filaPendiente).join("") + '</table></div>' + h;
   if (urg.length) h = '<div class="urgentes" id="bloque_urg"><div class="urg-cab">⚡ <b>Urgentes</b><span class="dato">' + urg.length + ' orden' + (urg.length > 1 ? "es" : "") + '</span>' +
-    '<span class="dato">⏱ ' + hm(urg.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h</span><span class="muted" style="margin-left:auto">primero las 🚚 entregas 24h–48h por plazo; luego por orden de llegada</span></div>' +
+    '<span class="dato">⏱ ' + hm(urg.reduce((s, o) => s + (tiempoOrden(o).t || 0), 0)) + ' h</span><span class="muted" style="margin-left:auto">por orden de llegada a urgentes</span></div>' +
     '<table>' + urg.map(filaPendiente).join("") + '</table></div>' + h;
   for (const z of zs) {
     const ords = porZona[z], porPob = {};
@@ -925,7 +953,7 @@ function pintarSeleccion(vis){
   bar.innerHTML = (vis.length ? '<button class="secondary peq" onclick="marcarTodas()">☑ Marcar todas (' + vis.length + ')</button>' : "") +
     (n ? '<span class="cuenta">' + n + ' marcada' + (n > 1 ? "s" : "") + '</span>' +
       (verSac ? '<button class="peq" onclick="devolverMarcadas()">↩ Devolver a la lista</button>'
-              : (hayUrgentes ? '<button class="peq urg" onclick="urgentesMarcadas()">⚡ Pasar a urgentes</button>' : "") + '<button class="peq rojo" onclick="sacarMarcadas()">🚫 Sacar de la lista</button>') +
+              : '<button class="peq" onclick="rutaDesdeLista()" title="Añadirlas a la lista de ruta y abrir el mapa">🧭 A la lista de ruta</button>' + (hayUrgentes ? '<button class="peq urg" onclick="urgentesMarcadas()">⚡ Pasar a urgentes</button>' : "") + '<button class="peq rojo" onclick="sacarMarcadas()">🚫 Sacar de la lista</button>') +
       '<button class="secondary peq" onclick="marcadas.clear();pintar()">Desmarcar</button>' : "") +
     (!verSac && !n ? '<span class="muted">¿Órdenes que no se van a montar nunca? Márcalas (☐) y sácalas de la lista. Con «Recibidas: solo antiguas» salen las viejas.</span>' : "");
 }
@@ -1001,7 +1029,7 @@ function filaPendiente(o){
   const tTxt = T.sinLineas ? "Sin artículos" : T.t != null ? hm(T.t) + " h" : T.parcial ? hm(T.parcial) + " h + ?" : "Poner tiempo";
   const sac = sacadas[o.n], urg = urgentes[o.n], e48 = ent2448[o.n];
   const h48 = e48 ? (new Date(e48.limite_hasta) < new Date() ? -1 : Math.floor(horasLab2448(new Date(e48.limite_hasta)))) : 0;
-  return '<tr class="fila' + (sac ? " sacada" : "") + (urg || e48 ? " urgente" : "") + '"><td style="width:96px" rowspan="2">' +
+  return '<tr class="fila' + (sac ? " sacada" : "") + (urg ? " urgente" : e48 ? " e48" : "") + '"><td style="width:96px" rowspan="2">' +
       (haySacadas ? '<input type="checkbox" class="marca" title="Marcar" ' + (marcadas.has(o.n) ? "checked" : "") + ' onchange="marcar(\'' + o.n + '\', this.checked)">' : "") +
       '<a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a>' +
       (o.inc ? '<div><span class="est incidencia" title="Orden de incidencia: ya tiene todo lo necesario (en casa del cliente o en el almacén), se puede hacer">⚠ Incidencia</span></div>' : "") +
@@ -1077,7 +1105,8 @@ function paradaHtml(s, e, f){
   const hecha = s.estado === "realizada", inc = hecha && s.inc;
   const etiqueta = inc ? "⚠ Montada con incidencia" : ESTX[s.estado] + (s.sinCita && !hecha && s.estado !== "incidencia" ? "*" : "");
   const titulo = hecha ? "Ya montada y firmada por el cliente" : s.estado === "incidencia" ? "La orden tiene una incidencia" : s.sinCita ? "Agendada desde Órdenes / Rutas (sin cita en esta pantalla)" : "";
-  return '<div class="ordag ' + s.estado + (inc ? " inc" : "") + '"><span class="hora">' + esc(s.hora || "—") + '</span>' +
+  const eu = hecha ? "" : etqUrg(o.n);   // ⚡ urgente (las ya montadas no se resaltan)
+  return '<div class="ordag ' + s.estado + (inc ? " inc" : "") + (eu ? " urg" : "") + '"><span class="hora">' + esc(s.hora || "—") + '</span>' + eu +
     '<a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> ' + esc(o.loc) +
     ' <span class="muted">· ' + esc((o.cli || "").split(" ")[0]) + ' · ' + (T.t != null ? txtT(T.t) : "⏱ ?") + '</span>' +
     '<span class="est ' + s.estado + (inc ? " inc" : "") + '" title="' + titulo + '">' + etiqueta + '</span>' +
@@ -1130,7 +1159,8 @@ function envolvente(pts){   // polígono que rodea los puntos (para dibujar el �
   return lo.slice(0, -1).concat(hi.slice(0, -1));
 }
 const puntoA = (km, grados) => { const r = grados * Math.PI / 180; return [VLC.lat + km * Math.cos(r) / 111.2, VLC.lon + km * Math.sin(r) / (111.2 * Math.cos(VLC.lat * Math.PI / 180))]; };
-async function verMapaZonas(){
+async function verMapaZonas(conservar){   // conservar = true: vuelve a dibujar sin mover el mapa de donde estaba
+  const antes = conservar && mapaZonas && document.getElementById("mz_mapa") ? { c: mapaZonas.getCenter(), z: mapaZonas.getZoom() } : null;
   const conAg = document.getElementById("mz_ag") ? document.getElementById("mz_ag").checked : false;
   const ords = [...pendientesVisibles(), ...(conAg ? agenda.filter(o => o.fprev >= HOY && o.estado !== "completado") : [])];
   // zonas → poblaciones (con su posición y cuántas órdenes)
@@ -1154,12 +1184,13 @@ async function verMapaZonas(){
       '<button class="peq" onclick="buscarZona()">🔎 Buscar</button><div id="mz_res"></div></div>' +
     '<div class="muted">Cada color es una zona y su área rodea las poblaciones que engloba. <b>Valencia capital</b> va partida en 5: <b style="color:' + COLOR_VLC.Centro + '">Centro</b> (2 km alrededor de la plaza del Ayuntamiento), ' +
       '<b style="color:' + COLOR_VLC.Norte + '">Norte</b>, <b style="color:' + COLOR_VLC.Este + '">Este</b> (la parte del mar: Malvarrosa, Cabanyal, Grau, Nazaret…), <b style="color:' + COLOR_VLC.Sur + '">Sur</b> y <b style="color:' + COLOR_VLC.Oeste + '">Oeste</b>. ' +
-      'Salen las órdenes de «Sin agendar» con los filtros de arriba. Pulsa una zona de la lista para verla en el mapa.</div>' +
-    '<div class="fila2"><label class="muted"><input type="checkbox" id="mz_ag" ' + (conAg ? "checked" : "") + ' onchange="verMapaZonas()"> Incluir también las ya agendadas (desde hoy)</label></div>' +
-    '<div class="mz-cuerpo"><div id="mz_mapa"></div><div class="mz-lista">' + (lista || '<div class="muted">No hay órdenes situadas con estos filtros.</div>') + '</div></div>' +
+      'Salen las órdenes de «Sin agendar» con los filtros de arriba. Pulsa una zona de la lista para verla en el mapa. <b>Pincha un punto</b> para ver sus órdenes y marcarlas para la <b>🧭 Lista de ruta</b>. Los puntos con <b>⚡</b> tienen algún pedido urgente.</div>' +
+    '<div class="fila2"><label class="muted"><input type="checkbox" id="mz_ag" ' + (conAg ? "checked" : "") + ' onchange="verMapaZonas(true)"> Incluir también las ya agendadas (desde hoy)</label></div>' +
+    '<div class="mz-cuerpo"><div id="mz_mapa"></div><div class="mz-lista"><div class="rl" id="rl"></div>' + (lista || '<div class="muted">No hay órdenes situadas con estos filtros.</div>') + '</div></div>' +
     '<div class="muted" style="font-size:11.5px">En Valencia capital cada punto es la calle (o el código postal) del cliente; fuera, la población. Para saber la zona solo se busca el nombre de la calle, sin número ni datos del cliente.</div>');
+  pintarRuta();
   try { await cargarLeaflet(); } catch (err) { document.getElementById("mz_mapa").innerHTML = '<div class="muted" style="padding:12px;color:#b91c1c">' + esc(err.message) + '</div>'; return; }
-  if (mapaZonas) { mapaZonas.remove(); mapaZonas = null; }
+  if (mapaZonas) { mapaZonas.remove(); mapaZonas = null; capaRuta = null; }
   const div = document.getElementById("mz_mapa"); if (!div) return;
   mapaZonas = L.map(div);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(mapaZonas);
@@ -1177,16 +1208,20 @@ async function verMapaZonas(){
     if (env.length >= 3 && !Z.nombre.startsWith("Valencia · ")) L.polygon(env, { color: Z.color, weight: 2, fillOpacity: .13 }).addTo(mapaZonas).bindTooltip(Z.nombre, { sticky: true });
     Object.values(Z.pobs).forEach(P => { if (!P.pos) return;
       // al pasar el ratón: nº de orden y tienda de cada una; al pinchar: globo con fotos/pedido de la tienda y «Ver la calle»
-      const lin = P.ords.slice(0, 8).map(o => esc(o.n) + " · " + esc(nomTienda(o.tiendaId))).join("<br>") + (P.ords.length > 8 ? "<br><i>y " + (P.ords.length - 8) + " más (pincha para verlas)</i>" : "");
-      L.circleMarker([P.pos.lat, P.pos.lon], { radius: 5 + Math.min(P.n, 6), color: "#fff", weight: 1.5, fillColor: Z.color, fillOpacity: .95 }).addTo(mapaZonas)
-        .bindTooltip("<b>" + esc(P.nom) + "</b> · " + esc(Z.nombre) + " · " + P.n + " orden" + (P.n > 1 ? "es" : "") + '<div class="mz-tt">' + lin + "</div>")
+      const nUrg = P.ords.filter(o => urgentes[o.n]).length;
+      const lin = P.ords.slice(0, 8).map(o => (urgentes[o.n] ? "⚡ " : "") + esc(o.n) + " · " + esc(nomTienda(o.tiendaId))).join("<br>") + (P.ords.length > 8 ? "<br><i>y " + (P.ords.length - 8) + " más (pincha para verlas)</i>" : "");
+      L.circleMarker([P.pos.lat, P.pos.lon], { radius: 5 + Math.min(P.n, 6) + (nUrg ? 2 : 0), color: nUrg ? "#f59e0b" : "#fff", weight: nUrg ? 4 : 1.5, fillColor: Z.color, fillOpacity: .95 }).addTo(mapaZonas)
+        .bindTooltip("<b>" + esc(P.nom) + "</b> · " + esc(Z.nombre) + " · " + P.n + " orden" + (P.n > 1 ? "es" : "") + '<div class="mz-tt">' + lin + '<br><i>👆 Pincha para ver fotos y marcarlas</i></div>')
         .bindPopup(() => globoPunto(P, Z), { maxWidth: 340, minWidth: 260, className: "mz-pop" });
+      if (nUrg) L.marker([P.pos.lat, P.pos.lon], { interactive: false, zIndexOffset: 400, icon: L.divIcon({ className: "", iconSize: [18, 18], iconAnchor: [-3, 24], html: '<div class="urg-punto">⚡</div>' }) }).addTo(mapaZonas);
       todos.push([P.pos.lat, P.pos.lon]); });
   });
   // se empieza por lo de alrededor de Valencia (hasta 60 km); lo lejano se ve alejando el mapa o pulsando su zona en la lista
   const cerca = todos.filter(p => Math.hypot((p[0] - VLC.lat) * 111.2, (p[1] - VLC.lon) * 85.8) <= 60);
   const vista = cerca.length ? cerca : todos;
-  if (vista.length) mapaZonas.fitBounds(vista, { padding: [25, 25], maxZoom: 12 }); else mapaZonas.setView([VLC.lat, VLC.lon], 11);
+  pintarRutaMapa();
+  if (antes) mapaZonas.setView(antes.c, antes.z, { animate: false });
+  else if (vista.length) mapaZonas.fitBounds(vista, { padding: [25, 25], maxZoom: 12 }); else mapaZonas.setView([VLC.lat, VLC.lon], 11);
   verEtq();
   setTimeout(() => mapaZonas && mapaZonas.invalidateSize(), 50);
 }
@@ -1204,15 +1239,180 @@ function lineasGlobo(o){
 }
 function globoPunto(P, Z){
   const div = document.createElement("div");
-  div.innerHTML = '<div class="mz-pop-cab"><b>' + esc(P.nom) + '</b> · ' + esc(Z.nombre) + '</div>' + P.ords.map(o => {
+  const libres = P.ords.filter(rutaLibre);
+  div.innerHTML = '<div class="mz-pop-cab"><b>' + esc(P.nom) + '</b> · ' + esc(Z.nombre) +
+      (libres.length > 1 ? ' <button class="secondary peq" onclick="marcarRutaVarias([' + libres.map(o => "'" + o.n + "'").join(",") + '])">☑ Marcar las ' + libres.length + '</button>' : "") + '</div>' + P.ords.map(o => {
     const nd = (docs[o.n] || []).length;
-    return '<div class="mz-ord"><div><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + esc(o.n) + '</b></a> · ' + esc(nomTienda(o.tiendaId)) +
+    return '<div class="mz-ord"><div><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + esc(o.n) + '</b></a> ' + etqUrg(o.n) + ' · ' + esc(nomTienda(o.tiendaId)) +
+      (urgentes[o.n] && urgentes[o.n].motivo ? '<div class="urg-info">' + esc(urgentes[o.n].motivo) + '</div>' : "") +
       '<div class="muted">' + esc((o.cli || "").split(" ").slice(0, 2).join(" ")) + (o.dir ? " · " + esc(o.dir) : "") + '</div></div>' +
+      (rutaLibre(o) ? '<label class="rl-marca"><input type="checkbox" data-ruta="' + esc(o.n) + '" ' + (rutaSel.includes(o.n) ? "checked" : "") + ' onchange="marcarRuta(\'' + o.n + '\', this.checked)"> 🧭 Añadir a la lista de ruta</label>'
+                    : '<div class="muted" style="margin:4px 0">📅 ' + (o.fprev ? "Ya agendada: " + fdia(o.fprev) + (o.hora ? " · " + esc(o.hora) : "") : "Ya tiene una cita en marcha") + '</div>') +
       '<div class="mz-docs" data-n="' + esc(o.n) + '">' + (nd ? '<span class="muted">Cargando fotos y pedido…</span>' : lineasGlobo(o)) + '</div>' +
       '<a class="mz-calle" href="' + esc(urlCalle(o)) + '" target="_blank" rel="noopener">📷 Ver la calle</a></div>';
   }).join("");
   cargarDocsGlobo(div, P.ords);
   return div;
+}
+/* ---------- 🧭 LISTA DE RUTA (petición de Arturo, 24-11-2026) ----------
+   Se marcan órdenes en los globos del mapa (o con las casillas de «Sin agendar»), se ordenan y se proponen TODAS de una vez
+   a un equipo y un día, con la hora de cada una calculada por el recorrido. Es lo mismo que proponerlas una a una
+   (proponer_cita, SQL 126): no toca las órdenes hasta que el cliente confirma. La lista se guarda en este navegador. */
+let rutaSel = (Array.isArray(lsGet("almma_lista_ruta")) ? lsGet("almma_lista_ruta") : []).filter(n => /^\d+\/\d+$/.test(n));
+let rutaEq = null, rutaF = null, capaRuta = null, rutaTrabajando = false;
+const ordPend = n => pend.find(o => o.n === n);
+const rutaLibre = o => !!ordPend(o.n) && !sacadas[o.n] && !citasAbiertas.some(c => c.anyo === o.anyo && c.orden === o.orden);
+const rutaOrds = () => rutaSel.map(ordPend).filter(o => o && rutaLibre(o));
+const posRuta = o => (esValencia(o.loc) ? posCalle(o) : null) || posOrden(o);   // en Valencia capital, la calle
+function rutaCambiada(){
+  lsSet("almma_lista_ruta", rutaSel);
+  document.querySelectorAll("input[data-ruta]").forEach(i => i.checked = rutaSel.includes(i.dataset.ruta));
+  pintarContadorRuta(); pintarRuta(); pintarRutaMapa();
+}
+function pintarContadorRuta(){ const el = document.getElementById("n_ruta"); if (el) el.textContent = rutaSel.length ? "· 🧭 " + rutaSel.length : ""; }
+function marcarRuta(n, si){ if (rutaTrabajando) return rutaCambiada(); rutaSel = rutaSel.filter(x => x !== n); if (si) rutaSel.push(n); rutaCambiada(); }
+function marcarRutaVarias(ns){ if (rutaTrabajando) return; ns.forEach(n => { if (!rutaSel.includes(n)) rutaSel.push(n); }); rutaCambiada(); }
+function moverRuta(i, d){ if (rutaTrabajando) return; const j = i + d; if (j < 0 || j >= rutaSel.length) return; [rutaSel[i], rutaSel[j]] = [rutaSel[j], rutaSel[i]]; rutaCambiada(); }
+function vaciarRuta(){ if (!rutaTrabajando && confirm("¿Vaciar la lista de ruta? Las órdenes no cambian: solo se desmarcan.")) { rutaSel = []; rutaCambiada(); } }
+function rutaDesdeLista(){   // las marcadas con las casillas de «Sin agendar»
+  const ns = marcadasVisibles().filter(n => rutaLibre(ordPend(n)));
+  marcadas.clear(); pintar(); marcarRutaVarias(ns); verMapaZonas();
+}
+function ordenarRuta(){   // siempre a la más cercana que quede; las que no están situadas, al final
+  if (rutaTrabajando) return;
+  const quedan = rutaOrds().filter(posRuta), sinSitio = rutaSel.filter(n => !quedan.some(o => o.n === n)), r = [];
+  rutaDestino();
+  const ya = rutaEq ? dia(rutaEq, rutaF).ps : [];   // si el equipo ya tiene montajes ese día, desde el último
+  let prev = (ya.length && posOrden(ya[ya.length - 1].o)) || NAVE();
+  while (quedan.length) {
+    const i = prev ? quedan.reduce((m, o, k) => kmAprox(prev, posRuta(o)) < kmAprox(prev, posRuta(quedan[m])) ? k : m, 0) : 0;
+    const o = quedan.splice(i, 1)[0]; r.push(o.n); prev = posRuta(o);
+  }
+  rutaSel = [...r, ...sinSitio]; rutaCambiada();
+}
+// Recorrido del día: lo que el equipo ya tiene ese día y, detrás, las de la lista. Hora de llegada de cada una.
+function calcRuta(e, f, ords){
+  const vel = Math.max(cfg.velocidad_kmh || 45, 10), p = e ? dia(e, f) : { ps: [], fin: 0 }, horas = {};
+  let km = 0, mont = 0, sinT = 0, prev = NAVE(), reloj = minHora(cfg.hora_salida) ?? 480;
+  for (const s of p.ps) {
+    const pos = posOrden(s.o); if (prev && pos) km += kmAprox(prev, pos); if (pos) prev = pos;
+    const T = tiempoOrden(s.o); mont += T.t ?? T.parcial;
+  }
+  const ult = p.ps[p.ps.length - 1];
+  if (ult) reloj = Math.max(p.fin, (minHora(ult.hora) ?? 0) + (tiempoOrden(ult.o).t || 60));   // = horaSugerida()
+  for (const o of ords) {
+    const pos = posRuta(o), tramo = prev && pos ? kmAprox(prev, pos) : 0, T = tiempoOrden(o);
+    km += tramo; reloj = Math.round((reloj + tramo / vel * 60) / 15) * 15;
+    horas[o.n] = reloj;   // minutos desde medianoche
+    mont += T.t ?? T.parcial; reloj += T.t ?? Math.max(T.parcial, 60);   // sin tiempo puesto: se deja 1 h
+    if (T.t == null) sinT++;
+    if (pos) prev = pos;
+  }
+  if (prev && NAVE()) km += kmAprox(prev, NAVE());
+  const viaje = Math.round(km / vel * 60);
+  return { horas, km: Math.round(km), mont, viaje, total: mont + viaje, sinT, fin: reloj, yaHay: p.ps.length };
+}
+function rutaDestino(){   // equipo y día elegidos (por defecto, los que se estén viendo en la tabla)
+  const act = eqActivos();
+  if (!rutaEq || !act.some(e => e.id === rutaEq)) rutaEq = sel && act.some(e => e.id === sel.e) ? sel.e : (act[0] || {}).id || null;
+  if (!rutaF || rutaF < HOY) rutaF = sel && sel.f >= HOY ? sel.f : laborables(suma(HOY, 1), 1)[0];
+}
+function pintarRuta(){
+  const div = document.getElementById("rl"); if (!div) return;
+  if (!rutaSel.length) {
+    div.innerHTML = '<div class="rl-cab">🧭 Lista de ruta</div><div class="muted" style="margin-top:4px">Pincha un punto del mapa y marca ☐ las órdenes que quieras llevar juntas. Aquí se ordenan y se proponen todas a un equipo y un día.</div>';
+    return;
+  }
+  rutaDestino();
+  const ords = rutaOrds(), c = calcRuta(rutaEq, rutaF, ords), libre = JORNADA() - c.total;
+  let k = 0;
+  const items = rutaSel.map((n, i) => {
+    const o = ordPend(n), ok = o && rutaLibre(o);
+    const bts = '<div class="rl-bt"><button title="Subir" ' + (i ? "" : "disabled") + ' onclick="moverRuta(' + i + ',-1)">▲</button><button title="Bajar" ' + (i < rutaSel.length - 1 ? "" : "disabled") + ' onclick="moverRuta(' + i + ',1)">▼</button><button title="Quitar de la lista" onclick="marcarRuta(\'' + n + '\', false)">✕</button></div>';
+    if (!ok) return '<div class="rl-it fuera"><div class="rl-tx"><b>' + esc(n) + '</b><div class="muted">' + (antiguasListas || o ? "Ya no está pendiente de agendar (tiene cita o ha cambiado): no se propone" : "Cargando…") + '</div></div>' + bts + '</div>';
+    const T = tiempoOrden(o);
+    return '<div class="rl-it"><span class="rl-num">' + (++k) + '</span><div class="rl-tx"><b style="color:#1e3a8a">' + aHora(c.horas[n]) + '</b> · <a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + esc(n) + '</b></a> ' + etqUrg(n) +
+      '<div>' + esc(o.loc || "sin población") + ' <span class="muted">· ' + esc((o.cli || "").split(" ").slice(0, 2).join(" ")) + ' · ' + esc(nomTienda(o.tiendaId)) + '</span></div>' +
+      '<div class="muted">⏱ ' + (T.t != null ? hm(T.t) + " h" : T.parcial ? hm(T.parcial) + " h + ?" : "sin tiempo") + (posRuta(o) ? "" : ' · <span style="color:#b45309">sin situar en el mapa</span>') + '</div></div>' + bts + '</div>';
+  }).join("");
+  div.innerHTML = '<div class="rl-cab">🧭 Lista de ruta <span class="dato">' + ords.length + (ords.length !== 1 ? " órdenes" : " orden") + '</span></div>' + items +
+    '<div class="rl-acc"><button class="secondary peq" onclick="ordenarRuta()" title="Desde la nave (o desde el último montaje que ya tenga ese día), siempre a la más cercana">↕ Ordenar por cercanía</button><button class="secondary peq" onclick="imprimirRuta()">🖨 Imprimir</button><button class="secondary peq" onclick="vaciarRuta()">Vaciar</button></div>' +
+    '<div class="rl-form"><select onchange="rutaEq=this.value;pintarRuta()" title="Equipo">' + (eqActivos().map(e => '<option value="' + e.id + '" ' + (e.id === rutaEq ? "selected" : "") + '>' + esc(e.nombre) + '</option>').join("") || '<option value="">No hay equipos (👥 Equipos)</option>') + '</select>' +
+      '<input type="date" value="' + rutaF + '" min="' + HOY + '" title="Día" onchange="if(this.value)cambiarDiaRuta(this.value)">' +
+      '<div class="muted">' + (c.yaHay ? "Ese día ya tiene " + c.yaHay + " montaje" + (c.yaHay > 1 ? "s" : "") + ": estas van detrás.<br>" : "") +
+        'Total del día: ' + c.km + ' km · ' + hm(c.mont) + ' h montaje + ' + hm(c.viaje) + ' h viaje = <b style="color:' + (libre < 0 ? "#dc2626" : "#15803d") + '">' + hm(c.total) + ' h</b>' +
+        (libre < 0 ? ' <span class="marca sobre">⚠ Sobrecarga +' + hm(-libre) + ' h</span>' : "") +
+        (c.sinT ? '<br><span style="color:#b45309">' + c.sinT + ' sin tiempo completo: el total es mayor (para las horas cuento 1 h)</span>' : "") + '</div>' +
+      '<button ' + (ords.length && rutaEq && !rutaTrabajando ? "" : "disabled") + ' onclick="proponerRuta()">' + (rutaTrabajando ? "Proponiendo…" : "📅 Proponer la ruta (" + ords.length + ")") + '</button></div>';
+}
+async function cambiarDiaRuta(f){
+  rutaF = f;
+  if (f < agendaDesde || f >= agendaHasta) { lunes = lunesDe(f); await cargarAgenda(); pintar(); }   // para saber qué tiene ya el equipo ese día
+  pintarRuta();
+}
+function pintarRutaMapa(){
+  if (!mapaZonas || !window.L || !document.getElementById("mz_mapa")) return;
+  if (capaRuta) capaRuta.remove();
+  capaRuta = L.layerGroup().addTo(mapaZonas);
+  const pts = [], nave = NAVE(), repes = {};
+  if (nave) pts.push([nave.lat, nave.lon]);
+  rutaOrds().forEach((o, i) => {
+    const q = posRuta(o); if (!q) return;
+    const k = q.lat + "," + q.lon, r = repes[k] = (repes[k] || 0) + 1;   // varias en el mismo sitio: los números, uno al lado de otro
+    L.marker([q.lat, q.lon], { interactive: false, zIndexOffset: 600, icon: L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [28 - (r - 1) * 20, 11], html: '<div class="rl-punto">' + (i + 1) + '</div>' }) }).addTo(capaRuta);
+    pts.push([q.lat, q.lon]);
+  });
+  if (pts.length < 2) return;
+  if (nave) pts.push([nave.lat, nave.lon]);
+  L.polyline(pts, { color: "#1d4ed8", weight: 3, opacity: .75, dashArray: "7 6", interactive: false }).addTo(capaRuta);
+}
+async function proponerRuta(){
+  if (rutaTrabajando) return;
+  rutaDestino();
+  const e = rutaEq, f = rutaF;
+  if (!e) { alert("Elige un equipo dado de alta (botón «👥 Equipos»)."); return; }
+  if (f < HOY) { alert("La fecha ya ha pasado."); return; }
+  rutaTrabajando = true; pintarRuta();
+  const hechas = [], fallos = [];
+  try {
+    const antes = rutaOrds().length;
+    await recargarCitas();   // por si otra persona ha propuesto alguna mientras tanto (no pisar su cita)
+    const ords = rutaOrds(), c = calcRuta(e, f, ords);
+    if (!ords.length) { alert("Ninguna orden de la lista está ya pendiente de agendar."); return; }
+    const tarde = ords.find(o => c.horas[o.n] >= 22 * 60);
+    if (tarde) { alert("Son demasiadas para un solo día: a la orden " + tarde.n + " se llegaría pasadas las 22 h.\n\nQuita alguna de la lista o elige otro día o equipo."); return; }
+    const libre = JORNADA() - c.total;
+    if (!confirm((libre < 0 ? "⚠ SOBRECARGA DE TRABAJO: el día quedaría con " + hm(c.total) + " h, " + hm(-libre) + " h más de la jornada.\n\n" : "") +
+      "Proponer " + ords.length + (ords.length > 1 ? " órdenes" : " orden") + " a " + nomEq(e) + " el " + fdia(f) + ":\n\n" +
+      ords.map(o => aHora(c.horas[o.n]) + "  " + o.n + (urgentes[o.n] ? " ⚡" : "") + "  " + o.loc).join("\n") +
+      (ords.length < antes ? "\n\n(" + (antes - ords.length) + " de la lista ya tiene cita y no se propone)" : "") +
+      "\n\nQuedan como «Propuesta»: luego se avisa a los clientes en «Avisar y confirmar».")) return;
+    for (const o of ords) {
+      const { error } = await client.rpc("proponer_cita", { p_anyo: o.anyo, p_orden: o.orden, p_fecha: f, p_hora: aHora(c.horas[o.n]), p_equipo: e });
+      if (error) fallos.push(o.n + ": " + error.message); else hechas.push(o.n);
+    }
+    rutaSel = rutaSel.filter(n => !hechas.includes(n)); lsSet("almma_lista_ruta", rutaSel);
+    sel = { e, f }; lunes = lunesDe(f); if (vista === "cal") vista = "tabla";
+    await recargarCitas();
+  } catch (err) { fallos.push(err.message || String(err)); }
+  finally {
+    rutaTrabajando = false; pintarContadorRuta();
+    if (hechas.length && document.getElementById("mz_mapa") && document.getElementById("ventana").style.display === "block") verMapaZonas(true); else pintarRuta();
+  }
+  if (hechas.length) toast("📅 " + hechas.length + (hechas.length > 1 ? " órdenes propuestas" : " orden propuesta") + " a " + nomEq(e) + " el " + fdia(f) + ". Falta avisar a los clientes (📲 Avisar y confirmar).");
+  if (fallos.length) alert("Estas no se han podido proponer (siguen en la lista):\n\n" + fallos.join("\n"));
+}
+function imprimirRuta(){
+  const ords = rutaOrds(); if (!ords.length) { alert("No hay órdenes que imprimir en la lista."); return; }
+  rutaDestino();
+  const c = calcRuta(rutaEq, rutaF, ords), w = window.open("", "_blank");
+  if (!w) { alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes de ALMMA."); return; }
+  w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Lista de ruta</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;color:#111}h1{font-size:17px;margin:0 0 2px}p{margin:0 0 8px;color:#444}' +
+    'table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:5px 6px;text-align:left;vertical-align:top}th{background:#e5e7eb}tr{break-inside:avoid}tr.u td{background:#fef3c7}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4 landscape;margin:10mm}</style></head><body>' +
+    '<h1>Lista de ruta · ' + esc(rutaEq ? nomEq(rutaEq) : "sin equipo") + ' · ' + esc(flargo(rutaF)) + '</h1><p>Sin confirmar todavía con los clientes. ' + ords.length + (ords.length > 1 ? ' órdenes' : ' orden') + ' · total del día ' + c.km + ' km · ' + hm(c.total) + ' h' + (c.yaHay ? ' (contando ' + c.yaHay + ' montaje' + (c.yaHay > 1 ? "s" : "") + ' que ya tiene ese día)' : "") + '</p>' +
+    '<table><tr><th>#</th><th>Hora</th><th>Orden</th><th>Cliente</th><th>Dirección</th><th>Teléfono</th><th>Tienda</th><th>Artículos</th><th>Montaje</th></tr>' +
+    ords.map((o, i) => { const T = tiempoOrden(o), u = urgentes[o.n]; return '<tr' + (u ? ' class="u"' : "") + '><td>' + (i + 1) + '</td><td><b>' + aHora(c.horas[o.n]) + '</b></td><td><b>' + esc(o.n) + '</b>' + (u ? '<br><b>⚡ URGENTE</b>' + (u.motivo ? '<br>' + esc(u.motivo) : "") : "") + '</td><td>' + esc(o.cli) + '</td><td>' + esc([o.dir, o.loc].filter(Boolean).join(", ")) + '</td><td>' + esc([o.tel, o.tel2].filter(Boolean).join(" / ")) + '</td><td>' + esc(nomTienda(o.tiendaId)) + '</td><td>' + o.lineas.map(l => l.cant + " × " + esc(capFrase(l.desc))).join("<br>") + '</td><td>' + (T.t != null ? hm(T.t) + " h" : T.parcial ? hm(T.parcial) + " h + ?" : "—") + '</td></tr>'; }).join("") + '</table></body></html>');
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
 }
 async function cargarDocsGlobo(div, ords){
   const lst = ords.flatMap(o => [...(docs[o.n] || [])].reverse());
@@ -1302,7 +1502,7 @@ async function verMapaRuta(e, f){
     (nave ? "" : '<div class="muted" style="color:#b45309">Sin dirección de la nave (⚙ Ajustes): el recorrido empieza en el primer montaje.</div>') +
     '<div id="mr_mapa" style="height:min(560px,62vh);margin:8px 0;border:1px solid #e2e8f0;border-radius:8px"></div>' +
     '<div class="muted" style="margin-bottom:6px">' + (p.ps.map((s, i) => (i + 1) + ". <b>" + esc(s.hora || "—") + "</b> " + esc(s.o.loc) + ' <span>(' + esc(s.o.n) + ')</span>').join(" → ")) + '</div>' +
-    '<div class="muted" style="font-size:11.5px">Cada punto es la población del cliente (no la calle exacta). Colores: gris propuesta, ámbar avisada, azul confirmada, verde montada, rojo incidencia.</div>' +
+    '<div class="muted" style="font-size:11.5px">Cada punto es la población del cliente (no la calle exacta). Colores: gris propuesta, ámbar avisada, azul confirmada, verde montada, rojo incidencia, marrón con ⚡ pedido urgente.</div>' +
     '<div class="fila2"><button class="secondary" onclick="cerrarVentana()">Cerrar</button></div>');
   try { await cargarLeaflet(); } catch (err) { document.getElementById("mr_mapa").innerHTML = '<div class="muted" style="padding:12px;color:#b91c1c">' + esc(err.message) + '</div>'; return; }
   if (mapaRuta) { mapaRuta.remove(); mapaRuta = null; }
@@ -1318,8 +1518,9 @@ async function verMapaRuta(e, f){
   p.ps.forEach((s, i) => {
     const q = posOrden(s.o); if (!q) return;
     const k = q.lat + "," + q.lon, n = repes[k] = (repes[k] || 0) + 1, d = (n - 1) * 0.0012;
-    L.marker([q.lat + d, q.lon + d], { icon: icono(i + 1, colorParada(s)) }).addTo(mapaRuta)
-      .bindPopup("<b>" + (i + 1) + ". " + esc(s.hora || "—") + " h · " + esc(s.o.n) + "</b><br>" + esc(s.o.loc) + "<br>" + esc((s.o.cli || "").split(" ")[0]) + " · " + esc(nomTienda(s.o.tiendaId)) +
+    const esUrg = s.estado !== "realizada" && urgentes[s.o.n];
+    L.marker([q.lat + d, q.lon + d], { icon: icono((esUrg ? "⚡" : "") + (i + 1), esUrg ? "#b45309" : colorParada(s), !!esUrg) }).addTo(mapaRuta)
+      .bindPopup((esUrg ? etqUrg(s.o.n) + "<br>" : "") + "<b>" + (i + 1) + ". " + esc(s.hora || "—") + " h · " + esc(s.o.n) + "</b><br>" + esc(s.o.loc) + "<br>" + esc((s.o.cli || "").split(" ")[0]) + " · " + esc(nomTienda(s.o.tiendaId)) +
         '<br><a href="pedidos.html?anyo=' + s.o.anyo + '&orden=' + s.o.orden + '" target="_blank">Abrir la orden</a>');
     puntos.push([q.lat, q.lon]);
   });
@@ -1366,7 +1567,7 @@ function avisos(){
     const visto = c.respuesta_nueva ? '<button class="secondary" title="Quitar el aviso de respuesta nueva" onclick="marcarVista(\'' + c.id + '\')">👁 Visto</button>' : "";
     const casilla = c.estado === "propuesta" ? '<input type="checkbox" class="sel-aviso" title="Marcar para avisar en grupo" ' + (selAviso.has(c.id) ? "checked" : "") + ' onchange="marcarAviso(\'' + c.id + '\', this.checked)"> ' : "";
     return '<div class="aviso-f ' + c.estado + (c.respuesta_nueva ? " nueva" : "") + '"><div class="cuando">' + casilla + fdia(c.fecha) + '<br>' + esc(c.hora) + ' h<div class="muted">' + esc(corto(c.equipo_id)) + '</div></div>' +
-      '<div><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> · ' + esc(o.cli) + ' <span class="muted">📞 ' + esc(o.tel || o.tel2 || "sin teléfono") + '</span><div class="muted">' + esc(o.loc) + ' · ' + esc(nomTienda(o.tiendaId)) + '</div>' +
+      '<div><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> ' + etqUrg(o.n) + ' · ' + esc(o.cli) + ' <span class="muted">📞 ' + esc(o.tel || o.tel2 || "sin teléfono") + '</span><div class="muted">' + esc(o.loc) + ' · ' + esc(nomTienda(o.tiendaId)) + '</div>' +
       (c.estado === "avisada" && c.avisado_at ? '<div class="muted" style="color:#92400e">Avisado por WhatsApp el ' + fHoraCorta(c.avisado_at) + '</div>' : "") + txtRespuesta(c) + '</div>' +
       '<div class="bts">' + (c.estado === "confirmada" ? '<span class="est confirmada">Confirmada</span>' : c.estado === "propuesta" ? '<button class="ambar" onclick="abrirAviso(\'' + c.id + '\')">📲 Avisar</button>' :
         '<button class="verde" onclick="confirmar(\'' + c.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + c.id + '\')">✖ No le va bien</button><button class="secondary" onclick="abrirAviso(\'' + c.id + '\')">Reenviar</button>') + visto +
@@ -1395,16 +1596,16 @@ function calendario(){
     const f = suma(ini, i), d = D(f), fuera = d.getMonth() + 1 !== m, finde = d.getDay() === 0 || d.getDay() === 6;
     if (i >= 35 && fuera) break;
     if (fuera) { h += '<div class="c fuera"><div class="d">' + d.getDate() + '</div></div>'; continue; }
-    let barras = "", n = 0, sinConf = 0;
+    let barras = "", n = 0, sinConf = 0, nUrg = 0;
     for (const e of eqs) {
-      const p = dia(e, f); n += p.ps.length; sinConf += p.ps.filter(s => s.estado === "propuesta" || s.estado === "avisada").length;
+      const p = dia(e, f); n += p.ps.length; nUrg += p.ps.filter(s => s.estado !== "realizada" && urgentes[s.o.n]).length; sinConf += p.ps.filter(s => s.estado === "propuesta" || s.estado === "avisada").length;
       if (finde && !p.ps.length) continue;
       const libre = JORNADA() - p.total, col = !p.ps.length ? "#e5e7eb" : libre < 0 ? "#dc2626" : libre < 120 ? "#f59e0b" : "#16a34a";
       barras += '<div class="eqb" title="' + esc(nomEq(e)) + ': ' + (p.ps.length ? hm(p.total) + " h (" + esc([...new Set(p.ps.map(s => s.o.loc))].join(", ")) + ")" : "libre") + '"><span>' + esc(corto(e)) + '</span><i><b style="width:' + (p.ps.length ? Math.min(100, p.total / JORNADA() * 100) : 0) + '%;background:' + col + '"></b></i></div>';
     }
-    h += '<div class="c ' + (finde ? "finde " : "") + (f === HOY ? "hoy" : "") + '" onclick="irDia(\'' + f + '\')"><div class="d">' + d.getDate() + (n ? ' <span class="muted">· ' + n + '</span>' : "") + (sinConf ? ' <span title="' + sinConf + ' sin confirmar" style="color:#b45309">●' + sinConf + '</span>' : "") + '</div>' + barras + '</div>';
+    h += '<div class="c ' + (finde ? "finde " : "") + (f === HOY ? "hoy" : "") + '" onclick="irDia(\'' + f + '\')"><div class="d">' + d.getDate() + (n ? ' <span class="muted">· ' + n + '</span>' : "") + (sinConf ? ' <span title="' + sinConf + ' sin confirmar" style="color:#b45309">●' + sinConf + '</span>' : "") + (nUrg ? ' <span class="etq-urg" title="' + nUrg + ' pedido' + (nUrg > 1 ? "s" : "") + ' urgente' + (nUrg > 1 ? "s" : "") + '">⚡' + nUrg + '</span>' : "") + '</div>' + barras + '</div>';
   }
-  return h + '</div><div class="muted" style="margin-top:6px"><span style="color:#b45309">●</span> = citas aún sin confirmar. Pulsa un día para verlo en la tabla.</div>';
+  return h + '</div><div class="muted" style="margin-top:6px"><span style="color:#b45309">●</span> = citas aún sin confirmar. <span class="etq-urg">⚡</span> = pedidos urgentes. Pulsa un día para verlo en la tabla.</div>';
 }
 async function cambiarVista(v){ vista = v; await cargarAgenda(); pintar(); }
 async function moverSemana(n){ lunes = n === 0 ? lunesDe(HOY) : suma(lunes, 7 * n); await cargarAgenda(); pintar(); }

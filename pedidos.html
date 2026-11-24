@@ -440,6 +440,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
     <div class="ph-top">
       <span class="ph-num" id="d_titulo"></span>
       <span id="d_estado_pill"></span>
+      <span id="d_urgente"></span>
       <span id="d_badges"></span>
       <span class="ph-spacer"></span>
       <button class="secondary ph-btn" onclick="cerrarPanel()" title="Cerrar">✕</button>
@@ -453,6 +454,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
   <div class="tabs">
     <button class="tab-btn activa" data-tab="tab_cliente" onclick="cambiarTab('tab_cliente')">👤 Cliente</button>
     <button class="tab-btn" data-tab="tab_pedido" onclick="cambiarTab('tab_pedido')">🏬 Pedido</button>
+    <button class="tab-btn" data-tab="tab_urgente" id="btn_tab_urgente" onclick="cambiarTab('tab_urgente')">⚡ Urgente</button>
     <button class="tab-btn" data-tab="tab_lineas" onclick="cambiarTab('tab_lineas')">📦 Líneas</button>
     <button class="tab-btn" data-tab="tab_montaje" onclick="cambiarTab('tab_montaje')">🔧 Montaje</button>
     <button class="tab-btn" data-tab="tab_importes" onclick="cambiarTab('tab_importes')">💶 Importes</button>
@@ -523,6 +525,14 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
       <div class="tarjeta-titulo">Eliminar la orden</div>
       <p class="meta" style="font-size:13px;margin:0 0 10px;">Borra para siempre la orden con todas sus líneas, citas, incidencias, fotos y llamadas. No se puede deshacer: te pedirá escribir el número de orden para confirmar.</p>
       <button class="secondary ph-del" onclick="eliminarOrdenActiva()">🗑 Eliminar esta orden</button>
+    </div>
+  </div>
+
+  <!-- URGENTE: la misma marca que el botón ⚡ de Planificar (planificar_urgentes, SQL 135). No es la entrega 24h–48h -->
+  <div class="tab-panel" id="tab_urgente">
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">⚡ Pedido urgente</div>
+      <div id="urg_cuerpo" style="font-size:13px;"></div>
     </div>
   </div>
 
@@ -1553,6 +1563,54 @@ async function cargarCitaPendiente(o, miApertura) {
   citaPendiente = (data && data[0]) || null;
   if (citaPendiente) pintarResumenOrden(o);
 }
+/* ---------- ⚡ Pedido urgente (tabla planificar_urgentes, SQL 135) ----------
+   Es la MISMA marca que el botón ⚡ de Planificar montajes: se pone o se quita desde cualquiera de los dos sitios y sale
+   resaltada en Planificar (lista, tabla de equipos y mapa) y en el Listado de rutas. No toca la orden (ni estado ni fechas)
+   y no tiene nada que ver con la 🚚 Entrega 24h–48h (no lleva precio ni plazo). Se puede poner aunque falte mercancía. */
+let urgentePed = null, urgenteOrden = null;
+function pestanaUrgente() {   // color de la pestaña y etiqueta en la cabecera de la ficha
+  document.getElementById("d_urgente").innerHTML = urgentePed ? '<span class="ph-badge" style="background:#f59e0b;color:#451a03">⚡ URGENTE</span>' : "";
+  const b = document.getElementById("btn_tab_urgente");
+  b.style.background = urgentePed ? "#f59e0b" : ""; b.style.color = urgentePed ? "#451a03" : "";
+}
+async function cargarUrgente(o, miApertura) {
+  const { data, error } = await client.from("planificar_urgentes").select("motivo, marcada_at, marcada_por").eq("anyo", o.anyo).eq("orden", o.orden).maybeSingle();
+  if (miApertura !== aperturaPanel) return;
+  if (error) { document.getElementById("urg_cuerpo").textContent = "No se ha podido leer: " + error.message; return; }
+  const quien = data ? await nombrePorUserId(data.marcada_por) : null;
+  if (miApertura !== aperturaPanel) return;
+  urgentePed = data; urgenteOrden = o;
+  pestanaUrgente(); pintarUrgente(quien);
+}
+function pintarUrgente(quien) {
+  const u = urgentePed, montada = urgenteOrden && urgenteOrden.fecha_montaje;
+  document.getElementById("urg_cuerpo").innerHTML = (u
+      ? '<div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-weight:600;color:#92400e;">⚡ Este pedido es URGENTE desde el ' + fhE(u.marcada_at) + (quien ? " · lo marcó " + escMont(quien) : "") + '</div>'
+      : '<p class="meta" style="margin:0 0 10px;">Márcalo si hay que darle prioridad. Sale resaltado con ⚡ en <b>Planificar montajes</b> (en la lista, en la tabla de los equipos y en el mapa) y en el <b>Listado de rutas</b>. Se puede marcar aunque todavía falte mercancía por llegar.</p>') +
+    '<div class="campo"><label>Motivo</label><input id="urg_motivo" maxlength="200" placeholder="Opcional. Por ejemplo: el cliente se va de viaje el viernes" value="' + escMont((u && u.motivo) || "") + '"></div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">' +
+      (u ? '<button onclick="guardarUrgente()">💾 Guardar motivo</button><button class="secondary" onclick="quitarUrgente()">Quitar ⚡ urgente</button>'
+         : '<button style="background:#f59e0b;color:#451a03;" onclick="guardarUrgente()">⚡ Marcar como urgente</button>') + '</div>' +
+    (montada ? '<p class="meta" style="margin:10px 0 0;">Esta orden ya está montada: la marca se queda apuntada, pero ya no se resalta en las rutas.</p>' : "") +
+    '<p class="meta" style="margin:10px 0 0;">Es otra cosa distinta de la <b>🚚 Entrega 24h–48h</b> (pestaña Pedido): urgente no lleva precio ni plazo, y no cambia la situación ni las fechas de la orden. Solo lo ve la oficina.</p>';
+}
+async function guardarUrgente() {
+  const o = urgenteOrden, nueva = !urgentePed;
+  if (!o || !pedidoActivo || pedidoActivo.anyo !== o.anyo || pedidoActivo.orden !== o.orden) return;
+  // upsert: si otra persona la acaba de marcar desde Planificar, solo se cambia el motivo
+  const { error } = await client.from("planificar_urgentes").upsert({ anyo: o.anyo, orden: o.orden, motivo: document.getElementById("urg_motivo").value.trim() || null });
+  if (error) { alert("No se ha podido guardar: " + error.message); return; }
+  if (pedidoActivo && pedidoActivo.anyo === o.anyo && pedidoActivo.orden === o.orden) await cargarUrgente(o, aperturaPanel);
+  if (!nueva) alert("Motivo guardado.");
+}
+async function quitarUrgente() {
+  const o = urgenteOrden;
+  if (!o || !pedidoActivo || pedidoActivo.anyo !== o.anyo || pedidoActivo.orden !== o.orden) return;
+  if (!confirm("¿Quitar la marca de urgente de la orden " + o.anyo + "/" + o.orden + "?")) return;
+  const { error } = await client.from("planificar_urgentes").delete().eq("anyo", o.anyo).eq("orden", o.orden);
+  if (error) { alert("No se ha podido quitar: " + error.message); return; }
+  if (pedidoActivo && pedidoActivo.anyo === o.anyo && pedidoActivo.orden === o.orden) await cargarUrgente(o, aperturaPanel);
+}
 async function abrirPanel(orden) {
   // recargamos la fila completa por si el listado no trae todos los campos
   const { data: full, error: errFull } = await client.from("ordenes").select("*").eq("anyo", orden.anyo).eq("orden", orden.orden).maybeSingle();
@@ -1582,6 +1640,7 @@ async function abrirPanel(orden) {
   // Mientras carga lo que va aparte, no se puede grabar (el dependiente y el equipo aún no están puestos)
   const miApertura = ++aperturaPanel;
   citaPendiente = null;
+  urgentePed = null; document.getElementById("urg_cuerpo").innerHTML = '<div class="meta">Cargando…</div>'; pestanaUrgente();
   const btnGrabar = document.querySelector("#pie_grabar button");
   btnGrabar.disabled = true;
   const cargando = '<div class="meta">Cargando…</div>';
@@ -1650,6 +1709,7 @@ async function abrirPanel(orden) {
     llenarSelectDependiente(o.tienda_id, o.dependiente_id),
     pintarMontadores(o).then(() => pintarResumenOrden(o)),
     cargarCitaPendiente(o, miApertura),
+    cargarUrgente(o, miApertura),
     llenarSelectTipoLinea().then(() => mostrarNuevaLinea(false)),
     cargarDetallesMontaje(),
     cargarDocumentosOrden(),

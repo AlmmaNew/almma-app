@@ -34,6 +34,8 @@ tr.hecha td{background:#dcfce7;} tr.hecha td:first-child{border-left:5px solid #
 tr.hecha.conincid td:first-child{border-left-color:#dc2626;} tr.incid td{background:#fee2e2;} tr.incid td:first-child{border-left:5px solid #dc2626;}
 .etq{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap;}
 .etq.ok{background:#bbf7d0;color:#14532d;} .etq.fact{background:#e0e7ff;color:#3730a3;} .etq.nofact{background:#fef3c7;color:#92400e;} .etq.inc{background:#fecaca;color:#991b1b;}
+tr.urg td{background:#fef3c7;} tr.urg td:first-child{border-left:5px solid #f59e0b;} .etq.urg{background:#f59e0b;color:#451a03;}
+.urg-mot{color:#92400e;font-size:12px;font-weight:600;}
 .chip{display:inline-block;background:#dbeafe;color:#1e3a8a;border-radius:12px;padding:2px 4px 2px 10px;margin:0 4px 4px 0;font-size:12px;}
 .chip button{background:none;color:#1e3a8a;padding:0 6px;font-size:14px;}
 .muted{color:var(--muted);font-size:13px;}
@@ -129,7 +131,11 @@ async function cargarMontajes(){
     .select("anyo, orden, nombre_cli, localidad_cli, estado, con_incidencia, fecha_prev_montaje, fecha_montaje, horamont, importe_cobrado, tipo_cobro, facturada, anyo_factura, serie_factura, numero_factura, ordenes_montadores(montador_id), linorden(tipolinea, importe_cobrar, facturada, facturada_anyo, facturada_serie, facturada_factura)")
     .gte("fecha_prev_montaje", iso(semanaIni)).lt("fecha_prev_montaje", iso(fin)).order("fecha_prev_montaje");
   if (error) { document.getElementById("montajes_tabla").innerHTML = '<span class="muted">Error: '+esc(error.message)+'</span>'; return; }
-  ordenesSemana = data || []; rutasCam = {};
+  ordenesSemana = data || []; rutasCam = {}; urgentes = {};
+  try {   // ⚡ pedidos urgentes (planificar_urgentes, SQL 135): se marcan en la ficha de la orden o en Planificar
+    const ru = await client.from("planificar_urgentes").select("anyo, orden, motivo");
+    (ru.data || []).forEach(u => urgentes[u.anyo + "/" + u.orden] = u);
+  } catch(_){}
   try { const rc = await client.from("rutas_camion").select("dia, equipo, camion_id").gte("dia", iso(semanaIni)).lt("dia", iso(fin)); (rc.data || []).forEach(x => rutasCam[x.dia + "|" + x.equipo] = x.camion_id); } catch(_){}
   cobros = {};
   try {
@@ -141,7 +147,8 @@ async function cargarMontajes(){
   } catch(_){}
   rellenarFiltros(); pintarMontajes();
 }
-let cobros = {};
+let cobros = {}, urgentes = {};
+const urgente = o => montada(o) ? null : urgentes[o.anyo + "/" + o.orden];   // una ya montada no se resalta
 function verAyer(){
   const a = new Date(); a.setDate(a.getDate()-1);
   semanaIni = lunes(a);
@@ -230,7 +237,8 @@ function pintarMontajes(){
         const opts = montadores.filter(m => !o.ordenes_montadores.some(a => a.montador_id === m.id)).map(m => '<option value="'+m.id+'">'+esc(m.nombre)+'</option>').join("");
         const clase = hecha ? 'hecha' + (o.con_incidencia || o.estado === "terminado_incidencia" ? ' conincid' : '') : o.estado === "incidencia" ? 'incid' : (o.ordenes_montadores.length ? 'con' : 'sin');
         const anadirTd = hecha ? '<span class="muted" title="Ya montada: no se asignan montadores">—</span>' : '<select onchange="anadir('+o.anyo+','+o.orden+',this)"><option value="">Elegir...</option>'+opts+'</select>';
-        h += '<tr class="'+clase+'"><td><b>'+esc(o.horamont || "—")+'</b></td><td><a href="pedidos.html?anyo='+o.anyo+'&orden='+o.orden+'">'+o.anyo+'/'+o.orden+'</a></td><td>'+esc(o.nombre_cli)+'</td><td>'+esc(o.localidad_cli)+'</td><td>'+celdaEstado(o)+'</td><td>'+(asig||'<span class="muted">Sin montador</span>')+'</td><td class="num">'+eur(importeOrden(o))+'</td><td>'+textoCobro(cobroOrden(o))+'</td><td class="noprint">'+anadirTd+'</td></tr>';
+        const u = urgente(o);
+        h += '<tr class="'+clase+(u ? ' urg' : '')+'"><td><b>'+esc(o.horamont || "—")+'</b></td><td><a href="pedidos.html?anyo='+o.anyo+'&orden='+o.orden+'">'+o.anyo+'/'+o.orden+'</a>'+(u ? '<br><span class="etq urg" title="Pedido urgente">⚡ URGENTE</span>'+(u.motivo ? '<div class="urg-mot">'+esc(u.motivo)+'</div>' : '') : '')+'</td><td>'+esc(o.nombre_cli)+'</td><td>'+esc(o.localidad_cli)+'</td><td>'+celdaEstado(o)+'</td><td>'+(asig||'<span class="muted">Sin montador</span>')+'</td><td class="num">'+eur(importeOrden(o))+'</td><td>'+textoCobro(cobroOrden(o))+'</td><td class="noprint">'+anadirTd+'</td></tr>';
       }
       h += filaSuma("Subtotal " + eq, delEq, "sub");
     }
@@ -306,7 +314,8 @@ async function imprimirListado(){
         for (const o of delEq) {
           const cli = envolver(F, 8.5, o.nombre_cli || "", 205), loc = envolver(F, 8.5, o.localidad_cli || "", 112);
           const mon = envolver(F, 8.5, o.ordenes_montadores.map(a => nom[a.montador_id] || "?").join(", ") || "Sin montador", 142), cob = cobroTxt(cobroOrden(o));
-          const n = Math.max(cli.length, loc.length, mon.length, cob.length, 1); hay(n * 10.5 + 4);
+          const u = urgente(o), n = Math.max(cli.length, loc.length, mon.length, cob.length, u ? 2 : 1); hay(n * 10.5 + 4);
+          if (u) { page.drawRectangle({ x: M, y: y - (n-1)*10.5 - 3, width: W-2*M, height: n*10.5 + 1, color: rgb(1,.93,.7) }); t("URGENTE", X.orden, y - 10.5, 8, B); }
           t(horaPdf(o.horamont), X.hora, y, 8.5, B); t(o.anyo + "/" + o.orden, X.orden, y, 8.5);
           cli.forEach((s,i) => t(s, X.cli, y - i*10.5)); loc.forEach((s,i) => t(s, X.loc, y - i*10.5)); mon.forEach((s,i) => t(s, X.mon, y - i*10.5));
           t(fmt(importeOrden(o)), X.imp, y); (cob.length ? cob : ["-"]).forEach((s,i) => t(s, X.cob, y - i*10.5));
