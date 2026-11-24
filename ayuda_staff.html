@@ -204,7 +204,25 @@ La ficha sale al momento de pulsar la orden. Las líneas, fotos, documentos e hi
 <h2>10. Albarán de salida / entrega</h2>
 <p>Es el documento que acompaña la entrega: artículos, cantidades, bultos, peso, ubicación y fecha/hora de montaje previstos, con el logo de la tienda. Botón <b>Imprimir / Guardar PDF</b>.</p>
 
-<h2>11. Otras pantallas</h2>
+<h2>11. Corregir una factura ya emitida</h2>
+<p>En <b>🧾 Facturación → EMITIDAS</b> (y en «Anteriores»), cada factura tiene estos botones:</p>
+<table>
+<tr><th>Botón</th><th>Para qué</th></tr>
+<tr><td><b>Corregir importes</b></td><td>Cambia el importe de las líneas que ya tiene.</td></tr>
+<tr><td><b>➕ Añadir líneas</b></td><td>Mete en la factura algo que faltaba. Se suma al total.</td></tr>
+<tr><td><b>Rectificativa</b></td><td>Hace una factura nueva en negativo, enlazada con esta.</td></tr>
+<tr><td><b>Adicional</b></td><td>Hace una factura nueva con importes de más, enlazada con esta.</td></tr>
+</table>
+<p>Para <b>añadir líneas</b>:</p>
+<ol>
+<li>Pulsa <b>➕ Añadir líneas</b>, escribe el <b>nº de orden</b> (y el año, si no es el de la factura). Sale el cliente para comprobar que es la buena. Tiene que ser una orden de la <b>misma tienda</b> que la factura.</li>
+<li>Si la orden tiene importes <b>pendientes de facturar</b>, salen para elegir: el que elijas queda facturado y <b>desaparece de Pendientes</b> (así no se cobra dos veces). Para cobrar algo que no está en la orden, elige <b>Otro importe distinto</b>.</li>
+<li>Escribe el <b>importe a cobrar</b> (sin IVA) y, si quieres, el concepto. Pulsa <b>Añadir a la lista</b>. Puedes repetir con más órdenes.</li>
+<li>Mira el total nuevo y pulsa <b>Guardar en la factura</b>. Se recalculan base, IVA, retención y total, cambia también el apunte de Contabilidad y queda anotado en las notas de la factura. Los importes de la orden no cambian.</li>
+</ol>
+<p>Avisa si la orden ya está en otra factura, si no está montada, si tiene líneas en un borrador o si la factura es de un trimestre anterior. No sale en las proformas ni en las rectificativas. Si ya habías enviado la factura a la tienda, <b>envíale la nueva</b>.</p>
+
+<h2>12. Otras pantallas</h2>
 <table>
 <tr><th>Botón</th><th>Para qué</th></tr>
 <tr><td>🧾 Facturación</td><td>Pendientes, borradores y emitidas. Normalmente solo oficina/dirección.</td></tr>
@@ -217,7 +235,7 @@ La ficha sale al momento de pulsar la orden. Las líneas, fotos, documentos e hi
 <ul>
 <li>Una orden se identifica por <b>año + número</b> (ej. <code>2026/118</code>).</li>
 <li>Registra la entrada <b>el mismo día</b>: de eso depende que tienda y oficina vean el estado correcto.</li>
-<li>Una factura ya emitida <b>no se puede modificar</b>: se corrige con una rectificativa.</li>
+<li>Una factura ya emitida <b>no se borra</b>: se corrige como explica el apartado 11.</li>
 <li>Si no estás seguro, <b>no confirmes</b>: «Dejar para después» no rompe nada.</li>
 </ul>
 </body></html>

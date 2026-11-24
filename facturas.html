@@ -107,6 +107,7 @@ input,select{padding:8px 10px;border:1px solid var(--border);border-radius:6px;f
 .tab-origen.activa{background:#fff;color:#1e40af;border-bottom-color:#f59e0b;font-weight:700;}
 .lbl-f{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;}
 .fila-tienda td{background:#eef2f8;font-weight:600;}
+.tabulator-cell.col-acciones{white-space:normal !important;line-height:2.5;}   /* los botones caben en dos renglones */
 .modal-f{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;z-index:60;}
 .modal-f .caja{background:var(--card);border:1px solid var(--border);border-radius:10px;width:100%;max-width:900px;padding:20px;}
 </style>
@@ -290,6 +291,25 @@ input,select{padding:8px 10px;border:1px solid var(--border);border-radius:6px;f
   <div id="mc_totales" style="margin-top:12px;font-size:15px;"></div>
   <p id="mc_error" class="error" style="display:none;color:#dc2626;"></p>
   <div style="display:flex;gap:8px;margin-top:14px;"><button id="mc_guardar" onclick="guardarCorreccion()">Guardar importes</button><button class="secondary" onclick="cerrarCorreccion()">Cancelar</button></div>
+</div></div>
+
+<!-- ventana para añadir líneas a una factura ya emitida (SQL 137) -->
+<div id="modal_any" class="modal-f"><div class="caja">
+  <button class="secondary" style="float:right;" onclick="cerrarAnyadir()">✕</button>
+  <h3 id="ma_titulo" style="margin-top:0;"></h3>
+  <p class="meta">Escribe el número de orden y el importe a cobrar (sin IVA), y pulsa «Añadir a la lista». Puedes añadir varias. Se suman al total de la factura al guardar.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <div><label class="meta">Año</label><br><input id="ma_anyo" type="number" style="width:90px;" oninput="buscarOrdenAnyadir()"></div>
+    <div><label class="meta">Nº de orden</label><br><input id="ma_orden" type="number" min="1" style="width:120px;" oninput="buscarOrdenAnyadir()" onkeydown="if(event.key==='Enter')g('ma_importe').focus()"></div>
+    <div style="flex:1;min-width:200px;"><label class="meta">Concepto</label><br><input id="ma_desc" style="width:100%;" placeholder="Servicio de montaje"></div>
+    <div><label class="meta">Importe a cobrar (€)</label><br><input id="ma_importe" type="number" step="0.01" style="width:130px;text-align:right;" onkeydown="if(event.key==='Enter')meterLineaAnyadir()"></div>
+    <button id="ma_meter" onclick="meterLineaAnyadir()">Añadir a la lista</button>
+  </div>
+  <div id="ma_info" style="margin-top:10px;font-size:13px;"></div>
+  <p id="ma_error" class="error" style="display:none;color:#dc2626;"></p>
+  <table class="lineas-table" id="ma_tabla" style="display:none;"></table>
+  <div id="ma_totales" style="margin-top:12px;font-size:15px;"></div>
+  <div style="display:flex;gap:8px;margin-top:14px;"><button id="ma_guardar" onclick="guardarAnyadir()">Guardar en la factura</button><button class="secondary" onclick="cerrarAnyadir()">Cancelar</button></div>
 </div></div>
 
 <script>
@@ -531,7 +551,7 @@ async function crearBorradores(s, gr) {
 
 // ---------------------------------------------------------------- FACTURA CON CONCEPTOS PROPIOS
 let conceptos = [];
-const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+const r2 = (n) => Math.sign(n) * Math.round(Math.abs(n) * 100 + 1e-6) / 100;   // igual que el redondeo de la base de datos
 function abrirLibre() {
   g("fl_serie").innerHTML = '<option value="">-- elige la serie --</option>' + Object.values(seriePorCodigo).filter(s => s.activa).map(s =>
     `<option value="${s.codigo}">${s.codigo} · ${s.es_proforma ? "PROFORMA (sin IVA)" : esc(s.emisor_nombre || s.descripcion)}${s.codigo === 2 ? " (almacenaje)" : ""}</option>`).join("");
@@ -671,7 +691,7 @@ async function cargar() {
   g("aviso").textContent = "Cargando...";
   const anyo = g("ff_anyo").value, tienda = g("ff_tienda").value.trim();
   let q = client.from("cabfacturas")
-    .select("anyo, serie, factura, ffactura, tipo_factura, origen, impbruto, impiva, impneto, iva_pct, motivo, rectifica_anyo, rectifica_serie, rectifica_factura, tienda_id, tiendas!tienda_id(nombre)")
+    .select("anyo, serie, factura, ffactura, tipo_factura, origen, impbruto, impiva, impneto, retencion, iva_pct, motivo, rectifica_anyo, rectifica_serie, rectifica_factura, tienda_id, tiendas!tienda_id(nombre)")
     .order("ffactura", { ascending: false }).order("factura", { ascending: false }).limit(500);
   q = q.eq("origen", origenActual);
   if (anyo) q = q.eq("anyo", anyo);
@@ -704,10 +724,11 @@ function pintar() {
     { title: '<input type="checkbox" id="chk_todas" title="Seleccionar todas las del listado">', field: "id", width: 44, headerSort: false, hozAlign: "center",
       formatter: (c) => `<input type="checkbox" data-id="${c.getValue()}" ${seleccion.has(c.getValue()) ? "checked" : ""}>` },
     { title: "Nº factura", field: "numero", minWidth: 120, sorter: (a, b) => String(a).localeCompare(String(b), "es", { numeric: true }), formatter: (c) => `<strong>${esc(c.getValue())}</strong>` },
-    { title: "Acciones", field: "id", width: 560, headerSort: false, formatter: (c) => {
+    { title: "Acciones", field: "id", width: 500, headerSort: false, variableHeight: true, cssClass: "col-acciones", formatter: (c) => {
         const d = c.getRow().getData(), id = d.id;
         return `<button class="btn-mini" onclick="imprimirUna('${id}')">Imprimir</button> <button class="secondary btn-mini" onclick="window.open('factura_imprimir.html?ids=${id}&descargar=1','_blank')">PDF</button> <button class="secondary btn-mini" onclick="window.open('factura_imprimir.html?ids=${id}&albaranes=1&descargar=1','_blank')">PDF + albaranes</button> ` +
           (d.tipo_factura === "proforma" ? "" : `<button class="secondary btn-mini" onclick="abrirCorreccion('${id}')">Corregir importes</button> `) +
+          (["proforma", "rectificativa"].includes(d.tipo_factura) ? "" : `<button class="secondary btn-mini" onclick="abrirAnyadir('${id}')">➕ Añadir líneas</button> `) +
           (d.tipo_factura === "proforma" ? "" : `<button class="secondary btn-mini" onclick="abrirModal('${id}','rectificativa')">Rectificativa</button> <button class="secondary btn-mini" onclick="abrirModal('${id}','adicional')">Adicional</button>`);
       } },
     { title: "Fecha", field: "ffactura", width: 100, formatter: (c) => fechaES(c.getValue()), sorter: "string" },
@@ -777,6 +798,136 @@ async function guardarCorreccion() {
   g("mc_guardar").disabled = false;
   if (error) { caja.textContent = "No se pudo guardar: " + error.message; caja.style.display = "block"; return; }
   cerrarCorreccion();
+  await cargar();
+}
+
+// ---------------------------------------------------------------- añadir líneas a una factura emitida (SQL 137)
+let ma = null;   // { cab, lineas: [...], orden: {...} | null, pendientes: [...], turno }
+function abrirAnyadir(id) {
+  const cab = datos.find(d => d.id === id); if (!cab) return;
+  ma = { cab, lineas: [], orden: null, pendientes: [], turno: 0 };
+  g("ma_titulo").textContent = `Añadir líneas a ${cab.numero} · ${cab.tienda_txt}`;
+  g("ma_anyo").value = cab.anyo;
+  limpiarAnyadir();
+  pintarAnyadir();
+  g("modal_any").style.display = "flex";
+  g("ma_orden").focus();
+}
+function cerrarAnyadir() {
+  if (ma?.lineas.length && !confirm("Hay líneas sin guardar. ¿Cerrar sin guardarlas?")) return;
+  g("modal_any").style.display = "none"; ma = null;
+}
+function limpiarAnyadir() {
+  ma.orden = null; ma.pendientes = []; ma.turno++;
+  g("ma_orden").value = ""; g("ma_desc").value = ""; g("ma_importe").value = "";
+  g("ma_info").innerHTML = ""; g("ma_error").style.display = "none";
+  g("ma_meter").disabled = true;
+}
+function errorAnyadir(txt) { g("ma_error").textContent = txt; g("ma_error").style.display = txt ? "block" : "none"; }
+let esperaAnyadir = null;
+function buscarOrdenAnyadir() {
+  ma.orden = null; ma.pendientes = []; ma.turno++;
+  g("ma_meter").disabled = true; g("ma_info").innerHTML = ""; errorAnyadir("");
+  clearTimeout(esperaAnyadir);
+  esperaAnyadir = setTimeout(cargarOrdenAnyadir, 350);
+}
+async function cargarOrdenAnyadir() {
+  if (!ma) return;
+  const anyo = parseInt(g("ma_anyo").value), num = parseInt(g("ma_orden").value), turno = ma.turno;
+  if (!anyo || !num) return;
+  g("ma_info").innerHTML = '<span class="meta">Buscando la orden…</span>';
+  const [ro, rl, rf] = await Promise.all([
+    client.from("ordenes").select("anyo, orden, nombre_cli, localidad_cli, num_pedido, tienda_id, estado, fecha_montaje").eq("anyo", anyo).eq("orden", num).maybeSingle(),
+    client.from("linorden").select("linea, descripcion, importe_cobrar, facturada, borrador_id, cerrada_sin_factura").eq("anyo", anyo).eq("orden", num).eq("tipolinea", 4).order("linea"),
+    client.from("linfacturas").select("anyo, serie, factura, descripcion, importecobrar").eq("anyoord", anyo).eq("numeroord", num),
+  ]);
+  if (!ma || ma.turno !== turno) return;   // mientras tanto se ha escrito otra orden
+  const error = ro.error || rl.error || rf.error;
+  if (error) { g("ma_info").innerHTML = ""; errorAnyadir("No se pudo buscar la orden: " + error.message); return; }
+  const o = ro.data;
+  if (!o) { g("ma_info").innerHTML = ""; errorAnyadir(`La orden ${anyo}/${num} no existe.`); return; }
+  if (o.tienda_id !== ma.cab.tienda_id) {
+    g("ma_info").innerHTML = "";
+    errorAnyadir(`La orden ${anyo}/${num} (${o.nombre_cli || "sin cliente"}) es de ${tiendasLista.find(t => t.id === o.tienda_id)?.nombre || "otra tienda"}, no de ${ma.cab.tienda_txt}. No se puede añadir a esta factura.`);
+    return;
+  }
+  ma.orden = o;
+  // las líneas de importes de la orden que aún no están facturadas (ni ya puestas en esta lista)
+  const puestas = new Set(ma.lineas.filter(l => l.linea && l.anyoord === anyo && l.numeroord === num).map(l => l.linea));
+  ma.pendientes = (rl.data || []).filter(l => !l.facturada && !l.borrador_id && !l.cerrada_sin_factura && Number(l.importe_cobrar || 0) !== 0 && !puestas.has(l.linea));
+  const enBorrador = (rl.data || []).filter(l => !l.facturada && l.borrador_id);
+  const fact = [...new Set((rf.data || []).map(f => numeroFactura(f, seriePorCodigo)))];
+  const avisos = [];
+  if (!["completado", "terminado_incidencia", "incidencia"].includes(o.estado)) avisos.push("Esta orden todavía no está montada.");
+  if (fact.length) avisos.push(`Esta orden ya está en ${fact.length > 1 ? "las facturas" : "la factura"} ${fact.join(", ")}: ${(rf.data || []).map(f => `${f.descripcion || "línea"} ${euros(f.importecobrar)}`).join(" · ")}`);
+  if (enBorrador.length) avisos.push(`Tiene líneas reservadas en un borrador (${enBorrador.map(l => `${l.descripcion || "línea"} ${euros(l.importe_cobrar)}`).join(" · ")}): si añades aquí el mismo importe, se cobraría dos veces.`);
+  g("ma_info").innerHTML = `<div><strong>${esc(o.nombre_cli) || "Sin cliente"}</strong> · ${esc(o.localidad_cli)}${o.num_pedido ? ` · Ref. ${esc(o.num_pedido)}` : ""}${o.fecha_montaje ? ` · montada el ${fechaES(o.fecha_montaje)}` : ""}</div>` +
+    avisos.map(a => `<div style="color:#b45309;margin-top:4px;">⚠ ${esc(a)}</div>`).join("") +
+    (ma.pendientes.length ? `<div style="margin-top:8px;"><strong>Esta orden tiene importes pendientes de facturar.</strong> Elige qué es lo que añades:</div>` +
+      ma.pendientes.map((l, i) => `<label style="display:flex;gap:8px;align-items:center;margin-top:4px;"><input type="radio" name="ma_que" value="${l.linea}" style="width:auto;" ${i === 0 ? "checked" : ""} onchange="elegirPendienteAnyadir()"> ${esc(l.descripcion) || "(sin concepto)"} — ${euros(l.importe_cobrar)} <span class="meta">(deja de salir en Pendientes)</span></label>`).join("") +
+      `<label style="display:flex;gap:8px;align-items:center;margin-top:4px;"><input type="radio" name="ma_que" value="" style="width:auto;" onchange="elegirPendienteAnyadir()"> Otro importe distinto <span class="meta">(lo pendiente sigue en Pendientes)</span></label>` : "");
+  g("ma_meter").disabled = false;
+  if (ma.pendientes.length) elegirPendienteAnyadir();
+}
+function lineaElegidaAnyadir() {
+  const v = document.querySelector('input[name="ma_que"]:checked')?.value;
+  return v ? ma.pendientes.find(l => String(l.linea) === v) : null;
+}
+function elegirPendienteAnyadir() {
+  const l = lineaElegidaAnyadir();
+  g("ma_desc").value = l ? (l.descripcion || "") : "";
+  g("ma_importe").value = l ? Number(l.importe_cobrar || 0) : "";
+  if (!l) g("ma_importe").focus();
+}
+function meterLineaAnyadir() {
+  errorAnyadir("");
+  if (!ma.orden) { errorAnyadir("Escribe primero un número de orden que exista."); return; }
+  const imp = Math.round((parseFloat(g("ma_importe").value) || 0) * 100) / 100;
+  if (!imp) { errorAnyadir("Escribe el importe a cobrar."); g("ma_importe").focus(); return; }
+  const l = lineaElegidaAnyadir();
+  ma.lineas.push({ anyoord: ma.orden.anyo, numeroord: ma.orden.orden, linea: l ? l.linea : null, cliente: ma.orden.nombre_cli || "",
+    descripcion: g("ma_desc").value.trim() || (l && l.descripcion) || "Servicio de montaje", importecobrar: imp });
+  limpiarAnyadir();
+  pintarAnyadir();
+  g("ma_orden").focus();
+}
+function quitarLineaAnyadir(i) { ma.lineas.splice(i, 1); pintarAnyadir(); if (g("ma_orden").value) buscarOrdenAnyadir(); }
+function totalAnyadir() {
+  const c = ma.cab, r2 = (n) => Math.sign(n) * Math.round(Math.abs(n) * 100 + 1e-6) / 100;   // igual que el redondeo de la base de datos
+  const suma = r2(ma.lineas.reduce((a, l) => a + l.importecobrar, 0));
+  const base = r2(Number(c.impbruto || 0) + suma);
+  const pct = Number(c.iva_pct ?? (c.impbruto ? Math.round(c.impiva / c.impbruto * 100) : 21));
+  const ret = (c.impbruto && !Number(c.retencion || 0)) ? 0 : r2(base * Number(seriePorCodigo[c.serie]?.retencion_pct || 0) / 100);
+  const iva = r2(base * pct / 100);
+  return { suma, base, pct, iva, ret, total: r2(base + iva - ret) };
+}
+function pintarAnyadir() {
+  const hay = ma.lineas.length > 0;
+  g("ma_tabla").style.display = hay ? "" : "none";
+  g("ma_tabla").innerHTML = `<tr><th>Orden</th><th>Concepto</th><th style="width:120px;text-align:right;">Importe</th><th style="width:40px;"></th></tr>` +
+    ma.lineas.map((l, i) => `<tr class="lin-t4"><td>${l.anyoord}/${l.numeroord} <span class="meta">${esc(l.cliente)}</span></td><td>${esc(l.descripcion)}</td><td style="text-align:right;">${euros(l.importecobrar)}</td><td><button class="secondary btn-mini" title="Quitar" onclick="quitarLineaAnyadir(${i})">✕</button></td></tr>`).join("");
+  g("ma_guardar").disabled = !hay;
+  const x = totalAnyadir();
+  g("ma_totales").innerHTML = hay
+    ? `Se añaden <strong>${euros(x.suma)}</strong> · Base ${euros(x.base)} · IVA ${x.pct}% ${euros(x.iva)}${x.ret ? ` · Retención −${euros(x.ret)}` : ""} · <strong>Total ${euros(x.total)}</strong> <span class="meta">(antes ${euros(ma.cab.impneto)})</span>`
+    : `<span class="meta">Total actual de la factura: ${euros(ma.cab.impneto)}</span>`;
+}
+async function guardarAnyadir() {
+  errorAnyadir("");
+  if (!ma.lineas.length) return;
+  if (g("ma_orden").value && !confirm(`Has escrito la orden ${g("ma_orden").value} pero no la has añadido a la lista. ¿Guardar sin ella?`)) return;
+  const x = totalAnyadir();
+  // trimestre ya pasado: el IVA puede estar presentado
+  const f = String(ma.cab.ffactura || "").slice(0, 10), trim = (s) => s.slice(0, 4) + "-" + Math.ceil(Number(s.slice(5, 7)) / 3);
+  const viejo = f && trim(f) < trim(hoyISO()) ? `\n\n⚠ Es una factura del ${fechaES(f)}, de un trimestre anterior: puede que su IVA ya esté presentado.` : "";
+  if (!confirm(`¿Añadir ${ma.lineas.length} ${ma.lineas.length > 1 ? "líneas" : "línea"} (${euros(x.suma)}) a ${ma.cab.numero}?\n\nEl total pasa de ${euros(ma.cab.impneto)} a ${euros(x.total)}. Cambia la factura y su apunte en Contabilidad, y queda anotado en las notas de la factura.${viejo}`)) return;
+  g("ma_guardar").disabled = true;
+  const { error } = await client.rpc("anyadir_lineas_factura", { p_anyo: ma.cab.anyo, p_serie: ma.cab.serie, p_factura: ma.cab.factura,
+    p_lineas: ma.lineas.map(l => ({ anyoord: l.anyoord, numeroord: l.numeroord, linea: l.linea, descripcion: l.descripcion, importecobrar: l.importecobrar })) });
+  g("ma_guardar").disabled = false;
+  if (error) { errorAnyadir("No se pudo guardar: " + error.message); return; }
+  ma.lineas = [];
+  cerrarAnyadir();
   await cargar();
 }
 
