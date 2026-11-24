@@ -305,8 +305,8 @@ function hoja(c, lineas, ss, originales, tiendaPorId, ordenPorClave) {
   const grupos = [];
   filas.forEach(l => {
     const clave = l.anyoord ? `${l.anyoord}/${l.numeroord}` : "sin-orden";
-    let g = grupos.find(x => x.clave === clave);
-    if (!g) { g = { clave, fecha: l._fecha, ref: l._ref, cli: l._cli, cobrado: l._cobrado, forma: l._forma, orden: l.anyoord ? clave : "", lineas: [] }; grupos.push(g); }
+    let g = grupos.find(x => x.clave === clave && (!l.anyoord || x.ref === l._ref));   // la misma orden con otra referencia va en su propio bloque
+    if (!g) { g = { clave, fecha: l._fecha, ref: l._ref, cli: l._cli, cobrado: grupos.some(x => l.anyoord && x.clave === clave) ? 0 : l._cobrado, forma: l._forma, orden: l.anyoord ? clave : "", lineas: [] }; grupos.push(g); }
     g.lineas.push(l);
   });
   grupos.sort((a, b) => (a.fecha || "9999").localeCompare(b.fecha || "9999") || a.clave.localeCompare(b.clave, undefined, { numeric: true }));
