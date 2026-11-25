@@ -12,6 +12,8 @@
 <title>ALMMA - Mi día</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="subir_archivos.js"></script>
+<script src="reducir_video.js"></script>
+<script src="instrucciones_orden.js"></script>
 <style>
 /* ALMMA · "Mi día": pantalla de los montadores, pensada para el móvil.
    Letra grande, botones grandes y una sola cosa por botón. Funciona sin cobertura:
@@ -374,7 +376,7 @@ async function cargarPaquete(){
       firmas:(o.entregas || []).filter(e => e.firma_storage_path).sort((a,b) => String(a.firmado_at).localeCompare(String(b.firmado_at))).map(e => ({ ruta:e.firma_storage_path, nombre:e.firmante_nombre, cuando:e.firmado_at })),
       fotos:(o.fotos || []).sort((a,b) => String(a.created_at).localeCompare(String(b.created_at))),
       docs:docs[o.anyo + "/" + o.orden] || [], servicios:servicios[o.anyo + "/" + o.orden] || [], lineas:lineas[o.anyo + "/" + o.orden] || [],
-      instr:instr.filter(i => (i.anyo === o.anyo && i.orden === o.orden) || (i.fabricante_codigo && (lineas[o.anyo + "/" + o.orden] || []).some(l => l.proveedor === i.fabricante_codigo)))
+      instr:instruccionesPara(o, lineas[o.anyo + "/" + o.orden], instr)   // { deOrden, generales, fabricantes }
     }));
     paquete = { cargado:new Date().toISOString(), ordenes };
     await kvSet("paquete", paquete);
@@ -452,6 +454,7 @@ function pintar(){
         ((o.vendedor || o.tienda) ? '<div class="eq">🧑‍💼 Vendedor: <b>' + esc([o.vendedor, o.tienda].filter(Boolean).join(" · ")) + '</b></div>' : "") +
         (pendienteReal(o) ? '<div class="eq" style="color:var(--rojo)">💶 Pendiente de pago: <b>' + euros(pendienteReal(o)) + '</b></div>' : "") +
         (o.equipo.length > 1 && !verTodos ? '<div class="eq">Equipo: ' + esc(o.equipo.join(" + ")) + '</div>' : "") +
+        avisoInstr(o) +
         '<div class="ver">Ver detalle ›</div></div>';
     }).join("");
   }
@@ -609,13 +612,24 @@ function bloqueIncidencias(o){
     env.map(i => caja(i.tipo, i.descripcion, i.created_at ? new Date(i.created_at).toLocaleString("es-ES", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }) : "", " · enviado a la oficina")).join("") +
     pend.map(c => caja(c.motivo, c.texto, new Date(c.ts).toLocaleString("es-ES", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }), " · ⏳ por enviar (sin cobertura)")).join("") + '</div>';
 }
-// Instrucciones subidas para esta orden o para los fabricantes de sus artículos
+// Instrucciones: las de esta orden y las generales de los fabricantes de sus artículos (el paquete guardado por la versión anterior traía una lista suelta)
+const instrDe = o => o.instr && o.instr.deOrden ? o.instr : { deOrden:[], generales:[], fabricantes:[] };
+function avisoInstr(o){   // línea en la tarjeta de la lista
+  const x = instrDe(o), t = [];
+  if (x.deOrden.length) t.push("de esta orden");
+  if (x.generales.length) t.push("generales de " + (x.fabricantes.slice(0, 3).join(", ") || "su fabricante") + (x.fabricantes.length > 3 ? "…" : ""));
+  return t.length ? '<div class="eq" style="color:#0f766e">📘 Hay instrucciones: <b>' + esc(t.join(" y ")) + '</b></div>' : "";
+}
 function bloqueInstrucciones(o){
-  const l = (o.instr || []).slice().sort((a, b) => (b.orden === o.orden && b.anyo === o.anyo) - (a.orden === o.orden && a.anyo === o.anyo)), q = "anyo=" + o.anyo + "&orden=" + o.orden;
-  return '<div class="sec"><h3>📘 Instrucciones de montaje' + (l.length ? " (" + l.length + ")" : "") + '</h3>' +
-    l.slice(0, 6).map(i => '<a class="instr" href="instrucciones.html?id=' + i.id + '">' + esc(i.titulo) + (i.fabricante ? '<br><small style="color:var(--gris)">' + esc(i.fabricante) + '</small>' : "") + '</a>').join("") +
-    (l.length ? "" : '<div style="color:var(--gris);margin-bottom:8px">No hay instrucciones para estos muebles todavía.</div>') +
-    '<div class="botones"><button class="btn az" onclick="location.href=\'instrucciones.html' + (l.length > 6 ? "?" + q : "") + '\'">🔎 ' + (l.length > 6 ? "Ver las " + l.length : "Buscar otras") + '</button>' +
+  const x = instrDe(o), n = x.deOrden.length + x.generales.length, q = "anyo=" + o.anyo + "&orden=" + o.orden;
+  const fila = i => '<a class="instr" href="instrucciones.html?id=' + i.id + '">' + esc(i.titulo) + (i.fabricante ? '<br><small style="color:var(--gris)">' + esc(i.fabricante) + '</small>' : "") + '</a>';
+  const tit = t => '<div style="font-weight:800;font-size:.9rem;margin:6px 0">' + t + '</div>';
+  const gen = x.generales.slice(0, 6);
+  return '<div class="sec"><h3>📘 Instrucciones de montaje' + (n ? " (" + n + ")" : "") + '</h3>' +
+    (x.deOrden.length ? tit("De esta orden") + x.deOrden.map(fila).join("") : "") +
+    (gen.length ? tit("✔ Hay instrucciones generales del fabricante: " + esc(x.fabricantes.join(", ") || "—")) + gen.map(fila).join("") : "") +
+    (!x.generales.length ? '<div style="color:var(--gris);margin-bottom:8px">' + (x.deOrden.length ? "No hay instrucciones generales del fabricante." : "No hay instrucciones de esta orden ni generales del fabricante.") + '</div>' : "") +
+    '<div class="botones"><button class="btn az" onclick="location.href=\'instrucciones.html' + (x.generales.length > 6 ? "?" + q : "") + '\'">🔎 ' + (x.generales.length > 6 ? "Ver las " + n : "Buscar otras") + '</button>' +
     '<button class="btn az" onclick="location.href=\'instrucciones.html?nuevo=1&' + q + '\'">⬆ Subir instrucciones</button></div></div>';
 }
 function pintarDetalle(){
@@ -723,9 +737,8 @@ async function alElegirFotos(e){
   const o = ordenFoto;
   for (const f of fs) {
     if (!esVideoArchivo(f)) { fotosPend.push({ blob:await comprimir(f), o }); continue; }
-    // vídeo de la fototeca: no tiene límite de segundos, solo de peso
-    if (f.size > MAX_MB_ARCHIVO * 1048576) { toast("El vídeo pesa " + Math.round(f.size / 1048576) + " MB (máximo " + MAX_MB_ARCHIVO + " MB). Recórtalo en el móvil y vuelve a elegirlo.", 7000); continue; }
-    fotosPend.push({ blob:f, o, video:true });
+    const v = await videoListo(f); if (!v) continue;   // 20 segundos como mucho y reducido
+    fotosPend.push({ blob:v, o, video:true });
   }
   if (fotosPend.length && document.getElementById("p_foto").style.display !== "block") mostrarFotoPend();
 }
@@ -745,25 +758,17 @@ function mostrarFotoPend(){
   document.getElementById("p_foto").style.display = "block";
 }
 /* ---------- Vídeo: como mucho 20 segundos ---------- */
-const VIDEO_MAX_SEG = 20, VIDEO_MAX_MB = 150;
-function hacerVideo(k){ ordenFoto = buscar(k); const e = document.getElementById("vid"); e.value = ""; e.click(); }
-function duracionVideo(file){
-  return new Promise(ok => {
-    const v = document.createElement("video"), u = URL.createObjectURL(file);
-    const fin = d => { URL.revokeObjectURL(u); ok(d); };
-    v.preload = "metadata"; v.onloadedmetadata = () => fin(v.duration); v.onerror = () => fin(NaN);
-    setTimeout(() => fin(NaN), 8000); v.src = u;
-  });
+// Recorta a 20 s y reduce el vídeo en el propio móvil (reducir_video.js); null = cancelado o no se puede usar
+async function videoListo(f){
+  try { return await prepararVideo(f, { maxSeg: MAX_SEG_VIDEO_ORDEN }); }
+  catch (e) { toast(e.message || "No se ha podido preparar el vídeo.", 8000); return null; }
 }
+function hacerVideo(k){ ordenFoto = buscar(k); const e = document.getElementById("vid"); e.value = ""; e.click(); }
 document.getElementById("vid").addEventListener("change", async e => {
-  const f = e.target.files[0]; if (!f || !ordenFoto) return;
-  const o = ordenFoto;
-  if (f.size > VIDEO_MAX_MB * 1048576) { toast("El vídeo pesa demasiado (máximo " + VIDEO_MAX_MB + " MB). Graba uno más corto."); return; }
-  const d = await duracionVideo(f);
-  if (!isFinite(d)) { toast("No se ha podido leer el vídeo. Prueba a grabarlo otra vez."); return; }
-  if (d > VIDEO_MAX_SEG + 0.5) { toast("El vídeo dura " + Math.round(d) + " s. El máximo es " + VIDEO_MAX_SEG + " s: grábalo más corto."); return; }
-  const ext = /quicktime|mov/i.test(f.type) ? "mov" : /webm/i.test(f.type) ? "webm" : "mp4";
-  await colaAdd({ tipo:"foto", anyo:o.anyo, orden:o.orden, blob:f, contentType:f.type || "video/mp4", path:o.anyo + "/" + o.orden + "/fotos/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + ext,
+  const orig = e.target.files[0]; if (!orig || !ordenFoto) return;
+  const o = ordenFoto, f = await videoListo(orig); if (!f) return;
+  const ext = extArchivo(f);
+  await colaAdd({ tipo:"foto", anyo:o.anyo, orden:o.orden, blob:f, contentType:tipoArchivo(f) || "video/mp4", path:o.anyo + "/" + o.orden + "/fotos/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + ext,
     comentario:"Vídeo", categoria:(o.estado === "incidencia" || enCola(o, "incidencia").length) ? "incidencia" : "entrega_ok", ts:Date.now() });
   cola = await colaAll(); pintar(); estadoBarra();
   toast(navigator.onLine ? "✔ Vídeo guardado, enviando…" : "✔ Vídeo guardado en el móvil. Se enviará cuando haya cobertura");
@@ -831,8 +836,8 @@ function quitarFotoInc(i){ incFotos.splice(i, 1); pintarFotosInc(); }
 async function alElegirFotosInc(e){
   for (const f of [...e.target.files]) {
     const video = esVideoArchivo(f);
-    if (video && f.size > MAX_MB_ARCHIVO * 1048576) { toast("El vídeo pesa " + Math.round(f.size / 1048576) + " MB (máximo " + MAX_MB_ARCHIVO + " MB).", 6000); continue; }
-    const blob = video ? f : await comprimir(f);
+    const blob = video ? await videoListo(f) : await comprimir(f);
+    if (!blob) continue;
     incFotos.push({ blob, video, url:URL.createObjectURL(blob) });
   }
   pintarFotosInc();

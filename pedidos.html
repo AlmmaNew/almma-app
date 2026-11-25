@@ -9,6 +9,8 @@
 <script src="busqueda.js"></script>
 <script src="distancia.js"></script>
 <script src="subir_archivos.js"></script>
+<script src="reducir_video.js"></script>
+<script src="instrucciones_orden.js"></script>
 <script src="bajar_fotos.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator.min.css" rel="stylesheet">
@@ -614,7 +616,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
         </div>
         <button class="btn-mini" id="fm_boton" style="font-size:14px;padding:8px 16px;margin-top:8px;" onclick="document.getElementById('fm_archivos').click()">⬆ Subir fotos o vídeos</button>
         <input type="file" id="fm_archivos" accept="image/*,video/*" multiple style="display:none" onchange="subirFotosMontaje(this)">
-        <div id="fm_avance" class="meta" style="margin-top:6px;">Desde el ordenador o la fototeca del móvil; varios a la vez (vídeos, hasta 200 MB). Los ven también la tienda de la orden y los montadores que van a ella.</div>
+        <div id="fm_avance" class="meta" style="margin-top:6px;">Desde el ordenador o la fototeca del móvil; varios a la vez. Los vídeos, de 20 segundos como mucho; se reducen solos antes de subir. Los ven también la tienda de la orden y los montadores que van a ella.</div>
       </div>
       <div id="ch_firma_montaje"></div>
     </div>
@@ -2161,8 +2163,9 @@ async function subirFotosMontaje(input) {
     try {
       const video = esVideoArchivo(f);
       if (!video && !esFotoArchivo(f)) throw new Error("solo se admiten fotos y vídeos");
-      if (f.size > MAX_MB_ARCHIVO * 1048576) throw new Error(`pesa ${Math.round(f.size / 1048576)} MB (máximo ${MAX_MB_ARCHIVO} MB)`);
-      const cuerpo = video ? f : await reducirFoto(f);
+      const cuerpo = video ? await prepararVideo(f, { maxSeg: MAX_SEG_VIDEO_ORDEN }) : await reducirFoto(f);
+      if (!cuerpo) continue;   // cancelado por la persona
+      if (cuerpo.size > MAX_MB_ARCHIVO * 1048576) throw new Error(`pesa ${Math.round(cuerpo.size / 1048576)} MB (máximo ${MAX_MB_ARCHIVO} MB)`);
       const ruta = `${anyo}/${orden}/fotos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extArchivo(cuerpo)}`;
       await subirArchivo(client, "ordenes-adjuntos", ruta, cuerpo, tipoArchivo(cuerpo), p => { av.textContent = `${cab} · ${p}%`; });
       const { error } = await client.from("fotos_orden").insert({ anyo, orden, storage_path: ruta, categoria, comentario: comentario || (video ? "Vídeo" : null), subida_por: staffUserId });
@@ -2189,16 +2192,14 @@ async function cargarInstruccionesOrden() {
   const { anyo, orden } = pedidoActivo, cont = document.getElementById("ch_instrucciones");
   const [{ data: ins, error }, { data: lin }] = await Promise.all([
     client.from("instrucciones_montaje").select("id, titulo, fabricante, fabricante_codigo, anyo, orden").order("created_at", { ascending: false }).limit(1000),
-    client.from("linorden").select("proveedor").eq("anyo", anyo).eq("orden", orden)
+    client.from("linorden").select("proveedor, descripcion, tipolinea").eq("anyo", anyo).eq("orden", orden)
   ]);
   if (!pedidoActivo || pedidoActivo.anyo !== anyo || pedidoActivo.orden !== orden) return;
   if (error) { cont.innerHTML = '<div class="meta">Todavía no disponible.</div>'; return; }
-  const fab = new Set((lin || []).map(l => l.proveedor).filter(Boolean));
-  const l = (ins || []).filter(i => (i.anyo === anyo && i.orden === orden) || (i.fabricante_codigo && fab.has(i.fabricante_codigo)))
-    .sort((a, b) => (b.anyo === anyo && b.orden === orden) - (a.anyo === anyo && a.orden === orden));
-  cont.innerHTML = l.slice(0, 5).map(i => `<div class="item"><a href="instrucciones.html?id=${i.id}"><strong>${escMont(i.titulo)}</strong></a><div class="meta">${i.anyo === anyo && i.orden === orden ? "De esta orden" : ""}${i.fabricante ? (i.anyo === anyo && i.orden === orden ? " · " : "") + escMont(i.fabricante) : ""}</div></div>`).join("")
+  const x = instruccionesPara({ anyo, orden }, lin, ins), l = [...x.deOrden, ...x.generales];
+  cont.innerHTML = l.slice(0, 5).map(i => `<div class="item"><a href="instrucciones.html?id=${i.id}"><strong>${escMont(i.titulo)}</strong></a><div class="meta">${i.orden ? "De esta orden" : "General del fabricante"}${i.fabricante ? " · " + escMont(i.fabricante) : ""}</div></div>`).join("")
     + (l.length > 5 ? `<div class="meta" style="margin-bottom:8px;"><a href="instrucciones.html?anyo=${anyo}&orden=${orden}">Ver las ${l.length}</a></div>` : "")
-    || '<div class="meta" style="margin-bottom:8px;">No hay instrucciones para estos muebles todavía. <a href="instrucciones.html">Buscar en todas</a></div>';
+    || '<div class="meta" style="margin-bottom:8px;">No hay instrucciones de esta orden ni generales del fabricante. <a href="instrucciones.html">Buscar en todas</a></div>';
 }
 function subirInstruccionesOrden() { location.href = `instrucciones.html?nuevo=1&anyo=${pedidoActivo.anyo}&orden=${pedidoActivo.orden}`; }
 

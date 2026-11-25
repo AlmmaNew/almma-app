@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALMMA - Inicio</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="busqueda.js"></script>
 <style>
 :root{--primary:#2563eb;--bg:#f5f6fa;--card:#fff;--border:#e2e4eb;--text:#1f2430;--muted:#6b7280;}
 *{box-sizing:border-box;}
@@ -17,13 +18,25 @@ h1{font-size:20px;margin:0 0 18px;}
 #botones{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;}
 a.boton{display:block;background:var(--card);border:1px solid #bfdbfe;border-left:5px solid var(--primary);border-radius:12px;padding:18px;text-decoration:none;color:var(--text);box-shadow:0 6px 14px -10px rgba(30,41,59,.3);}
 a.boton:hover{background:#eff6ff;}
+/* buzón de instrucciones: fabricante → modelos */
+#buzon{display:none;margin-top:30px;background:var(--card);border:1px solid #99f6e4;border-radius:12px;padding:18px;}
+#buzon .cab{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;} #buzon h2{font-size:18px;margin:0;flex:1 1 220px;color:#115e59;}
+#buzon .cab a{background:#0f766e;color:#fff;text-decoration:none;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:700;}
+#buzon .cab a.sec{background:#fff;color:#0f766e;border:1px solid #99f6e4;}
+#buzon input{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:16px;margin-bottom:10px;}
+#buzon details{border-top:1px solid var(--border);} #buzon summary{cursor:pointer;padding:11px 4px;font-weight:700;font-size:15px;}
+#buzon summary span{float:right;color:var(--muted);font-weight:500;font-size:13px;}
+#buzon details a{display:block;padding:9px 8px 9px 22px;color:#1e3a8a;text-decoration:none;font-size:14px;border-radius:6px;} #buzon details a:hover{background:#f0fdfa;}
+#buzon .nada{color:var(--muted);font-size:14px;padding:8px 0;}
 a.boton .ico{font-size:28px;} a.boton b{display:block;font-size:16px;margin:6px 0 2px;color:#1e3a8a;} a.boton span{font-size:13px;color:var(--muted);}
 </style>
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
 </head>
 <body>
 <header><div class="logo">ALMMA</div><div class="quien" id="quien"></div><button onclick="logout()">Salir</button></header>
-<main><h1>¿Qué quieres hacer?</h1><div id="botones"></div></main>
+<main><h1>¿Qué quieres hacer?</h1><div id="botones"></div>
+<section id="buzon"><div class="cab"><h2>📘 Buzón de instrucciones</h2><a href="instrucciones.html?nuevo=1">⬆ Subir instrucciones</a><a class="sec" href="instrucciones.html">Ver todas</a></div>
+<input type="search" id="bz_q" placeholder="Buscar fabricante o modelo…" autocomplete="off"><div id="bz_lista"></div></section></main>
 <script>
 const client = supabase.createClient(
   "https://uamgbtbsxbrgymhqalak.supabase.co",
@@ -53,7 +66,7 @@ async function init() {
       B("🗺️", "Rutas", "Montajes de la semana y montadores", "rutas.html"),
       B("📍", "Planificar montajes", "Agendar por zonas, avisar y confirmar con el cliente", "planificar.html"),
       B("📷", "Galería de fotos", "Fotos de los montajes, por orden y cliente", "galeria.html"),
-      B("📘", "Instrucciones de montaje", "Consultar y subir manuales, fotos y vídeos", "instrucciones.html"),
+      B("📘", "Buzón de instrucciones", "Instrucciones de montaje por fabricante y modelo", "instrucciones.html"),
       B("🧾", "Facturación", "Pendientes, borradores y emitidas", "facturas.html"),
       B("🛠️", "DeCA", "Pantalla de DeCA", "deca.html"),
       B("⚙️", "Sistema", "Tiendas, fabricantes, artículos…", "sistema.html"),
@@ -76,7 +89,7 @@ async function init() {
         B("🧾", "Facturas", "Facturas emitidas a la tienda", "tienda.html#facturas"),
         B("🚚", "Montajes", "Próximos montajes y realizados", "tienda.html#montajes"),
         B("📷", "Galería de fotos", "Fotos de los montajes de la tienda", "galeria.html"),
-        B("📘", "Instrucciones de montaje", "Subir manuales para los montadores", "instrucciones.html"),
+        B("📘", "Buzón de instrucciones", "Subir y consultar, por fabricante y modelo", "instrucciones.html"),
         B("📦", "Recibidos", "Mercancía llegada al almacén", "tienda.html#recibidos"),
         B("👥", "Mi equipo", "Teléfonos, emails y dependientes", "tienda.html#equipo"),
       ];
@@ -86,7 +99,7 @@ async function init() {
         B("📋", "Mis pedidos", "Pedidos de mi tienda", "mis-pedidos.html"),
         B("🚚", "Montajes", "Próximos montajes y realizados", "montajes_tienda.html"),
         B("📷", "Galería de fotos", "Fotos de los montajes de la tienda", "galeria.html"),
-        B("📘", "Instrucciones de montaje", "Subir manuales para los montadores", "instrucciones.html"),
+        B("📘", "Buzón de instrucciones", "Subir y consultar, por fabricante y modelo", "instrucciones.html"),
       ];
     }
   }
@@ -94,6 +107,34 @@ async function init() {
   botones.push(B("👤", "Mi perfil", "Mi nombre, teléfono, contraseña y email", "perfil.html"));
   document.getElementById("botones").innerHTML = botones.map(b =>
     '<a class="boton" href="' + b.href + '"><div class="ico">' + b.ico + '</div><b>' + b.t + '</b><span>' + b.d + '</span></a>').join("");
+  cargarBuzon();
+}
+/* Buzón de instrucciones: listado de fabricantes con sus modelos. La oficina los ve todos; cada tienda, solo los que ha subido ella (RLS del SQL 144) */
+const escB = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+async function cargarBuzon() {
+  const { data, error } = await client.from("instrucciones_montaje").select("id, titulo, fabricante, archivos:instrucciones_archivos(id)").order("created_at", { ascending: false }).limit(1000);
+  if (error) return;
+  const grupos = new Map();
+  (data || []).forEach(i => {
+    const kf = normBusqDato(i.fabricante || "").trim(), km = normBusqDato(i.titulo).trim();
+    if (!grupos.has(kf)) grupos.set(kf, { nombre: i.fabricante || "🗃 Varios (sin fabricante)", modelos: new Map() });
+    const g = grupos.get(kf); if (!g.modelos.has(km)) g.modelos.set(km, { id: i.id, nombre: i.titulo, n: 0 });
+    g.modelos.get(km).n += Math.max(1, (i.archivos || []).length);
+  });
+  const orden = (a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true });
+  const lista = [...grupos.entries()].sort((a, b) => (a[0] === "") - (b[0] === "") || orden(a[1], b[1])).map(x => ({ ...x[1], clave: x[0], modelos: [...x[1].modelos.values()].sort(orden) }));
+  const pintar = () => {
+    const toks = normBusq(document.getElementById("bz_q").value).split(" ").filter(Boolean);
+    const html = lista.map(g => {
+      const ms = g.modelos.filter(m => toks.every(t => (g.clave + " " + normBusqDato(m.nombre)).includes(t)));
+      return ms.length ? '<details' + (toks.length ? " open" : "") + '><summary>' + escB(g.nombre) + '<span>' + ms.length + (ms.length === 1 ? " modelo" : " modelos") + '</span></summary>' +
+        ms.map(m => '<a href="instrucciones.html?id=' + m.id + '">' + escB(m.nombre) + ' <small style="color:#6b7280">(' + m.n + (m.n === 1 ? " archivo" : " archivos") + ')</small></a>').join("") + '</details>' : "";
+    }).join("");
+    document.getElementById("bz_lista").innerHTML = html || '<div class="nada">' + (lista.length ? "No hay ninguno que coincida." : "Todavía está vacío. Sube las primeras instrucciones.") + '</div>';
+  };
+  document.getElementById("bz_q").style.display = lista.length > 5 ? "" : "none";
+  document.getElementById("bz_q").addEventListener("input", pintar);
+  pintar(); document.getElementById("buzon").style.display = "block";
 }
 async function logout() { await client.auth.signOut(); location.href = "login.html"; }
 init();

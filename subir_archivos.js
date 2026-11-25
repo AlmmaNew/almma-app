@@ -48,7 +48,8 @@
   }
 
   // Sube un archivo. alAvanzar(0-100) es opcional. Lanza un Error si no se puede (si ya estaba subido, no es un error).
-  async function subirArchivo(client, bucket, ruta, blob, tipo, alAvanzar) {
+  // «senal» (AbortSignal) es opcional: al cancelar, deja de subir y borra lo que llevara subido del archivo grande
+  async function subirArchivo(client, bucket, ruta, blob, tipo, alAvanzar, senal) {
     tipo = tipo || blob.type || "application/octet-stream";
     if (blob.size <= TROZO) {
       // sin el tipo dentro del propio archivo, Supabase lo guarda como «desconocido» y algunos móviles no lo abren
@@ -85,6 +86,7 @@
           const err = new Error(s ? "Error " + s + " " + cuerpo.slice(0, 200) : "network error: se cortó la conexión"); err.status = s; ko(err);
         }
       });
+      if (senal) senal.addEventListener("abort", () => { up.abort(true).catch(() => {}); ko(new Error("Subida cancelada")); }, { once: true });
       up.findPreviousUploads().then(a => { if (a.length) up.resumeFromPreviousUpload(a[0]); up.start(); }, () => up.start());
     });
   }

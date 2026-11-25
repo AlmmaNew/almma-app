@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="busqueda.js"></script>
 <script src="subir_archivos.js"></script>
+<script src="reducir_video.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/js/tabulator.min.js"></script>
 <script src="imprimir_movil.js"></script>
@@ -459,12 +460,15 @@ async function subirFoto() {
   if (!archivo) { errorBox.textContent = "Elige una foto o un vídeo primero."; errorBox.style.display = "block"; return; }
   const video = esVideoArchivo(archivo);
   if (!video && !esFotoArchivo(archivo)) { errorBox.textContent = "Solo se admiten fotos y vídeos."; errorBox.style.display = "block"; return; }
-  if (archivo.size > MAX_MB_ARCHIVO * 1048576) { errorBox.textContent = "Pesa demasiado (máximo " + MAX_MB_ARCHIVO + " MB)."; errorBox.style.display = "block"; return; }
+
   const { anyo, orden } = pedidoActivo, boton = document.getElementById("foto_boton");
 
   const categoria = document.getElementById("foto_categoria").value;
   const comentario = document.getElementById("foto_comentario").value.trim();
-  const cuerpo = video ? archivo : await reducirFoto(archivo);
+  let cuerpo;
+  try { cuerpo = video ? await prepararVideo(archivo, { maxSeg: MAX_SEG_VIDEO_ORDEN }) : await reducirFoto(archivo); }
+  catch (e) { errorBox.textContent = e.message || "No se ha podido preparar el vídeo."; errorBox.style.display = "block"; return; }
+  if (!cuerpo) return;   // cancelado por la persona
   const path = `${anyo}/${orden}/fotos/${Date.now()}.${extArchivo(cuerpo)}`;
 
   boton.disabled = true;

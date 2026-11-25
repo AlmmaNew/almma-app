@@ -4,15 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#115e59">
-<title>ALMMA - Instrucciones de montaje</title>
+<title>ALMMA - Buzón de instrucciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="busqueda.js"></script>
 <script src="condiciones.js"></script>
 <script src="subir_archivos.js"></script>
+<script src="reducir_video.js"></script>
+<script src="instrucciones_orden.js"></script>
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
 <style>
 /* ALMMA · Instrucciones de montaje (25-11-2026, migracion/144_instrucciones_montaje.sql).
-   Sube cualquiera con cuenta. Las ven todas el personal de ALMMA y los montadores; cada tienda, solo las de su tienda.
+   Sube cualquiera con cuenta. Las ven todas el personal de ALMMA y los montadores; cada tienda, solo las que ha subido su tienda.
+   Al entrar sale el listado de fabricantes → modelos → instrucciones; al buscar o filtrar, las fichas seguidas.
    Quién ve y quién puede borrar lo decide la seguridad de Supabase (RLS), no esta pantalla. */
 :root{--verde:#0f766e;--verde2:#115e59;--claro:#f0fdfa;--bg:#f1f5f9;--borde:#e2e8f0;--txt:#0f172a;--gris:#64748b;--rojo:#b91c1c;--sombra:0 1px 2px rgba(15,23,42,.06),0 8px 24px -12px rgba(15,23,42,.25);}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -53,7 +56,9 @@ main{max-width:1100px;margin:0 auto;padding:12px 20px 60px;}
 #form{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.55);display:none;overflow-y:auto;padding:20px;}
 #form.on{display:block;}
 .caja{background:#fff;border-radius:16px;max-width:620px;margin:0 auto;padding:18px 20px calc(20px + env(safe-area-inset-bottom));}
-.caja h2{margin:0 0 6px;font-size:20px;}
+.caja h2{margin:0;font-size:18px;flex:1;min-width:0;}
+.cab_f{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;background:#fff;border-bottom:1px solid var(--borde);margin:-18px -20px 12px;padding:12px 20px;padding-top:calc(12px + env(safe-area-inset-top));border-radius:16px 16px 0 0;}
+.cab_f button{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:10px;padding:10px 14px;font-weight:700;font-size:15px;cursor:pointer;flex:none;}
 .caja label{display:block;font-weight:700;font-size:14px;margin:12px 0 5px;} .caja label small{font-weight:500;color:var(--gris);}
 .caja input:not([type=file]),.caja textarea{width:100%;font-size:16px;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;}
 .suelta{border:2px dashed #5eead4;background:var(--claro);border-radius:14px;padding:16px;text-align:center;font-size:14px;color:var(--gris);}
@@ -63,9 +68,17 @@ main{max-width:1100px;margin:0 auto;padding:12px 20px 60px;}
 .lf{display:flex;gap:8px;align-items:center;border:1px solid var(--borde);border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px;}
 .lf span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .lf em{font-style:normal;color:var(--gris);font-size:12px;white-space:nowrap;}
 .lf button{border:none;background:#fee2e2;color:var(--rojo);border-radius:8px;width:30px;height:30px;cursor:pointer;flex:none;}
-.acc{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;} .acc .si{background:var(--verde);color:#fff;} .acc .no{background:#e2e8f0;color:#334155;} .acc button:disabled{opacity:.5;}
+.acc{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--borde);display:flex;gap:10px;justify-content:flex-end;margin:18px -20px calc(-20px - env(safe-area-inset-bottom));padding:12px 20px calc(12px + env(safe-area-inset-bottom));border-radius:0 0 16px 16px;} .acc .si{background:var(--verde);color:#fff;} .acc .no{background:#e2e8f0;color:#334155;} .acc button:disabled{opacity:.5;}
 #f_error{color:var(--rojo);font-weight:600;font-size:14px;margin-top:10px;white-space:pre-line;}
 #f_avance{color:var(--verde2);font-weight:700;font-size:14px;margin-top:10px;}
+/* listado por fabricantes */
+details.gf{background:#fff;border:1px solid var(--borde);border-left:6px solid var(--verde);border-radius:14px;box-shadow:var(--sombra);margin-bottom:10px;overflow:hidden;}
+details.gf > summary{list-style:none;cursor:pointer;padding:14px 16px;font-size:17px;font-weight:800;display:flex;align-items:center;gap:10px;}
+summary::-webkit-details-marker{display:none;}
+summary::before{content:"▸";color:var(--verde);font-size:15px;transition:transform .15s;} details[open] > summary::before{transform:rotate(90deg);}
+summary .cuantas{margin-left:auto;background:var(--claro);color:var(--verde2);border:1px solid #99f6e4;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:700;white-space:nowrap;}
+details.gm{border-top:1px solid var(--borde);} details.gm > summary{list-style:none;cursor:pointer;padding:12px 16px 12px 28px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;}
+details.gm > .dentro{padding:4px 14px 12px;background:#f8fafc;} details.gm .ficha{box-shadow:none;margin-bottom:8px;}
 /* visor */
 #visor{position:fixed;inset:0;z-index:80;background:rgba(2,6,23,.95);display:none;align-items:center;justify-content:center;} #visor.on{display:flex;}
 #visor img,#visor video{max-width:100%;max-height:calc(100% - 120px);object-fit:contain;}
@@ -73,12 +86,12 @@ main{max-width:1100px;margin:0 auto;padding:12px 20px 60px;}
 #v_cerrar{top:calc(12px + env(safe-area-inset-top));right:14px;} #v_bajar{top:calc(12px + env(safe-area-inset-top));left:14px;}
 #v_ant,#v_sig{top:50%;transform:translateY(-50%);font-size:24px;} #v_ant{left:10px;} #v_sig{right:10px;}
 #v_pie{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));left:16px;right:16px;text-align:center;color:#e2e8f0;font-size:14px;}
-@media (max-width:640px){ header{padding-left:12px;padding-right:12px;} .titulo{font-size:0;} header button{padding:9px 11px;font-size:13px;} .filtros,main,.resumen,.banda{padding-left:14px;padding-right:14px;} #form{padding:0;} .caja{border-radius:0;min-height:100%;} .arch{width:calc(33.33% - 7px);} }
+@media (max-width:640px){ header{padding-left:12px;padding-right:12px;} .titulo{font-size:0;} header button{padding:9px 11px;font-size:13px;} .filtros,main,.resumen,.banda{padding-left:14px;padding-right:14px;} #form{padding:0;} .caja{border-radius:0;min-height:100%;} .cab_f,.acc{border-radius:0;} .acc button{flex:1;} .arch{width:calc(33.33% - 7px);} }
 </style>
 <script src="volver.js" defer></script>
 </head>
 <body>
-<header><div class="fila-top"><span class="marca">ALMMA</span><span class="titulo">📘 Instrucciones de montaje</span><button class="fuerte" onclick="abrirForm()">⬆ Subir instrucciones</button></div></header>
+<header><div class="fila-top"><span class="marca">ALMMA</span><span class="titulo">📘 Buzón de instrucciones</span><button class="fuerte" onclick="abrirForm()">⬆ Subir instrucciones</button></div></header>
 <div class="filtros">
   <input type="search" id="q" placeholder="Buscar mueble, fabricante, nº de orden…" autocomplete="off">
   <select id="fab"><option value="">Todos los fabricantes</option></select>
@@ -89,13 +102,13 @@ main{max-width:1100px;margin:0 auto;padding:12px 20px 60px;}
 <main id="main"><div class="vacio"><div class="ico">⏳</div>Cargando…</div></main>
 
 <div id="form"><div class="caja">
-  <h2 id="f_tit">Subir instrucciones de montaje</h2>
+  <div class="cab_f"><button type="button" id="f_volver" onclick="cerrarForm()">← Volver</button><h2 id="f_tit">Subir instrucciones</h2></div>
   <div style="color:var(--gris);font-size:14px" id="f_ayuda">Las podrán consultar todos los montadores. No pongas datos de clientes.</div>
+  <label for="f_fab">Fabricante <small>(el que sea; si sale en la lista, elígelo)</small></label>
+  <input id="f_fab" list="lista_fab" maxlength="120" autocomplete="off" placeholder="Ej.: Tetris"><datalist id="lista_fab"></datalist>
   <label for="f_titulo">Mueble o modelo</label>
-  <input id="f_titulo" maxlength="200" placeholder="Ej.: Armario puertas correderas modelo Nova" autocomplete="off">
-  <label for="f_fab">Fabricante <small>(opcional; si lo eliges de la lista, sale solo en las órdenes de ese fabricante)</small></label>
-  <input id="f_fab" list="lista_fab" maxlength="120" autocomplete="off"><datalist id="lista_fab"></datalist>
-  <label>Archivos <small>(PDF, fotos o vídeos; varios a la vez, hasta 200 MB cada uno)</small></label>
+  <input id="f_titulo" list="lista_mod" maxlength="200" placeholder="Ej.: Armario puertas correderas modelo Nova" autocomplete="off"><datalist id="lista_mod"></datalist>
+  <label>Archivos <small>(PDF, fotos o vídeos; varios a la vez. Vídeos de 5 minutos como mucho: se reducen solos)</small></label>
   <div class="suelta" id="suelta"><button type="button" onclick="document.getElementById('f_arch').click()">📎 Elegir archivos</button><div>Desde el ordenador, la cámara o la fototeca del móvil. En el ordenador también puedes arrastrarlos aquí.</div>
     <input type="file" id="f_arch" multiple accept="application/pdf,image/*,video/*" style="display:none"></div>
   <div id="f_lista"></div>
@@ -103,7 +116,7 @@ main{max-width:1100px;margin:0 auto;padding:12px 20px 60px;}
   <input id="f_enlace" inputmode="url" placeholder="https://…" autocomplete="off">
   <label for="f_notas">Notas <small>(opcional; trucos, herramientas, avisos…)</small></label>
   <textarea id="f_notas" rows="3" maxlength="4000"></textarea>
-  <label for="f_orden">Orden <small>(opcional; año/número, ej. 2026/3206: saldrá en esa orden)</small></label>
+  <label for="f_orden">Orden <small>(opcional; año/número, ej. 2026/3206. Si la pones, sale solo en esa orden; vacía, es general del fabricante)</small></label>
   <input id="f_orden" placeholder="2026/3206" autocomplete="off">
   <div id="f_error"></div><div id="f_avance"></div>
   <div class="acc"><button class="no" id="f_no" onclick="cerrarForm()">Cancelar</button><button class="si" id="f_si" onclick="guardar()">💾 Guardar</button></div>
@@ -120,8 +133,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 const BUCKET = "instrucciones", TANDA = 20, params = new URLSearchParams(location.search);
 let uid = null, esOficina = false, esTienda = false, todas = [], filtradas = [], pintadas = 0, fabricantes = [], urls = {}, firmadoEn = 0;
-let deOrden = null;      // {anyo, orden, fab:Set}: solo las que sirven para esa orden
-let editando = null, nuevos = [], subiendo = false, visor = null;
+let deOrden = null;      // {anyo, orden, lineas}: solo las que sirven para esa orden
+let editando = null, nuevos = [], subiendo = false, visor = null, corte = null, formEnHistorial = false, soloSubir = false;
+const SIN_FAB = "🗃 Varios (sin fabricante)";
 const esVid = a => /^video\//.test(a.tipo || ""), esFoto = a => /^image\/(jpeg|png|webp|gif)$/.test(a.tipo || "");
 const icono = t => /^video\//.test(t) ? "🎥" : /^image\//.test(t) ? "📷" : "📄";
 const tam = b => b >= 1048576 ? Math.round(b / 1048576) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
@@ -142,18 +156,23 @@ async function init() {
   const a = +params.get("anyo"), o = +params.get("orden");
   if (a && o && !params.get("nuevo")) await ponerOrden(a, o);
   await Promise.all([cargar(), cargarFabricantes()]);
-  if (params.get("nuevo")) { abrirForm(); if (a && o) $("f_orden").value = a + "/" + o; }
+  if (params.get("nuevo")) { soloSubir = true; abrirForm(); if (a && o) $("f_orden").value = a + "/" + o; }
 }
 async function ponerOrden(anyo, orden) {
-  const { data } = await client.from("linorden").select("proveedor").eq("anyo", anyo).eq("orden", orden);
-  deOrden = { anyo, orden, fab: new Set((data || []).map(l => l.proveedor).filter(Boolean)) };
+  const { data } = await client.from("linorden").select("proveedor, descripcion, tipolinea").eq("anyo", anyo).eq("orden", orden);
+  deOrden = { anyo, orden, lineas: data || [] };
   $("banda").style.display = "block";
-  $("banda").firstElementChild.innerHTML = "<span>Instrucciones que sirven para la orden <b>" + anyo + "/" + orden + "</b> (de la orden o de sus fabricantes).</span><a href=\"instrucciones.html\">Ver todas</a>";
+  $("banda").firstElementChild.innerHTML = "<span>Instrucciones que sirven para la orden <b>" + anyo + "/" + orden + "</b> (de la orden o generales de sus fabricantes).</span><a href=\"instrucciones.html\">Ver todas</a>";
 }
 async function cargarFabricantes() {
   const { data } = await client.rpc("fabricantes_para_instrucciones");
   fabricantes = data || [];
-  $("lista_fab").innerHTML = fabricantes.map(f => '<option value="' + esc(f.nombre) + '">').join("");
+  listaFab();
+}
+// A la tienda solo se le proponen los fabricantes que ya ha subido ella; la lista completa se usa por dentro para reconocer el que escriba
+function listaFab() {
+  const ns = esTienda ? [...new Set(todas.map(i => i.fabricante).filter(Boolean))] : fabricantes.map(f => f.nombre);
+  $("lista_fab").innerHTML = ns.map(n => '<option value="' + esc(n) + '">').join("");
 }
 async function cargar() {
   const { data, error } = await client.from("instrucciones_montaje")
@@ -162,24 +181,60 @@ async function cargar() {
   if (error) { $("main").innerHTML = '<div class="vacio"><div class="ico">⚠️</div>No se han podido cargar las instrucciones.<br><small>' + esc(error.message) + '</small></div>'; return; }
   todas = data || [];
   todas.forEach(i => {
+    i.mia = i.subido_por === uid;
     (i.archivos ||= []).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     i.texto = normBusqDato([i.titulo, i.fabricante, i.notas, i.subido_nombre, i.orden ? i.anyo + "/" + i.orden + " " + i.orden : ""].join(" "));
   });
-  const prev = $("fab").value, fs = [...new Set(todas.map(i => i.fabricante).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  const prev = $("fab").value || params.get("fab") || "", fs = [...new Set(todas.map(i => i.fabricante).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  listaFab();
+  $("lista_mod").innerHTML = [...new Set(todas.map(i => i.titulo))].map(t => '<option value="' + esc(t) + '">').join("");
   $("fab").innerHTML = '<option value="">Todos los fabricantes</option>' + fs.map(f => '<option>' + esc(f) + '</option>').join("");
   $("fab").value = fs.includes(prev) ? prev : "";
   filtrar();
 }
 function filtrar() {
   const toks = normBusq($("q").value).split(" ").filter(Boolean), fab = $("fab").value, mias = $("mias").checked, id = params.get("id");
-  filtradas = todas.filter(i => (!fab || i.fabricante === fab) && (!mias || i.subido_por === uid) && toks.every(t => i.texto.includes(t)) &&
-    (!deOrden || (i.anyo === deOrden.anyo && i.orden === deOrden.orden) || (i.fabricante_codigo && deOrden.fab.has(i.fabricante_codigo))));
+  const sirven = deOrden && instruccionesPara(deOrden, deOrden.lineas, todas), valen = sirven && new Set([...sirven.deOrden, ...sirven.generales]);
+  filtradas = todas.filter(i => (!fab || i.fabricante === fab) && (!mias || i.mia) && toks.every(t => i.texto.includes(t)) &&
+    (!valen || valen.has(i)));
+  const ref = id && !toks.length && !fab && !mias && todas.find(i => i.id === id);
+  if (ref) {   // se ha pulsado una: salen las de ese mismo modelo
+    const k = i => normBusqDato(i.fabricante || "").trim() + "|" + normBusqDato(i.titulo).trim();
+    filtradas = filtradas.filter(i => k(i) === k(ref));
+    $("banda").style.display = "block"; $("banda").firstElementChild.innerHTML = "<span><b>" + esc(ref.titulo) + "</b>" + (ref.fabricante ? " · " + esc(ref.fabricante) : "") + "</span><a href=\"instrucciones.html\">Ver todas</a>";
+  } else if (id) $("banda").style.display = "none";
   if (id) filtradas.sort((a, b) => (b.id === id) - (a.id === id));   // la que se ha pulsado, la primera
   else if (deOrden) filtradas.sort((a, b) => (b.anyo === deOrden.anyo && b.orden === deOrden.orden) - (a.anyo === deOrden.anyo && a.orden === deOrden.orden));
   $("resumen").textContent = filtradas.length === 1 ? "1 instrucción" : filtradas.length + " instrucciones";
   pintadas = 0; $("main").innerHTML = "";
-  if (!filtradas.length) { $("main").innerHTML = '<div class="vacio"><div class="ico">📘</div>' + (todas.length ? "Ninguna coincide con lo que buscas." : esTienda ? "Tu tienda todavía no ha subido instrucciones." : "Todavía no hay instrucciones.") + '<br><br><button class="mas" onclick="abrirForm()">⬆ Subir instrucciones</button></div>'; return; }
-  pintarMas();
+  if (!filtradas.length) { $("main").innerHTML = '<div class="vacio"><div class="ico">📘</div>' + (todas.length ? "Ninguna coincide con lo que buscas." : "El buzón todavía está vacío.") + '<br><br><button class="mas" onclick="abrirForm()">⬆ Subir instrucciones</button></div>'; return; }
+  if (!toks.length && !fab && !mias && !id && !deOrden) pintarFabricantes(); else pintarMas();
+}
+/* Listado: fabricante → modelo → instrucciones. Lo de dentro se prepara al abrir cada modelo */
+function pintarFabricantes() {
+  const gf = new Map();   // clave sin tildes → { nombre, modelos: Map }
+  for (const i of filtradas) {
+    const kf = i.fabricante ? normBusqDato(i.fabricante).trim() : "";
+    if (!gf.has(kf)) gf.set(kf, { nombre: i.fabricante || SIN_FAB, modelos: new Map(), n: 0 });
+    const g = gf.get(kf), km = normBusqDato(i.titulo).trim();
+    if (!g.modelos.has(km)) g.modelos.set(km, { nombre: i.titulo, l: [] });
+    g.modelos.get(km).l.push(i); g.n++;
+  }
+  const orden = (a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true });
+  const lista = [...gf.entries()].sort((a, b) => (a[0] === "") - (b[0] === "") || orden(a[1], b[1]));   // sin fabricante, al final
+  $("resumen").textContent = lista.length + (lista.length === 1 ? " fabricante · " : " fabricantes · ") + $("resumen").textContent;
+  $("main").innerHTML = lista.map(([, g]) => {
+    const ms = [...g.modelos.values()].sort(orden);
+    return '<details class="gf"><summary>' + (g.nombre === SIN_FAB ? "" : "🏭 ") + esc(g.nombre) + '<span class="cuantas">' + ms.length + (ms.length === 1 ? " modelo" : " modelos") + '</span></summary>' +
+      ms.map(m => '<details class="gm" data-ids="' + m.l.map(i => i.id).join(",") + '"><summary>' + esc(m.nombre) + '<span class="cuantas">' + m.l.length + '</span></summary><div class="dentro"></div></details>').join("") + '</details>';
+  }).join("");
+  $("main").querySelectorAll("details.gm").forEach(d => d.addEventListener("toggle", async () => {
+    const c = d.querySelector(".dentro"); if (!d.open || c.innerHTML) return;
+    c.textContent = "Cargando…";
+    const l = d.dataset.ids.split(",").map(x => todas.find(i => i.id === x)).filter(Boolean);
+    await firmar(l.flatMap(i => i.archivos.map(a => a.storage_path)));
+    c.innerHTML = l.map(ficha).join("");
+  }));
 }
 async function pintarMas() {
   $("btn_mas")?.remove();
@@ -198,7 +253,7 @@ async function firmar(rutas) {
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && firmadoEn && Date.now() - firmadoEn > 45 * 60000 && !visor && !subiendo) { urls = {}; firmadoEn = 0; filtrar(); } });
 
 function ficha(i) {
-  const mia = esOficina || i.subido_por === uid;
+  const mia = esOficina || i.mia;
   const archs = i.archivos.map((a, n) => {
     const u = urls[a.storage_path], dentro = '<span class="im">' + (esFoto(a) && u ? '<img src="' + esc(u) + '" loading="lazy" alt="">' : icono(a.tipo || "")) + '</span><span class="nm" title="' + esc(a.nombre) + '">' + esc(a.nombre || "archivo") + '</span>';
     return esVid(a) || esFoto(a) ? '<button class="arch" onclick="abrirVisor(\'' + i.id + '\',' + n + ')">' + dentro + '</button>' : '<a class="arch" href="' + esc(u || "#") + '" target="_blank" rel="noopener">' + dentro + '</a>';
@@ -208,35 +263,57 @@ function ficha(i) {
     (i.notas ? '<div class="notas">' + esc(i.notas) + '</div>' : "") +
     (i.enlace && /^https?:\/\//i.test(i.enlace) ? '<div class="notas">🔗 <a href="' + esc(i.enlace) + '" target="_blank" rel="noopener noreferrer">' + esc(i.enlace) + '</a></div>' : "") +
     (archs ? '<div class="archivos">' + archs + '</div>' : "") +
-    '<div class="pie"><span>Subida por ' + esc(i.subido_nombre || "—") + ' · ' + new Date(i.created_at).toLocaleDateString("es-ES") + '</span><span class="hueco"></span>' +
+    '<div class="pie"><span>' + (i.subido_nombre ? 'Subida por ' + esc(i.subido_nombre) + ' · ' : 'Subida el ') + new Date(i.created_at).toLocaleDateString("es-ES") + '</span><span class="hueco"></span>' +
     (mia ? '<button onclick="abrirForm(\'' + i.id + '\')">✎ Cambiar / añadir archivos</button><button class="rojo" onclick="borrar(\'' + i.id + '\')">🗑 Borrar</button>' : "") + '</div></article>';
 }
 
 /* ---------- Subir / cambiar ---------- */
 function abrirForm(id) {
   editando = id ? todas.find(i => i.id === id) : null; nuevos = [];
-  $("f_tit").textContent = editando ? "Cambiar instrucciones" : "Subir instrucciones de montaje";
-  $("f_titulo").value = editando ? editando.titulo : ""; $("f_fab").value = editando ? editando.fabricante || "" : "";
+  $("f_tit").textContent = editando ? "Cambiar instrucciones" : "Subir instrucciones";
+  if (!formEnHistorial) { history.pushState({ form: 1 }, ""); formEnHistorial = true; }   // la flecha de atrás del móvil cierra esta ventana
+  $("f_titulo").value = editando ? editando.titulo : ""; $("f_fab").value = editando ? editando.fabricante || "" : $("fab").value;
   $("f_enlace").value = editando ? editando.enlace || "" : ""; $("f_notas").value = editando ? editando.notas || "" : "";
   $("f_orden").value = editando && editando.orden ? editando.anyo + "/" + editando.orden : deOrden && !editando ? deOrden.anyo + "/" + deOrden.orden : "";
   $("f_error").textContent = ""; $("f_avance").textContent = "";
   pintarArchivos(); $("form").classList.add("on"); document.body.style.overflow = "hidden"; $("form").scrollTop = 0;
 }
-function cerrarForm() {
-  if (subiendo) return;
-  if (nuevos.length && !confirm("¿Salir sin guardar los archivos elegidos?")) return;
-  nuevos = []; $("form").classList.remove("on"); document.body.style.overflow = "";
+// «← Volver», «Cancelar» y la flecha de atrás. Devuelve false si la persona prefiere quedarse
+function puedeSalir() {
+  if (subiendo) { if (confirm("¿Cancelar la subida?\n\nLo que ya se haya subido se queda guardado; lo demás no.")) corte && corte.abort(); return false; }
+  return !nuevos.length || confirm("¿Salir sin guardar los archivos elegidos?");
 }
+function ocultarForm() { nuevos = []; $("form").classList.remove("on"); document.body.style.overflow = ""; }
+function cerrarForm(guardado) {
+  if (guardado !== true && !puedeSalir()) return;
+  ocultarForm();
+  const volverMas = soloSubir && guardado !== true; soloSubir = false;
+  if (!formEnHistorial) return;
+  formEnHistorial = false;
+  // si se entró solo para subir (desde una orden o desde Inicio), Cancelar vuelve a donde se estaba
+  if (volverMas && document.referrer.startsWith(location.origin) && history.length > 2) history.go(-2); else history.back();
+}
+window.addEventListener("popstate", () => {
+  if (!formEnHistorial || !$("form").classList.contains("on")) return;
+  if (puedeSalir()) { formEnHistorial = false; ocultarForm(); if (soloSubir) { soloSubir = false; if (document.referrer.startsWith(location.origin)) history.back(); } }
+  else history.pushState({ form: 1 }, "");
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !visor && $("form").classList.contains("on") && !document.querySelector("[data-t]")) cerrarForm(); });
 function pintarArchivos() {
   $("f_lista").innerHTML = (editando ? editando.archivos.map(a => '<div class="lf">' + icono(a.tipo || "") + '<span>' + esc(a.nombre) + '</span><em>ya subido</em><button title="Borrar" onclick="borrarArchivo(\'' + a.id + '\')">✕</button></div>').join("") : "") +
     nuevos.map((f, n) => '<div class="lf">' + icono(tipoArchivo(f)) + '<span>' + esc(f.name) + '</span><em>' + tam(f.size) + '</em><button title="Quitar" onclick="nuevos.splice(' + n + ',1);pintarArchivos()">✕</button></div>').join("");
 }
-function anyadir(lista) {
-  const malos = [];
-  for (const f of lista) {
+async function anyadir(lista) {
+  const malos = [], cual = editando;
+  for (let f of lista) {
     const t = tipoArchivo(f);
-    if (t !== "application/pdf" && !esVideoArchivo(f) && !esFotoArchivo(f)) malos.push(f.name + ": solo PDF, fotos o vídeos");
-    else if (f.size > MAX_MB_ARCHIVO * 1048576) malos.push(f.name + ": pesa " + tam(f.size) + " (máximo " + MAX_MB_ARCHIVO + " MB)");
+    if (t !== "application/pdf" && !esVideoArchivo(f) && !esFotoArchivo(f)) { malos.push(f.name + ": solo PDF, fotos o vídeos"); continue; }
+    if (esVideoArchivo(f)) {   // se recorta y se reduce antes de añadirlo
+      try { f = await prepararVideo(f, { maxSeg: MAX_SEG_VIDEO_INSTRUCCIONES }); } catch (e) { malos.push(f.name + ": " + (e.message || e)); continue; }
+      if (!f) continue;
+      if (cual !== editando || !$("form").classList.contains("on")) return;   // se cerró la ventana mientras tanto
+    }
+    if (f.size > MAX_MB_ARCHIVO * 1048576) malos.push(f.name + ": pesa " + tam(f.size) + " (máximo " + MAX_MB_ARCHIVO + " MB)");
     else nuevos.push(f);
   }
   $("f_error").textContent = malos.join("\n"); pintarArchivos();
@@ -247,7 +324,7 @@ $("f_arch").addEventListener("change", e => { anyadir([...e.target.files]); e.ta
 $("suelta").addEventListener("drop", e => { if (!subiendo) anyadir([...e.dataTransfer.files]); });
 
 const noCerrar = e => { e.preventDefault(); e.returnValue = ""; };
-function ocupado(si) { subiendo = si; $("f_si").disabled = $("f_no").disabled = si; window[si ? "addEventListener" : "removeEventListener"]("beforeunload", noCerrar); }
+function ocupado(si) { subiendo = si; $("f_si").disabled = si; $("f_no").textContent = si ? "✕ Cancelar la subida" : "Cancelar"; corte = si ? new AbortController() : null; window[si ? "addEventListener" : "removeEventListener"]("beforeunload", noCerrar); }
 async function guardar() {
   if (subiendo) return;
   const err = t => { $("f_error").textContent = t; };
@@ -278,25 +355,29 @@ async function guardar() {
     ocupado(false); $("f_avance").textContent = "";
     err(/foreign key/i.test(e.message || "") || (anyo && /row-level/i.test(e.message || "")) ? "No existe la orden " + ordTxt + " (o no es de tu tienda)." : "No se ha podido guardar: " + (e.message || e)); return;
   }
-  const fallos = [], pendientes = nuevos.slice(); let bien = 0;
+  const fallos = [], pendientes = nuevos.slice(), senal = corte.signal; let bien = 0;
   for (const [n, a] of pendientes.entries()) {
+    if (senal.aborted) break;
     const cab = "Subiendo " + (n + 1) + " de " + pendientes.length + ": " + a.name;
     $("f_avance").textContent = cab + "…";
     try {
       const cuerpo = esFotoArchivo(a) ? await reducirFoto(a, 2200, 0.85) : a, tipo = tipoArchivo(cuerpo);
       const ruta = uid + "/" + id + "/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + extArchivo(cuerpo);
-      await subirArchivo(client, BUCKET, ruta, cuerpo, tipo, p => { $("f_avance").textContent = cab + " · " + p + "%"; });
+      await subirArchivo(client, BUCKET, ruta, cuerpo, tipo, p => { $("f_avance").textContent = cab + " · " + p + "%"; }, senal);
+      if (senal.aborted) { await client.storage.from(BUCKET).remove([ruta]); break; }
       const { error } = await client.from("instrucciones_archivos").insert({ instruccion_id: id, storage_path: ruta, nombre: a.name, tipo, bytes: cuerpo.size });
       if (error) { await client.storage.from(BUCKET).remove([ruta]); throw error; }
       bien++; nuevos = nuevos.filter(x => x !== a);
-    } catch (e) { fallos.push(a.name + ": " + (e.message || e)); }
+    } catch (e) { if (senal.aborted) break; fallos.push(a.name + ": " + (e.message || e)); }
   }
+  const cancelada = senal.aborted;
   // si era nueva y no ha entrado nada, no se deja una ficha vacía
-  if (!editando && fallos.length && !bien && !enlace) { await client.from("instrucciones_montaje").delete().eq("id", id); id = null; }
+  if (!editando && (cancelada || fallos.length) && !bien && (cancelada || !enlace)) { await client.from("instrucciones_montaje").delete().eq("id", id); id = null; }
   ocupado(false); $("f_avance").textContent = "";
   await cargar();
+  if (cancelada) { nuevos = []; cerrarForm(true); $("resumen").textContent = (bien ? "Subida cancelada: se han guardado " + bien + " de " + pendientes.length + " archivos. " : "Subida cancelada. ") + $("resumen").textContent; return; }
   if (fallos.length) { editando = id ? todas.find(i => i.id === id) : null; pintarArchivos(); err("No se ha podido subir:\n" + fallos.join("\n") + (id ? "\nLo demás sí se ha guardado. Pulsa Guardar para reintentar." : "")); return; }
-  nuevos = []; cerrarForm();
+  nuevos = []; cerrarForm(true);
 }
 async function borrarArchivo(aid) {
   const a = editando.archivos.find(x => x.id === aid);
