@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#115e59">
+<title>ALMMA - Instrucciones de montaje</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="busqueda.js"></script>
+<script src="condiciones.js"></script>
+<script src="subir_archivos.js"></script>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
+<style>
+/* ALMMA · Instrucciones de montaje (25-11-2026, migracion/144_instrucciones_montaje.sql).
+   Sube cualquiera con cuenta. Las ven todas el personal de ALMMA y los montadores; cada tienda, solo las de su tienda.
+   Quién ve y quién puede borrar lo decide la seguridad de Supabase (RLS), no esta pantalla. */
+:root{--verde:#0f766e;--verde2:#115e59;--claro:#f0fdfa;--bg:#f1f5f9;--borde:#e2e8f0;--txt:#0f172a;--gris:#64748b;--rojo:#b91c1c;--sombra:0 1px 2px rgba(15,23,42,.06),0 8px 24px -12px rgba(15,23,42,.25);}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--txt);}
+button,input,select,textarea{font:inherit;}
+header{position:sticky;top:0;z-index:30;background:linear-gradient(135deg,#115e59,#0d9488);color:#fff;padding:12px 20px;padding-top:calc(12px + env(safe-area-inset-top));}
+.fila-top{display:flex;align-items:center;gap:12px;max-width:1100px;margin:0 auto;}
+.marca{font-weight:800;font-size:20px;letter-spacing:.5px;}
+.titulo{flex:1;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+header button{border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.14);color:#fff;border-radius:10px;padding:9px 14px;cursor:pointer;font-weight:700;font-size:14px;white-space:nowrap;}
+header button.fuerte{background:#fff;color:var(--verde2);}
+.filtros{max-width:1100px;margin:0 auto;padding:16px 20px 4px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+.filtros input[type=search]{flex:1 1 260px;padding:12px 14px;border:1px solid var(--borde);border-radius:12px;background:#fff;font-size:16px;box-shadow:var(--sombra);}
+.filtros select{padding:12px;border:1px solid var(--borde);border-radius:12px;background:#fff;font-size:15px;max-width:100%;}
+.filtros label{display:flex;gap:6px;align-items:center;font-size:14px;font-weight:600;background:#fff;border:1px solid var(--borde);border-radius:12px;padding:11px 12px;cursor:pointer;}
+.banda{max-width:1100px;margin:10px auto 0;padding:0 20px;display:none;} .banda div{background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:10px 14px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.banda a{color:var(--verde);font-weight:700;}
+.resumen{max-width:1100px;margin:0 auto;padding:6px 20px 0;color:var(--gris);font-size:13px;}
+main{max-width:1100px;margin:0 auto;padding:12px 20px 60px;}
+.ficha{background:#fff;border:1px solid var(--borde);border-left:6px solid var(--verde);border-radius:14px;box-shadow:var(--sombra);padding:14px 16px;margin-bottom:14px;}
+.ficha.marcada{outline:3px solid #fde047;}
+.ficha h2{margin:0;font-size:18px;}
+.fab{display:inline-block;background:var(--claro);color:var(--verde2);border:1px solid #99f6e4;border-radius:999px;padding:3px 11px;font-size:13px;font-weight:700;margin:6px 6px 0 0;}
+.fab.ord{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a;}
+.notas{white-space:pre-wrap;margin:10px 0 0;font-size:15px;line-height:1.45;overflow-wrap:anywhere;}
+.archivos{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+.arch{width:120px;border:1px solid var(--borde);border-radius:12px;overflow:hidden;background:#f8fafc;color:var(--txt);text-decoration:none;cursor:pointer;padding:0;text-align:center;display:block;}
+.arch .im{height:100px;display:flex;align-items:center;justify-content:center;font-size:38px;background:#e2e8f0;overflow:hidden;}
+.arch .im img{width:100%;height:100%;object-fit:cover;}
+.arch .nm{font-size:12px;padding:6px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.arch:hover{border-color:var(--verde);}
+.pie{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-top:12px;color:var(--gris);font-size:13px;}
+.pie .hueco{flex:1;}
+.pie button{border:1px solid var(--borde);background:#fff;border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:600;} .pie button.rojo{color:var(--rojo);}
+.vacio{text-align:center;padding:60px 20px;color:var(--gris);} .vacio .ico{font-size:48px;}
+.mas{display:block;margin:10px auto;padding:12px 22px;border-radius:12px;border:1px solid var(--borde);background:#fff;font-weight:700;color:var(--verde);cursor:pointer;}
+/* ventana para subir */
+#form{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.55);display:none;overflow-y:auto;padding:20px;}
+#form.on{display:block;}
+.caja{background:#fff;border-radius:16px;max-width:620px;margin:0 auto;padding:18px 20px calc(20px + env(safe-area-inset-bottom));}
+.caja h2{margin:0 0 6px;font-size:20px;}
+.caja label{display:block;font-weight:700;font-size:14px;margin:12px 0 5px;} .caja label small{font-weight:500;color:var(--gris);}
+.caja input:not([type=file]),.caja textarea{width:100%;font-size:16px;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;}
+.suelta{border:2px dashed #5eead4;background:var(--claro);border-radius:14px;padding:16px;text-align:center;font-size:14px;color:var(--gris);}
+.suelta.encima{background:#ccfbf1;border-color:var(--verde);}
+.suelta button,.acc button{border:none;border-radius:12px;padding:12px 18px;font-weight:700;font-size:15px;cursor:pointer;}
+.suelta button{background:var(--verde);color:#fff;margin-bottom:8px;}
+.lf{display:flex;gap:8px;align-items:center;border:1px solid var(--borde);border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px;}
+.lf span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .lf em{font-style:normal;color:var(--gris);font-size:12px;white-space:nowrap;}
+.lf button{border:none;background:#fee2e2;color:var(--rojo);border-radius:8px;width:30px;height:30px;cursor:pointer;flex:none;}
+.acc{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;} .acc .si{background:var(--verde);color:#fff;} .acc .no{background:#e2e8f0;color:#334155;} .acc button:disabled{opacity:.5;}
+#f_error{color:var(--rojo);font-weight:600;font-size:14px;margin-top:10px;white-space:pre-line;}
+#f_avance{color:var(--verde2);font-weight:700;font-size:14px;margin-top:10px;}
+/* visor */
+#visor{position:fixed;inset:0;z-index:80;background:rgba(2,6,23,.95);display:none;align-items:center;justify-content:center;} #visor.on{display:flex;}
+#visor img,#visor video{max-width:100%;max-height:calc(100% - 120px);object-fit:contain;}
+#visor button,#visor a{position:absolute;border:none;background:rgba(255,255,255,.2);color:#fff;border-radius:12px;padding:10px 16px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;}
+#v_cerrar{top:calc(12px + env(safe-area-inset-top));right:14px;} #v_bajar{top:calc(12px + env(safe-area-inset-top));left:14px;}
+#v_ant,#v_sig{top:50%;transform:translateY(-50%);font-size:24px;} #v_ant{left:10px;} #v_sig{right:10px;}
+#v_pie{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));left:16px;right:16px;text-align:center;color:#e2e8f0;font-size:14px;}
+@media (max-width:640px){ header{padding-left:12px;padding-right:12px;} .titulo{font-size:0;} header button{padding:9px 11px;font-size:13px;} .filtros,main,.resumen,.banda{padding-left:14px;padding-right:14px;} #form{padding:0;} .caja{border-radius:0;min-height:100%;} .arch{width:calc(33.33% - 7px);} }
+</style>
+<script src="volver.js" defer></script>
+</head>
+<body>
+<header><div class="fila-top"><span class="marca">ALMMA</span><span class="titulo">📘 Instrucciones de montaje</span><button class="fuerte" onclick="abrirForm()">⬆ Subir instrucciones</button></div></header>
+<div class="filtros">
+  <input type="search" id="q" placeholder="Buscar mueble, fabricante, nº de orden…" autocomplete="off">
+  <select id="fab"><option value="">Todos los fabricantes</option></select>
+  <label><input type="checkbox" id="mias"> Solo las mías</label>
+</div>
+<div class="banda" id="banda"><div></div></div>
+<div class="resumen" id="resumen"></div>
+<main id="main"><div class="vacio"><div class="ico">⏳</div>Cargando…</div></main>
+
+<div id="form"><div class="caja">
+  <h2 id="f_tit">Subir instrucciones de montaje</h2>
+  <div style="color:var(--gris);font-size:14px" id="f_ayuda">Las podrán consultar todos los montadores. No pongas datos de clientes.</div>
+  <label for="f_titulo">Mueble o modelo</label>
+  <input id="f_titulo" maxlength="200" placeholder="Ej.: Armario puertas correderas modelo Nova" autocomplete="off">
+  <label for="f_fab">Fabricante <small>(opcional; si lo eliges de la lista, sale solo en las órdenes de ese fabricante)</small></label>
+  <input id="f_fab" list="lista_fab" maxlength="120" autocomplete="off"><datalist id="lista_fab"></datalist>
+  <label>Archivos <small>(PDF, fotos o vídeos; varios a la vez, hasta 200 MB cada uno)</small></label>
+  <div class="suelta" id="suelta"><button type="button" onclick="document.getElementById('f_arch').click()">📎 Elegir archivos</button><div>Desde el ordenador, la cámara o la fototeca del móvil. En el ordenador también puedes arrastrarlos aquí.</div>
+    <input type="file" id="f_arch" multiple accept="application/pdf,image/*,video/*" style="display:none"></div>
+  <div id="f_lista"></div>
+  <label for="f_enlace">Enlace <small>(opcional; por ejemplo, un vídeo de YouTube del fabricante)</small></label>
+  <input id="f_enlace" inputmode="url" placeholder="https://…" autocomplete="off">
+  <label for="f_notas">Notas <small>(opcional; trucos, herramientas, avisos…)</small></label>
+  <textarea id="f_notas" rows="3" maxlength="4000"></textarea>
+  <label for="f_orden">Orden <small>(opcional; año/número, ej. 2026/3206: saldrá en esa orden)</small></label>
+  <input id="f_orden" placeholder="2026/3206" autocomplete="off">
+  <div id="f_error"></div><div id="f_avance"></div>
+  <div class="acc"><button class="no" id="f_no" onclick="cerrarForm()">Cancelar</button><button class="si" id="f_si" onclick="guardar()">💾 Guardar</button></div>
+</div></div>
+
+<div id="visor"><a id="v_bajar" target="_blank" rel="noopener">⬇ Descargar</a><button id="v_cerrar" onclick="cerrarVisor()">✕ Cerrar</button><button id="v_ant" onclick="moverVisor(-1)">‹</button><div id="v_media" style="display:contents"></div><button id="v_sig" onclick="moverVisor(1)">›</button><div id="v_pie"></div></div>
+
+<script>
+const client = supabase.createClient(
+  "https://uamgbtbsxbrgymhqalak.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k"
+);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const BUCKET = "instrucciones", TANDA = 20, params = new URLSearchParams(location.search);
+let uid = null, esOficina = false, esTienda = false, todas = [], filtradas = [], pintadas = 0, fabricantes = [], urls = {}, firmadoEn = 0;
+let deOrden = null;      // {anyo, orden, fab:Set}: solo las que sirven para esa orden
+let editando = null, nuevos = [], subiendo = false, visor = null;
+const esVid = a => /^video\//.test(a.tipo || ""), esFoto = a => /^image\/(jpeg|png|webp|gif)$/.test(a.tipo || "");
+const icono = t => /^video\//.test(t) ? "🎥" : /^image\//.test(t) ? "📷" : "📄";
+const tam = b => b >= 1048576 ? Math.round(b / 1048576) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+
+async function init() {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) { location.href = "login.html"; return; }
+  uid = user.id;
+  const { data: st } = await client.from("staff").select("nombre, solo_montajes, solo_deca").eq("user_id", uid).maybeSingle();
+  if (st) esOficina = !st.solo_montajes && !st.solo_deca;
+  else {
+    const { data: dep } = await client.from("dependientes").select("nombre").eq("user_id", uid).maybeSingle();
+    if (!dep) { await client.auth.signOut(); location.href = "login.html"; return; }
+    esTienda = true;
+    if (typeof exigirCondiciones === "function") await exigirCondiciones(client);
+  }
+  $("q").addEventListener("input", filtrar); $("fab").addEventListener("change", filtrar); $("mias").addEventListener("change", filtrar);
+  const a = +params.get("anyo"), o = +params.get("orden");
+  if (a && o && !params.get("nuevo")) await ponerOrden(a, o);
+  await Promise.all([cargar(), cargarFabricantes()]);
+  if (params.get("nuevo")) { abrirForm(); if (a && o) $("f_orden").value = a + "/" + o; }
+}
+async function ponerOrden(anyo, orden) {
+  const { data } = await client.from("linorden").select("proveedor").eq("anyo", anyo).eq("orden", orden);
+  deOrden = { anyo, orden, fab: new Set((data || []).map(l => l.proveedor).filter(Boolean)) };
+  $("banda").style.display = "block";
+  $("banda").firstElementChild.innerHTML = "<span>Instrucciones que sirven para la orden <b>" + anyo + "/" + orden + "</b> (de la orden o de sus fabricantes).</span><a href=\"instrucciones.html\">Ver todas</a>";
+}
+async function cargarFabricantes() {
+  const { data } = await client.rpc("fabricantes_para_instrucciones");
+  fabricantes = data || [];
+  $("lista_fab").innerHTML = fabricantes.map(f => '<option value="' + esc(f.nombre) + '">').join("");
+}
+async function cargar() {
+  const { data, error } = await client.from("instrucciones_montaje")
+    .select("id, titulo, fabricante, fabricante_codigo, notas, enlace, anyo, orden, subido_por, subido_nombre, created_at, archivos:instrucciones_archivos(id, storage_path, nombre, tipo, bytes, created_at)")
+    .order("created_at", { ascending: false }).limit(1000);
+  if (error) { $("main").innerHTML = '<div class="vacio"><div class="ico">⚠️</div>No se han podido cargar las instrucciones.<br><small>' + esc(error.message) + '</small></div>'; return; }
+  todas = data || [];
+  todas.forEach(i => {
+    (i.archivos ||= []).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    i.texto = normBusqDato([i.titulo, i.fabricante, i.notas, i.subido_nombre, i.orden ? i.anyo + "/" + i.orden + " " + i.orden : ""].join(" "));
+  });
+  const prev = $("fab").value, fs = [...new Set(todas.map(i => i.fabricante).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  $("fab").innerHTML = '<option value="">Todos los fabricantes</option>' + fs.map(f => '<option>' + esc(f) + '</option>').join("");
+  $("fab").value = fs.includes(prev) ? prev : "";
+  filtrar();
+}
+function filtrar() {
+  const toks = normBusq($("q").value).split(" ").filter(Boolean), fab = $("fab").value, mias = $("mias").checked, id = params.get("id");
+  filtradas = todas.filter(i => (!fab || i.fabricante === fab) && (!mias || i.subido_por === uid) && toks.every(t => i.texto.includes(t)) &&
+    (!deOrden || (i.anyo === deOrden.anyo && i.orden === deOrden.orden) || (i.fabricante_codigo && deOrden.fab.has(i.fabricante_codigo))));
+  if (id) filtradas.sort((a, b) => (b.id === id) - (a.id === id));   // la que se ha pulsado, la primera
+  else if (deOrden) filtradas.sort((a, b) => (b.anyo === deOrden.anyo && b.orden === deOrden.orden) - (a.anyo === deOrden.anyo && a.orden === deOrden.orden));
+  $("resumen").textContent = filtradas.length === 1 ? "1 instrucción" : filtradas.length + " instrucciones";
+  pintadas = 0; $("main").innerHTML = "";
+  if (!filtradas.length) { $("main").innerHTML = '<div class="vacio"><div class="ico">📘</div>' + (todas.length ? "Ninguna coincide con lo que buscas." : esTienda ? "Tu tienda todavía no ha subido instrucciones." : "Todavía no hay instrucciones.") + '<br><br><button class="mas" onclick="abrirForm()">⬆ Subir instrucciones</button></div>'; return; }
+  pintarMas();
+}
+async function pintarMas() {
+  $("btn_mas")?.remove();
+  const trozo = filtradas.slice(pintadas, pintadas + TANDA); pintadas += trozo.length;
+  await firmar(trozo.flatMap(i => i.archivos.map(a => a.storage_path)));
+  $("main").insertAdjacentHTML("beforeend", trozo.map(ficha).join("") + (pintadas < filtradas.length ? '<button class="mas" id="btn_mas" onclick="pintarMas()">Ver más (' + (filtradas.length - pintadas) + ')</button>' : ""));
+}
+// Enlaces temporales (1 hora); se preparan antes de pintar para que el PDF se abra con una simple pulsación (en el iPhone, si no, se bloquea)
+async function firmar(rutas) {
+  const falta = rutas.filter(r => !urls[r]); firmadoEn ||= Date.now();
+  for (let n = 0; n < falta.length; n += 100) {
+    const { data } = await client.storage.from(BUCKET).createSignedUrls(falta.slice(n, n + 100), 3600);
+    (data || []).forEach(d => { if (d.signedUrl) urls[d.path] = d.signedUrl; });
+  }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && firmadoEn && Date.now() - firmadoEn > 45 * 60000 && !visor && !subiendo) { urls = {}; firmadoEn = 0; filtrar(); } });
+
+function ficha(i) {
+  const mia = esOficina || i.subido_por === uid;
+  const archs = i.archivos.map((a, n) => {
+    const u = urls[a.storage_path], dentro = '<span class="im">' + (esFoto(a) && u ? '<img src="' + esc(u) + '" loading="lazy" alt="">' : icono(a.tipo || "")) + '</span><span class="nm" title="' + esc(a.nombre) + '">' + esc(a.nombre || "archivo") + '</span>';
+    return esVid(a) || esFoto(a) ? '<button class="arch" onclick="abrirVisor(\'' + i.id + '\',' + n + ')">' + dentro + '</button>' : '<a class="arch" href="' + esc(u || "#") + '" target="_blank" rel="noopener">' + dentro + '</a>';
+  }).join("");
+  return '<article class="ficha' + (i.id === params.get("id") ? " marcada" : "") + '"><h2>' + esc(i.titulo) + '</h2>' +
+    (i.fabricante ? '<span class="fab">🏭 ' + esc(i.fabricante) + '</span>' : "") + (i.orden ? '<span class="fab ord">Orden ' + i.anyo + '/' + i.orden + '</span>' : "") +
+    (i.notas ? '<div class="notas">' + esc(i.notas) + '</div>' : "") +
+    (i.enlace && /^https?:\/\//i.test(i.enlace) ? '<div class="notas">🔗 <a href="' + esc(i.enlace) + '" target="_blank" rel="noopener noreferrer">' + esc(i.enlace) + '</a></div>' : "") +
+    (archs ? '<div class="archivos">' + archs + '</div>' : "") +
+    '<div class="pie"><span>Subida por ' + esc(i.subido_nombre || "—") + ' · ' + new Date(i.created_at).toLocaleDateString("es-ES") + '</span><span class="hueco"></span>' +
+    (mia ? '<button onclick="abrirForm(\'' + i.id + '\')">✎ Cambiar / añadir archivos</button><button class="rojo" onclick="borrar(\'' + i.id + '\')">🗑 Borrar</button>' : "") + '</div></article>';
+}
+
+/* ---------- Subir / cambiar ---------- */
+function abrirForm(id) {
+  editando = id ? todas.find(i => i.id === id) : null; nuevos = [];
+  $("f_tit").textContent = editando ? "Cambiar instrucciones" : "Subir instrucciones de montaje";
+  $("f_titulo").value = editando ? editando.titulo : ""; $("f_fab").value = editando ? editando.fabricante || "" : "";
+  $("f_enlace").value = editando ? editando.enlace || "" : ""; $("f_notas").value = editando ? editando.notas || "" : "";
+  $("f_orden").value = editando && editando.orden ? editando.anyo + "/" + editando.orden : deOrden && !editando ? deOrden.anyo + "/" + deOrden.orden : "";
+  $("f_error").textContent = ""; $("f_avance").textContent = "";
+  pintarArchivos(); $("form").classList.add("on"); document.body.style.overflow = "hidden"; $("form").scrollTop = 0;
+}
+function cerrarForm() {
+  if (subiendo) return;
+  if (nuevos.length && !confirm("¿Salir sin guardar los archivos elegidos?")) return;
+  nuevos = []; $("form").classList.remove("on"); document.body.style.overflow = "";
+}
+function pintarArchivos() {
+  $("f_lista").innerHTML = (editando ? editando.archivos.map(a => '<div class="lf">' + icono(a.tipo || "") + '<span>' + esc(a.nombre) + '</span><em>ya subido</em><button title="Borrar" onclick="borrarArchivo(\'' + a.id + '\')">✕</button></div>').join("") : "") +
+    nuevos.map((f, n) => '<div class="lf">' + icono(tipoArchivo(f)) + '<span>' + esc(f.name) + '</span><em>' + tam(f.size) + '</em><button title="Quitar" onclick="nuevos.splice(' + n + ',1);pintarArchivos()">✕</button></div>').join("");
+}
+function anyadir(lista) {
+  const malos = [];
+  for (const f of lista) {
+    const t = tipoArchivo(f);
+    if (t !== "application/pdf" && !esVideoArchivo(f) && !esFotoArchivo(f)) malos.push(f.name + ": solo PDF, fotos o vídeos");
+    else if (f.size > MAX_MB_ARCHIVO * 1048576) malos.push(f.name + ": pesa " + tam(f.size) + " (máximo " + MAX_MB_ARCHIVO + " MB)");
+    else nuevos.push(f);
+  }
+  $("f_error").textContent = malos.join("\n"); pintarArchivos();
+}
+$("f_arch").addEventListener("change", e => { anyadir([...e.target.files]); e.target.value = ""; });
+["dragover", "dragenter"].forEach(ev => $("suelta").addEventListener(ev, e => { e.preventDefault(); $("suelta").classList.add("encima"); }));
+["dragleave", "drop"].forEach(ev => $("suelta").addEventListener(ev, e => { e.preventDefault(); $("suelta").classList.remove("encima"); }));
+$("suelta").addEventListener("drop", e => { if (!subiendo) anyadir([...e.dataTransfer.files]); });
+
+const noCerrar = e => { e.preventDefault(); e.returnValue = ""; };
+function ocupado(si) { subiendo = si; $("f_si").disabled = $("f_no").disabled = si; window[si ? "addEventListener" : "removeEventListener"]("beforeunload", noCerrar); }
+async function guardar() {
+  if (subiendo) return;
+  const err = t => { $("f_error").textContent = t; };
+  err("");
+  const titulo = $("f_titulo").value.trim(), fabTxt = $("f_fab").value.trim(), enlaceTxt = $("f_enlace").value.trim(), ordTxt = $("f_orden").value.trim();
+  if (titulo.length < 2) { err("Escribe el mueble o modelo."); $("f_titulo").focus(); return; }
+  const enlace = enlaceTxt ? (/^https?:\/\//i.test(enlaceTxt) ? enlaceTxt : "https://" + enlaceTxt) : null;
+  let anyo = null, orden = null;
+  if (ordTxt) {
+    const m = ordTxt.match(/^(\d{4})\s*[\/\- ]\s*(\d+)$/);
+    if (!m) { err("La orden se escribe así: 2026/3206 (o déjala vacía)."); return; }
+    anyo = +m[1]; orden = +m[2];
+  }
+  const quedan = editando ? editando.archivos.length : 0;
+  if (!nuevos.length && !quedan && !enlace) { err("Añade al menos un archivo o un enlace."); return; }
+  const f = fabricantes.find(x => normBusqDato(x.nombre).trim() === normBusqDato(fabTxt).trim());
+  // al corregir, si el fabricante no cambia se conserva su código aunque ya no salga en la lista
+  const codigo = !fabTxt ? null : f ? f.codigo : editando && editando.fabricante === fabTxt ? editando.fabricante_codigo : null;
+  const fila = { titulo, fabricante: fabTxt ? (f ? f.nombre : fabTxt) : null, fabricante_codigo: codigo, enlace, notas: $("f_notas").value.trim() || null, anyo, orden };
+  ocupado(true); $("f_avance").textContent = "Guardando…";
+  let id = editando && editando.id;
+  try {
+    const r = id ? await client.from("instrucciones_montaje").update(fila).eq("id", id).select("id") : await client.from("instrucciones_montaje").insert(fila).select("id");
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.length) throw new Error("no tienes permiso para cambiarla");
+    id = r.data[0].id;
+  } catch (e) {
+    ocupado(false); $("f_avance").textContent = "";
+    err(/foreign key/i.test(e.message || "") || (anyo && /row-level/i.test(e.message || "")) ? "No existe la orden " + ordTxt + " (o no es de tu tienda)." : "No se ha podido guardar: " + (e.message || e)); return;
+  }
+  const fallos = [], pendientes = nuevos.slice(); let bien = 0;
+  for (const [n, a] of pendientes.entries()) {
+    const cab = "Subiendo " + (n + 1) + " de " + pendientes.length + ": " + a.name;
+    $("f_avance").textContent = cab + "…";
+    try {
+      const cuerpo = esFotoArchivo(a) ? await reducirFoto(a, 2200, 0.85) : a, tipo = tipoArchivo(cuerpo);
+      const ruta = uid + "/" + id + "/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + extArchivo(cuerpo);
+      await subirArchivo(client, BUCKET, ruta, cuerpo, tipo, p => { $("f_avance").textContent = cab + " · " + p + "%"; });
+      const { error } = await client.from("instrucciones_archivos").insert({ instruccion_id: id, storage_path: ruta, nombre: a.name, tipo, bytes: cuerpo.size });
+      if (error) { await client.storage.from(BUCKET).remove([ruta]); throw error; }
+      bien++; nuevos = nuevos.filter(x => x !== a);
+    } catch (e) { fallos.push(a.name + ": " + (e.message || e)); }
+  }
+  // si era nueva y no ha entrado nada, no se deja una ficha vacía
+  if (!editando && fallos.length && !bien && !enlace) { await client.from("instrucciones_montaje").delete().eq("id", id); id = null; }
+  ocupado(false); $("f_avance").textContent = "";
+  await cargar();
+  if (fallos.length) { editando = id ? todas.find(i => i.id === id) : null; pintarArchivos(); err("No se ha podido subir:\n" + fallos.join("\n") + (id ? "\nLo demás sí se ha guardado. Pulsa Guardar para reintentar." : "")); return; }
+  nuevos = []; cerrarForm();
+}
+async function borrarArchivo(aid) {
+  const a = editando.archivos.find(x => x.id === aid);
+  if (!a || subiendo || !confirm("¿Borrar «" + a.nombre + "»?\n\nNo se puede deshacer.")) return;
+  const { error } = await client.from("instrucciones_archivos").delete().eq("id", aid);
+  if (error) { $("f_error").textContent = "No se pudo borrar: " + error.message; return; }
+  await client.storage.from(BUCKET).remove([a.storage_path]);
+  editando.archivos = editando.archivos.filter(x => x.id !== aid); pintarArchivos(); filtrar();
+}
+async function borrar(id) {
+  const i = todas.find(x => x.id === id);
+  if (!confirm("¿Borrar las instrucciones «" + i.titulo + "» con sus archivos?\n\nNo se puede deshacer.")) return;
+  const { data, error } = await client.from("instrucciones_montaje").delete().eq("id", id).select("id");
+  if (error || !data.length) { alert("No se pudo borrar" + (error ? ": " + error.message : ".")); return; }
+  if (i.archivos.length) await client.storage.from(BUCKET).remove(i.archivos.map(a => a.storage_path));
+  await cargar();
+}
+
+/* ---------- Visor de fotos y vídeos ---------- */
+function abrirVisor(id, n) { const i = todas.find(x => x.id === id); visor = { l: i.archivos.filter(a => esVid(a) || esFoto(a)) }; visor.n = visor.l.indexOf(i.archivos[n]); $("visor").classList.add("on"); pintarVisor(); }
+function pintarVisor() {
+  const a = visor.l[visor.n], u = esc(urls[a.storage_path] || "");
+  $("v_media").innerHTML = esVid(a) ? '<video src="' + u + '" controls autoplay playsinline></video>' : '<img src="' + u + '" alt="">';
+  $("v_bajar").href = urls[a.storage_path] || "#"; $("v_pie").textContent = (a.nombre || "") + (visor.l.length > 1 ? " · " + (visor.n + 1) + " de " + visor.l.length : "");
+  $("v_ant").style.display = $("v_sig").style.display = visor.l.length > 1 ? "" : "none";
+}
+function moverVisor(d) { if (visor) { visor.n = (visor.n + d + visor.l.length) % visor.l.length; pintarVisor(); } }
+function cerrarVisor() { $("visor").classList.remove("on"); $("v_media").innerHTML = ""; visor = null; }
+document.addEventListener("keydown", e => { if (!visor) return; if (e.key === "Escape") cerrarVisor(); else if (e.key === "ArrowRight") moverVisor(1); else if (e.key === "ArrowLeft") moverVisor(-1); });
+
+init();
+</script>
+</body>
+</html>

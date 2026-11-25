@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>ALMMA - Mi día</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="subir_archivos.js"></script>
 <style>
 /* ALMMA · "Mi día": pantalla de los montadores, pensada para el móvil.
    Letra grande, botones grandes y una sola cosa por botón. Funciona sin cobertura:
@@ -20,7 +21,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{font-size:18px;}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--txt);padding-bottom:env(safe-area-inset-bottom);}
-header{position:sticky;top:0;z-index:20;background:var(--azul);color:#fff;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px;}
+header{position:sticky;top:0;z-index:20;background:var(--azul);color:#fff;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
 header .marca{font-weight:800;font-size:1.15rem;letter-spacing:.5px;}
 header .quien{font-size:.8rem;opacity:.85;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #estado{border:none;border-radius:20px;padding:7px 12px;font-size:.78rem;font-weight:700;background:#fff;color:var(--azul);}
@@ -94,7 +95,9 @@ header .quien{font-size:.8rem;opacity:.85;flex:1;white-space:nowrap;overflow:hid
 .v_btn{position:absolute;top:50%;transform:translateY(-50%);border:none;background:rgba(255,255,255,.25);color:#fff;font-size:2rem;border-radius:50%;width:52px;height:52px;z-index:2;}
 #v_cerrar{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;border:none;background:rgba(255,255,255,.3);color:#fff;font-size:1.1rem;font-weight:800;border-radius:12px;padding:10px 16px;z-index:3;}
 #v_pie{position:absolute;left:0;right:0;bottom:0;height:90px;color:#fff;padding:10px 16px calc(10px + env(safe-area-inset-bottom));text-align:center;font-size:.95rem;overflow:auto;}
-#p_foto img{width:100%;max-height:300px;object-fit:contain;border-radius:12px;background:#e2e8f0;}
+#p_foto img,#p_foto video{width:100%;max-height:300px;object-fit:contain;border-radius:12px;background:#e2e8f0;}
+.fila_instr{padding:8px 16px 0;} .fila_instr button{width:100%;border:2px solid #0f766e;background:#f0fdfa;color:#0f766e;border-radius:12px;padding:11px 6px;font-size:.95rem;font-weight:800;}
+.instr{display:block;width:100%;text-align:left;border:1px solid #99f6e4;background:#f0fdfa;color:#0f172a;border-radius:12px;padding:12px;margin-bottom:8px;font-size:.95rem;font-weight:700;text-decoration:none;}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;} .chips button{border:2px solid #cbd5e1;background:#fff;border-radius:20px;padding:8px 14px;font-size:.9rem;font-weight:700;}
 </style>
 <script src="volver.js" defer></script>
@@ -122,15 +125,16 @@ header .quien{font-size:.8rem;opacity:.85;flex:1;white-space:nowrap;overflow:hid
   <button id="f_mios" class="on" onclick="verEquipos(false)">Solo los míos</button>
   <button id="f_todos" onclick="verEquipos(true)">Todos los equipos</button>
 </div>
+<div class="fila_instr"><button onclick="location.href='instrucciones.html'">📘 Instrucciones de montaje</button></div>
 <div id="mensaje"></div>
 <div id="lista"></div>
 <div class="pie" id="pie">…</div>
 <div id="toast"></div>
 <input type="file" id="cam" accept="image/*" capture="environment" style="display:none">
-<input type="file" id="galeria" accept="image/*" multiple style="display:none">
+<input type="file" id="galeria" accept="image/*,video/*" multiple style="display:none">
 <input type="file" id="vid" accept="video/*" capture="environment" style="display:none">
 <input type="file" id="cam_inc" accept="image/*" capture="environment" style="display:none">
-<input type="file" id="gal_inc" accept="image/*" multiple style="display:none">
+<input type="file" id="gal_inc" accept="image/*,video/*" multiple style="display:none">
 
 <div class="pantalla" id="p_detalle">
   <div class="det_top"><button onclick="cerrarDetalle()">← Volver</button><b id="det_titulo"></b></div>
@@ -146,15 +150,16 @@ header .quien{font-size:.8rem;opacity:.85;flex:1;white-space:nowrap;overflow:hid
 </div>
 
 <div class="pantalla" id="p_foto">
-  <h2>Foto</h2>
+  <h2 id="pf_tit">Foto</h2>
   <img id="pf_img" alt="">
-  <label for="pf_desc">¿Qué se ve en la foto? (opcional)</label>
+  <video id="pf_vid" controls playsinline muted preload="metadata" style="display:none"></video>
+  <label for="pf_desc">¿Qué se ve? (opcional)</label>
   <input type="text" id="pf_desc" autocomplete="off" placeholder="Ej.: mueble de comedor">
   <div class="chips" id="pf_chips"></div>
   <div style="color:var(--gris);font-size:.85rem" id="pf_resto"></div>
   <div class="botones" style="margin-top:18px">
     <button class="btn pl" onclick="descartarFoto()">Descartar</button>
-    <button class="btn gr" style="grid-column:auto" onclick="guardarFotoPend()">✔ GUARDAR FOTO</button>
+    <button class="btn gr" style="grid-column:auto" onclick="guardarFotoPend()" id="pf_guardar">✔ GUARDAR FOTO</button>
   </div>
 </div>
 
@@ -210,7 +215,7 @@ header .quien{font-size:.8rem;opacity:.85;flex:1;white-space:nowrap;overflow:hid
   <div class="opciones" id="i_opciones"></div>
   <label for="i_texto">Cuéntalo con tus palabras (opcional)</label>
   <textarea id="i_texto" rows="3"></textarea>
-  <label>Fotos del problema (opcional)</label>
+  <label>Fotos o vídeos del problema (opcional)</label>
   <div class="botones" style="margin-top:0">
     <button class="btn az" onclick="document.getElementById('cam_inc').value='';document.getElementById('cam_inc').click()">📷 Cámara</button>
     <button class="btn az" onclick="document.getElementById('gal_inc').value='';document.getElementById('gal_inc').click()">🖼 Fototeca</button>
@@ -337,9 +342,12 @@ async function cargarPaquete(){
     }
     if (error) throw error;
     const lineas = {}, docs = {}, tiendas = {}, servicios = {};
+    // instrucciones de montaje: aquí solo la lista (para decir cuáles sirven para cada orden); se abren en instrucciones.html
+    let instr = [];
+    try { const { data: ins } = await client.from("instrucciones_montaje").select("id, titulo, fabricante, fabricante_codigo, anyo, orden").order("created_at", { ascending: false }).limit(1000); instr = ins || []; } catch(_){}
     const porAnyo = {}; (data || []).forEach(o => (porAnyo[o.anyo] ||= []).push(o.orden));
     for (const [a, lst] of Object.entries(porAnyo)) {
-      const { data: ls, error: el } = await client.from("linorden").select("anyo, orden, linea, tipolinea, descripcion, cantidad").eq("anyo", +a).in("orden", lst).neq("tipolinea", 4).order("linea");
+      const { data: ls, error: el } = await client.from("linorden").select("anyo, orden, linea, tipolinea, descripcion, cantidad, proveedor").eq("anyo", +a).in("orden", lst).neq("tipolinea", 4).order("linea");
       if (el) throw el;
       (ls || []).forEach(l => (lineas[l.anyo + "/" + l.orden] ||= []).push(l));
       try {   // quién vendió el pedido (dependiente) y de qué tienda: lo da una función de la base de datos (el montador no lee esas tablas)
@@ -365,7 +373,8 @@ async function cargarPaquete(){
       incidencias:(o.incidencias || []).sort((a,b) => String(a.created_at).localeCompare(String(b.created_at))),
       firmas:(o.entregas || []).filter(e => e.firma_storage_path).sort((a,b) => String(a.firmado_at).localeCompare(String(b.firmado_at))).map(e => ({ ruta:e.firma_storage_path, nombre:e.firmante_nombre, cuando:e.firmado_at })),
       fotos:(o.fotos || []).sort((a,b) => String(a.created_at).localeCompare(String(b.created_at))),
-      docs:docs[o.anyo + "/" + o.orden] || [], servicios:servicios[o.anyo + "/" + o.orden] || [], lineas:lineas[o.anyo + "/" + o.orden] || []
+      docs:docs[o.anyo + "/" + o.orden] || [], servicios:servicios[o.anyo + "/" + o.orden] || [], lineas:lineas[o.anyo + "/" + o.orden] || [],
+      instr:instr.filter(i => (i.anyo === o.anyo && i.orden === o.orden) || (i.fabricante_codigo && (lineas[o.anyo + "/" + o.orden] || []).some(l => l.proveedor === i.fabricante_codigo)))
     }));
     paquete = { cargado:new Date().toISOString(), ordenes };
     await kvSet("paquete", paquete);
@@ -600,6 +609,15 @@ function bloqueIncidencias(o){
     env.map(i => caja(i.tipo, i.descripcion, i.created_at ? new Date(i.created_at).toLocaleString("es-ES", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }) : "", " · enviado a la oficina")).join("") +
     pend.map(c => caja(c.motivo, c.texto, new Date(c.ts).toLocaleString("es-ES", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }), " · ⏳ por enviar (sin cobertura)")).join("") + '</div>';
 }
+// Instrucciones subidas para esta orden o para los fabricantes de sus artículos
+function bloqueInstrucciones(o){
+  const l = (o.instr || []).slice().sort((a, b) => (b.orden === o.orden && b.anyo === o.anyo) - (a.orden === o.orden && a.anyo === o.anyo)), q = "anyo=" + o.anyo + "&orden=" + o.orden;
+  return '<div class="sec"><h3>📘 Instrucciones de montaje' + (l.length ? " (" + l.length + ")" : "") + '</h3>' +
+    l.slice(0, 6).map(i => '<a class="instr" href="instrucciones.html?id=' + i.id + '">' + esc(i.titulo) + (i.fabricante ? '<br><small style="color:var(--gris)">' + esc(i.fabricante) + '</small>' : "") + '</a>').join("") +
+    (l.length ? "" : '<div style="color:var(--gris);margin-bottom:8px">No hay instrucciones para estos muebles todavía.</div>') +
+    '<div class="botones"><button class="btn az" onclick="location.href=\'instrucciones.html' + (l.length > 6 ? "?" + q : "") + '\'">🔎 ' + (l.length > 6 ? "Ver las " + l.length : "Buscar otras") + '</button>' +
+    '<button class="btn az" onclick="location.href=\'instrucciones.html?nuevo=1&' + q + '\'">⬆ Subir instrucciones</button></div></div>';
+}
 function pintarDetalle(){
   const o = detalleK && buscar(detalleK); if (!o) return;
   const { hecho, incid } = situacion(o);
@@ -633,12 +651,13 @@ function pintarDetalle(){
     bloqueIncidencias(o) +
     '<div class="sec"><h3>Qué hay que montar</h3>' + (arts ? '<div class="arts" style="margin:0">' + arts + '</div>' : '<div style="color:var(--gris)">Sin artículos.</div>') +
       (o.obs ? '<div class="obs">📝 ' + esc(o.obs) + '</div>' : "") + '</div>' +
+    bloqueInstrucciones(o) +
     (docs.length ? '<div class="sec"><h3>📄 Documentos de la oficina (' + docs.length + ')</h3>' + tiraFotos(docs, []) + '</div>' : "") +
-    '<div class="sec"><h3>📷 Mis fotos (' + (fotos.length + fotosCola.length) + ')</h3>' +
-      (fotos.length || fotosCola.length ? tiraFotos(fotos, fotosCola) : '<div style="color:var(--gris);margin-bottom:8px">Todavía no has enviado fotos.</div>') +
+    '<div class="sec"><h3>📷 Fotos y vídeos (' + (fotos.length + fotosCola.length) + ')</h3>' +
+      (fotos.length || fotosCola.length ? tiraFotos(fotos, fotosCola) : '<div style="color:var(--gris);margin-bottom:8px">Todavía no hay fotos ni vídeos.</div>') +
       '<div class="botones"><button class="btn az" onclick="hacerFoto(\'' + k + '\',true)">📷 Cámara</button>' +
-      '<button class="btn az" onclick="hacerFoto(\'' + k + '\',false)">🖼 Fototeca</button>' +
-      '<button class="btn az" onclick="hacerVideo(\'' + k + '\')">🎥 Vídeo (máx. 20 s)</button></div></div>' +
+      '<button class="btn az" onclick="hacerFoto(\'' + k + '\',false)">🖼 Fototeca (fotos y vídeos)</button>' +
+      '<button class="btn az" onclick="hacerVideo(\'' + k + '\')">🎥 Grabar vídeo (máx. 20 s)</button></div></div>' +
     (hecho ? bloqueFirma(o) : "") +
     '<div class="botones">' +
       '<button class="btn na" onclick="abrirIncidencia(\'' + k + '\')">⚠ Problema</button>' +
@@ -681,7 +700,7 @@ function estadoBarra(){
   const b = document.getElementById("estado"), n = cola.length, malos = cola.filter(c => c.error).length;
   if (malos) { b.className = "mal"; b.textContent = "⚠ " + malos + " con problema"; }
   else if (!navigator.onLine) { b.className = n ? "pend" : "sin"; b.textContent = n ? "📵 " + n + " por enviar" : "📵 Sin cobertura"; }
-  else if (sincronizando) { b.className = "pend"; b.textContent = "Enviando…"; }
+  else if (sincronizando) { b.className = "pend"; b.textContent = avance > 0 && avance < 100 ? "Enviando " + avance + "%" : "Enviando…"; }
   else if (n) { b.className = "pend"; b.textContent = "⏳ " + n + " por enviar"; }
   else { b.className = "ok"; b.textContent = "✔ Todo enviado"; }
 }
@@ -701,16 +720,27 @@ async function comprimir(file){
 const rutaFoto = o => o.anyo + "/" + o.orden + "/fotos/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".jpg";
 async function alElegirFotos(e){
   const fs = [...e.target.files]; if (!fs.length || !ordenFoto) return;
-  for (const f of fs) fotosPend.push({ blob:await comprimir(f), o:ordenFoto });
-  if (document.getElementById("p_foto").style.display !== "block") mostrarFotoPend();
+  const o = ordenFoto;
+  for (const f of fs) {
+    if (!esVideoArchivo(f)) { fotosPend.push({ blob:await comprimir(f), o }); continue; }
+    // vídeo de la fototeca: no tiene límite de segundos, solo de peso
+    if (f.size > MAX_MB_ARCHIVO * 1048576) { toast("El vídeo pesa " + Math.round(f.size / 1048576) + " MB (máximo " + MAX_MB_ARCHIVO + " MB). Recórtalo en el móvil y vuelve a elegirlo.", 7000); continue; }
+    fotosPend.push({ blob:f, o, video:true });
+  }
+  if (fotosPend.length && document.getElementById("p_foto").style.display !== "block") mostrarFotoPend();
 }
 ["cam","galeria"].forEach(id => document.getElementById(id).addEventListener("change", alElegirFotos));
 function mostrarFotoPend(){
   const f = fotosPend[0];
   if (!f) { cerrarPantalla("p_foto"); return; }
   if (f.url) URL.revokeObjectURL(f.url); f.url = URL.createObjectURL(f.blob);
-  document.getElementById("pf_img").src = f.url; document.getElementById("pf_desc").value = "";
-  document.getElementById("pf_resto").textContent = fotosPend.length > 1 ? "Quedan " + (fotosPend.length - 1) + " fotos más por describir" : "";
+  const im = document.getElementById("pf_img"), vi = document.getElementById("pf_vid");
+  im.style.display = f.video ? "none" : ""; vi.style.display = f.video ? "" : "none";
+  if (f.video) { im.removeAttribute("src"); vi.src = f.url; } else { vi.removeAttribute("src"); vi.load(); im.src = f.url; }
+  document.getElementById("pf_tit").textContent = f.video ? "Vídeo (" + Math.max(1, Math.round(f.blob.size / 1048576)) + " MB)" : "Foto";
+  document.getElementById("pf_guardar").textContent = f.video ? "✔ GUARDAR VÍDEO" : "✔ GUARDAR FOTO";
+  document.getElementById("pf_desc").value = "";
+  document.getElementById("pf_resto").textContent = fotosPend.length > 1 ? "Quedan " + (fotosPend.length - 1) + " más por describir" : "";
   document.getElementById("pf_chips").innerHTML = DESC_RAPIDAS.map(t => '<button onclick="document.getElementById(\'pf_desc\').value=this.textContent">' + esc(t) + '</button>').join("");
   document.getElementById("p_foto").style.display = "block";
 }
@@ -741,14 +771,15 @@ document.getElementById("vid").addEventListener("change", async e => {
 });
 async function guardarFotoPend(){
   const f = fotosPend.shift(); if (!f) return;
-  const o = f.o, comentario = document.getElementById("pf_desc").value.trim() || null;
-  await colaAdd({ tipo:"foto", anyo:o.anyo, orden:o.orden, blob:f.blob, path:rutaFoto(o), comentario, categoria:(o.estado === "incidencia" || enCola(o, "incidencia").length) ? "incidencia" : "entrega_ok", ts:Date.now() });
+  const o = f.o, comentario = document.getElementById("pf_desc").value.trim() || (f.video ? "Vídeo" : null);
+  document.getElementById("pf_vid").pause();
+  await colaAdd({ tipo:"foto", anyo:o.anyo, orden:o.orden, blob:f.blob, contentType:f.video ? tipoArchivo(f.blob) : undefined, path:f.video ? rutaFoto(o).replace(/jpg$/, extArchivo(f.blob)) : rutaFoto(o), comentario, categoria:(o.estado === "incidencia" || enCola(o, "incidencia").length) ? "incidencia" : "entrega_ok", ts:Date.now() });
   cola = await colaAll(); pintar(); estadoBarra();
   if (fotosPend.length) mostrarFotoPend();
-  else { cerrarPantalla("p_foto"); toast(navigator.onLine ? "✔ Foto guardada" : "✔ Foto guardada en el móvil. Se enviará cuando haya cobertura"); }
+  else { cerrarPantalla("p_foto"); const q = f.video ? "✔ Vídeo guardado" : "✔ Foto guardada"; toast(navigator.onLine ? q + (f.video ? ", enviando…" : "") : q + " en el móvil. Se enviará cuando haya cobertura"); }
   enviarCola(false);
 }
-function descartarFoto(){ fotosPend.shift(); mostrarFotoPend(); }
+function descartarFoto(){ document.getElementById("pf_vid").pause(); fotosPend.shift(); mostrarFotoPend(); }
 
 /* ---------- Firma / terminar ---------- */
 let ordenFirma = null, dibujando = false, pintado = false, ult = null;
@@ -794,18 +825,23 @@ function abrirIncidencia(k){
 }
 function elegirMotivo(i){ motivoSel = MOTIVOS[i]; MOTIVOS.forEach((_, j) => document.getElementById("m" + j).classList.toggle("sel", j === i)); }
 function pintarFotosInc(){
-  document.getElementById("i_fotos").innerHTML = incFotos.map((f, i) => '<div class="mini"><div class="im"><img src="' + f.url + '" alt=""></div><button class="btn pl" style="min-height:36px;width:100%;margin-top:4px;font-size:.8rem" onclick="quitarFotoInc(' + i + ')">Quitar</button></div>').join("");
+  document.getElementById("i_fotos").innerHTML = incFotos.map((f, i) => '<div class="mini"><div class="im">' + (f.video ? "🎥<br>Vídeo" : '<img src="' + f.url + '" alt="">') + '</div><button class="btn pl" style="min-height:36px;width:100%;margin-top:4px;font-size:.8rem" onclick="quitarFotoInc(' + i + ')">Quitar</button></div>').join("");
 }
 function quitarFotoInc(i){ incFotos.splice(i, 1); pintarFotosInc(); }
 async function alElegirFotosInc(e){
-  for (const f of [...e.target.files]) { const blob = await comprimir(f); incFotos.push({ blob, url:URL.createObjectURL(blob) }); }
+  for (const f of [...e.target.files]) {
+    const video = esVideoArchivo(f);
+    if (video && f.size > MAX_MB_ARCHIVO * 1048576) { toast("El vídeo pesa " + Math.round(f.size / 1048576) + " MB (máximo " + MAX_MB_ARCHIVO + " MB).", 6000); continue; }
+    const blob = video ? f : await comprimir(f);
+    incFotos.push({ blob, video, url:URL.createObjectURL(blob) });
+  }
   pintarFotosInc();
 }
 ["cam_inc","gal_inc"].forEach(id => document.getElementById(id).addEventListener("change", alElegirFotosInc));
 async function guardarIncidencia(){
   if (!motivoSel) { toast("Elige qué ha pasado"); return; }
   const o = ordenInc;
-  const fotos = incFotos.map(f => ({ blob:f.blob, path:rutaFoto(o) }));
+  const fotos = incFotos.map(f => f.video ? { blob:f.blob, contentType:tipoArchivo(f.blob), path:rutaFoto(o).replace(/jpg$/, extArchivo(f.blob)) } : { blob:f.blob, path:rutaFoto(o) });
   await colaAdd({ tipo:"incidencia", anyo:o.anyo, orden:o.orden, motivo:motivoSel, texto:document.getElementById("i_texto").value.trim() || null, fotos, ts:Date.now() });
   cola = await colaAll(); cerrarPantalla("p_incid"); pintar(); estadoBarra();
   toast(navigator.onLine ? "✔ Aviso enviado a la oficina" : "✔ Aviso guardado. Se enviará cuando haya cobertura", 5000);
@@ -815,11 +851,13 @@ async function guardarIncidencia(){
 /* ---------- Enviar lo pendiente (sin perder nada si falla la cobertura) ---------- */
 // «demasiadas peticiones» (429) también se trata como falta de señal: se para y se reintenta solo, sin marcar la foto como fallida
 const esRed = e => !navigator.onLine || /fetch|network|timeout|load failed|abort|too many|rate limit|429|502|503|504/i.test(String(e?.message || e) + String(e?.statusCode || "") + String(e?.status || "")) || e?.status === 0;
+let avance = 0;   // % del archivo que se está subiendo (solo se nota en los vídeos)
+function verAvance(p){ avance = p; if (sincronizando) estadoBarra(); }
 async function enviarUno(it){
+  avance = 0;
   if (it.tipo === "foto" || it.tipo === "firma") {
     if (!it.subido) {
-      const { error } = await client.storage.from("ordenes-adjuntos").upload(it.path, it.blob, { contentType: it.contentType || (it.tipo === "foto" ? "image/jpeg" : "image/png") });
-      if (error && !/already exists|duplicate|409/i.test(String(error.message) + String(error.statusCode))) throw error;
+      await subirArchivo(client, "ordenes-adjuntos", it.path, it.blob, it.contentType || (it.tipo === "foto" ? "image/jpeg" : "image/png"), verAvance);
       it.subido = true; await colaPut(it);
     }
     if (it.tipo === "foto") {
@@ -852,8 +890,7 @@ async function enviarUno(it){
     }
     for (const f of (it.fotos || [])) {
       if (f.hecha) continue;
-      const { error } = await client.storage.from("ordenes-adjuntos").upload(f.path, f.blob, { contentType:"image/jpeg" });
-      if (error && !/already exists|duplicate|409/i.test(String(error.message) + String(error.statusCode))) throw error;
+      await subirArchivo(client, "ordenes-adjuntos", f.path, f.blob, f.contentType || "image/jpeg", verAvance);
       const { error: e2 } = await client.from("fotos_orden").insert({ anyo:it.anyo, orden:it.orden, storage_path:f.path, categoria:"incidencia", incidencia_id:it.incidencia_id, subida_por:uid });
       if (e2) throw e2;
       f.hecha = true; await colaPut(it);
@@ -882,9 +919,14 @@ async function enviarCola(manual){
 function abrirPendientes(){
   const c = document.getElementById("pend_cuerpo"), nom = { foto:"Foto", firma:"Firma de terminado", incidencia:"Aviso de problema", cobro:"Cobro", servicio:"Servicio adicional" };
   c.innerHTML = cola.length ? cola.map(it => '<div class="tarjeta" style="border-left-color:' + (it.error ? "var(--rojo)" : "var(--naranja)") + '"><b>' + nom[it.tipo] + '</b> · orden ' + it.anyo + '/' + it.orden +
-      (it.error ? '<br><span style="color:var(--rojo);font-size:.85rem">No se ha podido enviar: ' + esc(it.error) + '<br>Enséñaselo a la oficina.</span>' : '<br><span style="color:var(--gris);font-size:.85rem">Esperando cobertura</span>') + '</div>').join("")
+      (it.error ? '<br><span style="color:var(--rojo);font-size:.85rem">No se ha podido enviar: ' + esc(it.error) + '<br>Enséñaselo a la oficina.</span>' + (it.tipo === "foto" ? '<br><button class="btn pl" style="margin-top:8px;min-height:42px;font-size:.9rem" onclick="quitarDeCola(' + it.id + ')">🗑 Quitar de la lista</button>' : "") : '<br><span style="color:var(--gris);font-size:.85rem">Esperando cobertura</span>') + '</div>').join("")
     : '<div class="vacio">✔ No hay nada pendiente. Todo está enviado.</div>';
   document.getElementById("p_pend").style.display = "block";
+}
+// Una foto o un vídeo que no se puede enviar (p. ej. pesa demasiado) se puede quitar; lo demás (firma, cobro, avisos) no
+async function quitarDeCola(id){
+  if (!confirm("¿Quitar esta foto o vídeo?\n\nNo se enviará a la oficina.")) return;
+  await colaDel(id); cola = await colaAll(); abrirPendientes(); estadoBarra(); pintar();
 }
 window.addEventListener("online", () => { estadoBarra(); enviarCola(false); cargarPaquete(); });
 window.addEventListener("offline", () => { estadoBarra(); pintar(); });

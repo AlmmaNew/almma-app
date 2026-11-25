@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="imprimir_movil.js"></script>
+<script src="bajar_fotos.js"></script>
 <style>
 :root{--primary:#2563eb;--bg:#f5f6fa;--card:#fff;--border:#e2e4eb;--text:#1f2430;--muted:#6b7280;}
 *{box-sizing:border-box;}
@@ -117,7 +118,7 @@ function volver(){ location.href = destino; }
   // fotos y firma del montaje (solo lectura)
   try {
     const [fo, en] = await Promise.all([
-      client.from("fotos_orden").select("storage_path, comentario, created_at").eq("anyo", anyo).eq("orden", orden).order("created_at"),
+      client.from("fotos_orden").select("storage_path, categoria, comentario, created_at").eq("anyo", anyo).eq("orden", orden).order("created_at"),
       client.from("entregas").select("firmante_nombre, firmado_at, firma_storage_path").eq("anyo", anyo).eq("orden", orden)
     ]);
     const rutas = [...(fo.data || []).map(x => x.storage_path), ...(en.data || []).map(x => x.firma_storage_path)].filter(Boolean);
@@ -125,7 +126,9 @@ function volver(){ location.href = destino; }
     if (rutas.length) { const { data } = await client.storage.from("ordenes-adjuntos").createSignedUrls(rutas, 3600); (data || []).forEach(d => urls[d.path] = d.signedUrl); }
     const img = (r, t) => urls[r] && /\.(mp4|mov|webm|m4v|3gp)$/i.test(r) ? '<div style="display:inline-block;width:240px;margin:0 8px 8px 0;vertical-align:top"><video src="'+urls[r]+'" controls preload="metadata" playsinline style="width:240px;border-radius:8px;border:1px solid #cbd5e1;background:#000"></video>'+(t ? '<div style="font-size:11px">'+esc(t)+'</div>' : "")+'</div>' : urls[r] ? '<a href="'+urls[r]+'" target="_blank"><div style="display:inline-block;width:120px;margin:0 8px 8px 0;vertical-align:top"><img src="'+urls[r]+'" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1">'+(t ? '<div style="font-size:11px">'+esc(t)+'</div>' : "")+'</div></a>' : "";
     const firmas = (en.data || []).map(x => '<div style="margin-bottom:8px">Firmado por <b>'+esc(x.firmante_nombre)+'</b> · '+(x.firmado_at ? new Date(x.firmado_at).toLocaleString("es-ES") : "")+'<br>'+img(x.firma_storage_path)+'</div>').join("");
-    const fotos = (fo.data || []).map(x => img(x.storage_path, x.comentario)).join("");
+    const fotosL = fo.data || [];
+    const fotos = (fotosL.length ? '<div style="margin:4px 0 10px">' + botonBajarFotos(anyo, orden, fotosL) + '</div>' : "") +
+      fotosL.map((x, i) => '<div style="display:inline-block;vertical-align:top;margin-right:8px;margin-bottom:10px">' + img(x.storage_path, x.comentario) + '<div>' + botonBajarUna(anyo, orden, fotosL, i, { estilo:"padding:4px 10px;font-size:12px" }) + '</div></div>').join("");
     document.getElementById("montaje_cont").innerHTML = (firmas || fotos) ? firmas + fotos : "Todavía no hay fotos ni firma del montaje.";
   } catch (_) { document.getElementById("montaje_cont").textContent = "No se pudo cargar."; }
 })();

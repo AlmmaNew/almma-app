@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="busqueda.js"></script>
 <script src="condiciones.js"></script>
+<script src="bajar_fotos.js"></script>
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
 <style>
 /* ALMMA · Galería de fotos de las órdenes.
@@ -68,6 +69,7 @@ main{max-width:1300px;margin:0 auto;padding:12px 20px 40px;}
 .cuenta{background:#0f172a;color:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;}
 .abrir{font-size:13px;color:var(--azul2);text-decoration:none;font-weight:600;}
 .abrir:hover{text-decoration:underline;}
+.bajar{border:1px solid #bfdbfe !important;background:#eff6ff !important;color:#1e40af !important;border-radius:9px;padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:none !important;}
 .estado{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;background:#e2e8f0;color:#334155;text-transform:uppercase;letter-spacing:.3px;}
 .estado.en_proceso{background:#f1f5f9;color:#475569;} .estado.recepcionado_parcial{background:#fef9c3;color:#a16207;} .estado.recepcionado_total{background:#ffedd5;color:#c2410c;}
 .estado.completado{background:#bbf7d0;color:#166534;}
@@ -120,7 +122,8 @@ main{max-width:1300px;margin:0 auto;padding:12px 20px 40px;}
   .titulo{display:none;}
   .filtros,main,.resumen{padding-left:16px;padding-right:16px;}
   .cab{flex-wrap:wrap;padding:12px 14px;}
-  .der{flex-direction:row;align-items:center;width:100%;justify-content:space-between;}
+  .der{flex-direction:row;flex-wrap:wrap;align-items:center;width:100%;justify-content:space-between;}
+  .der > *{white-space:nowrap;}
   .rejilla{grid-template-columns:repeat(3,1fr);gap:6px;padding:10px 12px 14px;}
   .mini{border-radius:8px;}
   .mini .etq{display:none;}
@@ -169,7 +172,7 @@ main{max-width:1300px;margin:0 auto;padding:12px 20px 40px;}
   <div class="v-top">
     <div class="v-tit"><b id="v_tit"></b><span id="v_sub"></span></div>
     <a class="v-btn" id="v_orden" href="#" style="display:none">Abrir orden</a>
-    <a class="v-btn" id="v_bajar" href="#" target="_blank" rel="noopener">⬇ Descargar</a>
+    <button class="v-btn" id="v_bajar" onclick="bajarActual()">⬇ Descargar</button>
     <button class="v-btn" onclick="cerrarVisor()" aria-label="Cerrar">✕</button>
   </div>
   <div class="v-centro" id="v_centro">
@@ -436,6 +439,7 @@ function tarjeta(g, gi) {
       <div class="der">
         <span class="cuenta">📷 ${n} ${n === 1 ? "foto" : "fotos"}</span>
         ${o.estado ? (o.estado === "completado" && o.con_incidencia ? `<span class="estado conincid">⚠ Completado con incidencias</span>` : `<span class="estado ${esc(o.estado)}">${esc(ESTADO_TXT[o.estado] || o.estado)}</span>`) : ""}
+        ${modo === "montador" ? "" : botonBajarFotos(g.anyo, g.orden, g.ver, { clase: "bajar" })}
         ${enlaceOrden(g) ? `<a class="abrir" href="${enlaceOrden(g)}">Abrir orden →</a>` : ""}
       </div>
     </div>
@@ -481,7 +485,7 @@ function pintarVisor(tiras) {
   document.getElementById("v_sub").textContent = `Foto ${visor.i + 1} de ${g.ver.length}` + (o.localidad_cli ? ` · ${o.localidad_cli}` : "");
   document.getElementById("v_media").innerHTML = esVideo(f.storage_path)
     ? `<video src="${u}" controls autoplay playsinline></video>` : `<img src="${u}" alt="">`;
-  const bajar = document.getElementById("v_bajar"); bajar.href = u;
+
   const ab = document.getElementById("v_orden");
   if (enlaceOrden(g)) { ab.style.display = ""; ab.href = enlaceOrden(g); }
   document.getElementById("v_pie").innerHTML =
@@ -497,6 +501,7 @@ function pintarVisor(tiras) {
   // la siguiente orden aún sin pintar: la preparamos para poder seguir pasando
   if (visor.g === pintadas - 1 && visor.i === g.ver.length - 1) pintarMas();
 }
+function bajarActual() { if (!visor) return; const g = filtrados[visor.g]; bajarFotoDe(g.anyo, g.orden, g.ver, visor.i); }
 function irA(i) { visor.i = i; pintarVisor(false); }
 
 document.addEventListener("keydown", (e) => {

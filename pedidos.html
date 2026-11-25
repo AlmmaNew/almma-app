@@ -8,6 +8,8 @@
 <script src="tiendas_activas.js"></script>
 <script src="busqueda.js"></script>
 <script src="distancia.js"></script>
+<script src="subir_archivos.js"></script>
+<script src="bajar_fotos.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/js/tabulator.min.js"></script>
@@ -593,8 +595,27 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
     </div>
 
     <div class="tarjeta">
-      <div class="tarjeta-titulo">Fotos y firma del montaje</div>
+      <div class="tarjeta-titulo">📘 Instrucciones de montaje</div>
+      <div id="ch_instrucciones" class="mini-list"></div>
+      <button class="secondary btn-mini" style="font-size:13px;padding:7px 14px;" onclick="subirInstruccionesOrden()">⬆ Subir instrucciones para esta orden</button>
+    </div>
+
+    <div class="tarjeta">
+      <div class="tarjeta-titulo">Fotos, vídeos y firma del montaje</div>
       <div id="ch_lista_fotos_montaje" class="mini-list"></div>
+      <div style="border:1px dashed #93c5fd;border-radius:10px;padding:10px 12px;margin:8px 0 12px;background:#f8fafc;">
+        <div class="form-inline" style="align-items:center;">
+          <select id="fm_categoria" title="Qué se ve">
+            <option value="otro">Otra</option>
+            <option value="entrega_ok">Entrega (montaje hecho)</option>
+            <option value="incidencia">Incidencia</option>
+          </select>
+          <input id="fm_comentario" placeholder="Comentario (opcional)">
+        </div>
+        <button class="btn-mini" id="fm_boton" style="font-size:14px;padding:8px 16px;margin-top:8px;" onclick="document.getElementById('fm_archivos').click()">⬆ Subir fotos o vídeos</button>
+        <input type="file" id="fm_archivos" accept="image/*,video/*" multiple style="display:none" onchange="subirFotosMontaje(this)">
+        <div id="fm_avance" class="meta" style="margin-top:6px;">Desde el ordenador o la fototeca del móvil; varios a la vez (vídeos, hasta 200 MB). Los ven también la tienda de la orden y los montadores que van a ella.</div>
+      </div>
       <div id="ch_firma_montaje"></div>
     </div>
   </div>
@@ -1646,7 +1667,7 @@ async function abrirPanel(orden) {
   const btnGrabar = document.querySelector("#pie_grabar button");
   btnGrabar.disabled = true;
   const cargando = '<div class="meta">Cargando…</div>';
-  ["ch_montadores", "ch_lista_fotos_montaje", "ch_firma_montaje", "ch_lista_documentos", "lista_incidencias", "lista_historial", "lista_llamadas"]
+  ["ch_montadores", "ch_instrucciones", "ch_lista_fotos_montaje", "ch_firma_montaje", "ch_lista_documentos", "lista_incidencias", "lista_historial", "lista_llamadas"]
     .forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = cargando; });
   const tablaLin = document.getElementById("tabla_lineas"); if (tablaLin) tablaLin.innerHTML = "<tr><td class='meta'>Cargando…</td></tr>";
   document.getElementById("ch_dependiente").innerHTML = '<option value="">Cargando…</option>';
@@ -1708,6 +1729,7 @@ async function abrirPanel(orden) {
     cargarUrgente(o, miApertura),
     llenarSelectTipoLinea().then(() => mostrarNuevaLinea(false)),
     cargarDetallesMontaje(),
+    cargarInstruccionesOrden(),
     cargarDocumentosOrden(),
     cargarLineas().then(() => cargarE2448(o, miApertura)),   // el recuadro 🚚 necesita las líneas (botón ✂ Separar)
     cargarIncidencias(),
@@ -2120,18 +2142,80 @@ async function consultarFacturas() {
 
 // --- detalles del montaje (fotos y firma subidas por el montador) ---
 
+const CAT_FOTO = { entrega_ok: "Entrega", incidencia: "Incidencia", otro: "Otra" };
+const esRutaVideo = r => /\.(mp4|mov|webm|m4v|3gp)$/i.test(r || "");
+
+// Sube fotos y vídeos a la orden (a fotos_orden, igual que las del montador): salen en la galería, en Mi día y en la ficha de la tienda
+async function subirFotosMontaje(input) {
+  const archivos = [...input.files]; input.value = "";
+  if (!archivos.length || !pedidoActivo) return;
+  const { anyo, orden } = pedidoActivo;
+  const categoria = document.getElementById("fm_categoria").value, comentario = document.getElementById("fm_comentario").value.trim();
+  const boton = document.getElementById("fm_boton"), av = document.getElementById("fm_avance"), fallos = [];
+  const noCerrar = e => { e.preventDefault(); e.returnValue = ""; };   // aviso si se cierra la pestaña a media subida
+  boton.disabled = true; window.addEventListener("beforeunload", noCerrar);
+  let bien = 0;
+  for (const [n, f] of archivos.entries()) {
+    const cab = `Subiendo ${n + 1} de ${archivos.length}: ${f.name}`;
+    av.textContent = cab + "…";
+    try {
+      const video = esVideoArchivo(f);
+      if (!video && !esFotoArchivo(f)) throw new Error("solo se admiten fotos y vídeos");
+      if (f.size > MAX_MB_ARCHIVO * 1048576) throw new Error(`pesa ${Math.round(f.size / 1048576)} MB (máximo ${MAX_MB_ARCHIVO} MB)`);
+      const cuerpo = video ? f : await reducirFoto(f);
+      const ruta = `${anyo}/${orden}/fotos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extArchivo(cuerpo)}`;
+      await subirArchivo(client, "ordenes-adjuntos", ruta, cuerpo, tipoArchivo(cuerpo), p => { av.textContent = `${cab} · ${p}%`; });
+      const { error } = await client.from("fotos_orden").insert({ anyo, orden, storage_path: ruta, categoria, comentario: comentario || (video ? "Vídeo" : null), subida_por: staffUserId });
+      if (error) { await client.storage.from("ordenes-adjuntos").remove([ruta]); throw error; }
+      bien++;
+    } catch (e) { fallos.push(f.name + ": " + (e.message || e)); }
+  }
+  boton.disabled = false; window.removeEventListener("beforeunload", noCerrar);
+  av.textContent = (bien ? `✔ Subido a la orden ${anyo}/${orden}: ${bien} ${bien === 1 ? "archivo" : "archivos"}.` : "No se ha subido nada.");
+  if (bien) document.getElementById("fm_comentario").value = "";
+  if (pedidoActivo && pedidoActivo.anyo === anyo && pedidoActivo.orden === orden) await cargarDetallesMontaje();
+  if (fallos.length) alert("No se ha podido subir:\n\n" + fallos.join("\n"));
+}
+async function borrarFotoMontaje(id, ruta) {
+  if (!confirm("¿Borrar esta foto o vídeo de la orden?\n\nNo se puede deshacer.")) return;
+  const { error } = await client.from("fotos_orden").delete().eq("id", id);
+  if (error) { alert("No se pudo borrar: " + error.message); return; }
+  await client.storage.from("ordenes-adjuntos").remove([ruta]);
+  await cargarDetallesMontaje();
+}
+
+// Instrucciones de montaje de esta orden o de los fabricantes de sus artículos (instrucciones.html, SQL 144)
+async function cargarInstruccionesOrden() {
+  const { anyo, orden } = pedidoActivo, cont = document.getElementById("ch_instrucciones");
+  const [{ data: ins, error }, { data: lin }] = await Promise.all([
+    client.from("instrucciones_montaje").select("id, titulo, fabricante, fabricante_codigo, anyo, orden").order("created_at", { ascending: false }).limit(1000),
+    client.from("linorden").select("proveedor").eq("anyo", anyo).eq("orden", orden)
+  ]);
+  if (!pedidoActivo || pedidoActivo.anyo !== anyo || pedidoActivo.orden !== orden) return;
+  if (error) { cont.innerHTML = '<div class="meta">Todavía no disponible.</div>'; return; }
+  const fab = new Set((lin || []).map(l => l.proveedor).filter(Boolean));
+  const l = (ins || []).filter(i => (i.anyo === anyo && i.orden === orden) || (i.fabricante_codigo && fab.has(i.fabricante_codigo)))
+    .sort((a, b) => (b.anyo === anyo && b.orden === orden) - (a.anyo === anyo && a.orden === orden));
+  cont.innerHTML = l.slice(0, 5).map(i => `<div class="item"><a href="instrucciones.html?id=${i.id}"><strong>${escMont(i.titulo)}</strong></a><div class="meta">${i.anyo === anyo && i.orden === orden ? "De esta orden" : ""}${i.fabricante ? (i.anyo === anyo && i.orden === orden ? " · " : "") + escMont(i.fabricante) : ""}</div></div>`).join("")
+    + (l.length > 5 ? `<div class="meta" style="margin-bottom:8px;"><a href="instrucciones.html?anyo=${anyo}&orden=${orden}">Ver las ${l.length}</a></div>` : "")
+    || '<div class="meta" style="margin-bottom:8px;">No hay instrucciones para estos muebles todavía. <a href="instrucciones.html">Buscar en todas</a></div>';
+}
+function subirInstruccionesOrden() { location.href = `instrucciones.html?nuevo=1&anyo=${pedidoActivo.anyo}&orden=${pedidoActivo.orden}`; }
+
 async function cargarDetallesMontaje() {
   const { data: fotos } = await client.from("fotos_orden")
-    .select("id, storage_path, categoria, comentario, created_at")
+    .select("id, storage_path, categoria, comentario, created_at, subida_por")
     .eq("anyo", pedidoActivo.anyo).eq("orden", pedidoActivo.orden)
     .order("created_at", { ascending: false });
 
   const contFotos = document.getElementById("ch_lista_fotos_montaje");
-  contFotos.innerHTML = (fotos || []).map(f => `
+  const { anyo: anyoF, orden: ordenF } = pedidoActivo;
+  contFotos.innerHTML = ((fotos || []).length ? `<div style="margin-bottom:8px;">${botonBajarFotos(anyoF, ordenF, fotos, { clase: "secondary btn-mini", estilo: "font-size:13px;padding:7px 14px;" })}</div>` : "") + (fotos || []).map((f, i) => `
     <div class="item">
-      <strong>${escMont(f.categoria || "foto")}</strong> ${f.comentario ? "— " + escMont(f.comentario) : ""}
-      <div class="meta">${new Date(f.created_at).toLocaleString("es-ES")} — <a href="#" onclick="verFotoMontaje('${f.storage_path}');return false;">ver</a></div>
-    </div>`).join("") || '<div class="meta">Sin fotos del montaje.</div>';
+      <strong>${esRutaVideo(f.storage_path) ? "🎥" : "📷"} ${escMont(CAT_FOTO[f.categoria] || "Foto")}</strong> ${f.comentario ? "— " + escMont(f.comentario) : ""}
+      <div class="meta">${new Date(f.created_at).toLocaleString("es-ES")} — <a href="#" onclick="verFotoMontaje('${f.storage_path}');return false;">ver</a> — <a href="#" onclick="almmaBajar('${anyoF}/${ordenF}', ${i});return false;">descargar</a>${f.subida_por && f.subida_por === staffUserId ? ` — <a href="#" style="color:#dc2626;" onclick="borrarFotoMontaje('${f.id}', '${f.storage_path}');return false;">borrar</a>` : ""}</div>
+    </div>`).join("");
+  if (!(fotos || []).length) contFotos.innerHTML = '<div class="meta">Sin fotos ni vídeos del montaje.</div>';
 
   const { data: entrega } = await client.from("entregas")
     .select("firmante_nombre, firmado_at, firma_storage_path, observaciones")

@@ -201,7 +201,7 @@ async function cargar() {
   $("lista").innerHTML = lista.map(i => {
     const o = i.ordenes || {};
     const dir = [o.domicilio_cli, o.localidad_cli].filter(Boolean).join(", ");
-    const fs = i.fotos.map(f => '<figure class="' + (f.incidencia_id === i.id ? "de-inc" : "") + '">' + (urls[f.storage_path] ? '<img src="' + urls[f.storage_path] + '" alt="">' : "") +
+    const fs = i.fotos.map(f => '<figure class="' + (f.incidencia_id === i.id ? "de-inc" : "") + '">' + (!urls[f.storage_path] ? "" : /\.(mp4|mov|webm|m4v|3gp)$/i.test(f.storage_path) ? '<video src="' + urls[f.storage_path] + '" controls preload="metadata" playsinline style="width:170px;height:130px;border-radius:6px;background:#000"></video>' : '<img src="' + urls[f.storage_path] + '" alt="">') +
       '<figcaption>' + (f.incidencia_id === i.id ? "⚠ Incidencia" : "Orden") + (f.comentario ? " · " + esc(f.comentario) : "") + ' · ' + fmt(f.created_at) + '</figcaption></figure>').join("");
     return '<div class="inc ' + i.estado + '"><h3>Orden ' + i.anyo + '/' + i.orden + ' — ' + esc(o.nombre_cli || "") + '<span class="chip ' + i.estado + '">' + ETQ[i.estado] + '</span></h3>' +
       '<div class="meta">Tienda: <b>' + esc(tiendas[o.tienda_id] || "—") + '</b>' + (o.num_pedido ? ' · Pedido ' + esc(o.num_pedido) : "") + (dir ? ' · ' + esc(dir) : "") + (o.telefono_cli ? ' · ☎ ' + esc(o.telefono_cli) : "") +

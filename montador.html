@@ -6,6 +6,7 @@
 <title>ALMMA - Mis montajes</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="busqueda.js"></script>
+<script src="subir_archivos.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/js/tabulator.min.js"></script>
 <script src="imprimir_movil.js"></script>
@@ -195,7 +196,7 @@ canvas#firma_canvas{border:1px solid var(--border);border-radius:8px;width:100%;
   <h4>Documentos de la orden</h4>
   <div id="lista_documentos" class="mini-list"></div>
 
-  <h4>Fotos</h4>
+  <h4>Fotos y vídeos</h4>
   <div id="lista_fotos" class="mini-list"></div>
   <select id="foto_categoria">
     <option value="entrega_ok">Entrega OK</option>
@@ -203,8 +204,8 @@ canvas#firma_canvas{border:1px solid var(--border);border-radius:8px;width:100%;
     <option value="otro">Otro</option>
   </select>
   <input id="foto_comentario" placeholder="Comentario (opcional)" style="margin-top:8px;">
-  <input id="foto_archivo" type="file" accept="image/*" capture="environment" style="margin-top:8px;">
-  <button class="secondary btn-mini" style="margin-top:8px;" onclick="subirFoto()">+ Subir foto</button>
+  <input id="foto_archivo" type="file" accept="image/*,video/*" style="margin-top:8px;">
+  <button class="secondary btn-mini" id="foto_boton" style="margin-top:8px;" onclick="subirFoto()">+ Subir foto o vídeo</button>
 
   <h4>Firma de entrega</h4>
   <div id="entrega_previa" class="mini-list"></div>
@@ -455,19 +456,25 @@ async function subirFoto() {
   errorBox.style.display = "none";
   const input = document.getElementById("foto_archivo");
   const archivo = input.files[0];
-  if (!archivo) { errorBox.textContent = "Elige una foto primero."; errorBox.style.display = "block"; return; }
+  if (!archivo) { errorBox.textContent = "Elige una foto o un vídeo primero."; errorBox.style.display = "block"; return; }
+  const video = esVideoArchivo(archivo);
+  if (!video && !esFotoArchivo(archivo)) { errorBox.textContent = "Solo se admiten fotos y vídeos."; errorBox.style.display = "block"; return; }
+  if (archivo.size > MAX_MB_ARCHIVO * 1048576) { errorBox.textContent = "Pesa demasiado (máximo " + MAX_MB_ARCHIVO + " MB)."; errorBox.style.display = "block"; return; }
+  const { anyo, orden } = pedidoActivo, boton = document.getElementById("foto_boton");
 
   const categoria = document.getElementById("foto_categoria").value;
   const comentario = document.getElementById("foto_comentario").value.trim();
-  const ext = (archivo.name.split(".").pop() || "jpg").toLowerCase();
-  const path = `${pedidoActivo.anyo}/${pedidoActivo.orden}/fotos/${Date.now()}.${ext}`;
+  const cuerpo = video ? archivo : await reducirFoto(archivo);
+  const path = `${anyo}/${orden}/fotos/${Date.now()}.${extArchivo(cuerpo)}`;
 
-  const { error: errSubida } = await client.storage.from("ordenes-adjuntos").upload(path, archivo);
-  if (errSubida) { errorBox.textContent = "No se pudo subir la foto: " + errSubida.message; errorBox.style.display = "block"; return; }
+  boton.disabled = true;
+  try { await subirArchivo(client, "ordenes-adjuntos", path, cuerpo, tipoArchivo(cuerpo), p => { boton.textContent = "Subiendo " + p + "%"; }); }
+  catch (e) { errorBox.textContent = "No se pudo subir: " + (e.message || e); errorBox.style.display = "block"; return; }
+  finally { boton.disabled = false; boton.textContent = "+ Subir foto o vídeo"; }
 
   const { error: errFila } = await client.from("fotos_orden").insert({
-    anyo: pedidoActivo.anyo, orden: pedidoActivo.orden,
-    storage_path: path, categoria, comentario: comentario || null,
+    anyo, orden,
+    storage_path: path, categoria, comentario: comentario || (video ? "Vídeo" : null),
     subida_por: montadorUserId,
   });
   if (errFila) { errorBox.textContent = "Foto subida, pero no se pudo guardar el registro: " + errFila.message; errorBox.style.display = "block"; return; }
