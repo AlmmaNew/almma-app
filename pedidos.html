@@ -112,6 +112,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 .bloque-titulo{font-weight:700;color:#1e3a8a;margin-bottom:8px;}
 .bloque-real .bloque-titulo{color:#15803d;}
 .fecha-vacia{display:inline-block;color:var(--muted);font-size:12px;margin-top:2px;}
+#ch_fecha_montaje:disabled,#ch_hora_montaje:disabled{background:#e5e7eb;color:#4b5563;opacity:1;cursor:not-allowed;}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px 16px;}
 .lineas-table{width:100%;font-size:13px;border-collapse:separate;border-spacing:0;margin-top:8px;border:1px solid #bfdbfe;border-radius:8px;overflow:hidden;}
 .lineas-table th{background:#dbeafe;color:#1e3a8a;font-weight:700;padding:8px 8px;text-align:left;border-bottom:2px solid #93c5fd;}
@@ -576,8 +577,9 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
       <div class="form-grid">
         <div class="campo"><label>Fecha del montaje</label><input id="ch_fecha_montaje" type="date" oninput="marcarFechaVacia('ch_fecha_montaje')"><span class="fecha-vacia" id="ch_fecha_montaje_vacia">0/0/0</span></div>
         <div class="campo"><label>Hora del montaje</label><input id="ch_hora_montaje" type="time"></div>
+        <div class="campo" style="align-self:end;"><button type="button" class="secondary" id="btn_desbloquear_montaje" onclick="desbloquearMontaje()">🔒 Poner fecha a mano</button></div>
       </div>
-      <div class="meta" style="font-size:11px;">Se rellena sola cuando el montador recoge la firma del cliente (día y hora de la firma); se puede corregir a mano. Al ponerla, la orden pasa a "completado".</div>
+      <div class="meta" style="font-size:11px;">Se rellena sola cuando el montador recoge la firma del cliente (día y hora de la firma) y la orden pasa a "completado". Está bloqueada para no ponerla por error: solo si se ha montado sin firma, con «🔒 Poner fecha a mano».</div>
     </div>
 
     <div class="tarjeta" style="margin-top:16px;">
@@ -1669,13 +1671,7 @@ async function abrirPanel(orden) {
   ["ch_fecha_prev_recepcion", "ch_fecha_recepcion", "ch_fecha_prev_montaje", "ch_fecha_montaje"].forEach(marcarFechaVacia);
   document.getElementById("ch_horamont").value = o.horamont || "";
   document.getElementById("ch_hora_montaje").value = horaInput(o.fecha_montaje);
-  // montaje cerrado: la fecha y hora son las de la firma del cliente y no se tocan
-  montajeCerrado = ["completado", "terminado_incidencia"].includes(o.estado) && !!o.fecha_montaje;
-  ["ch_fecha_montaje", "ch_hora_montaje"].forEach(id => {
-    const el = document.getElementById(id);
-    el.disabled = montajeCerrado;
-    el.title = montajeCerrado ? "Montaje cerrado: la fecha y hora son las de la firma del cliente" : "";
-  });
+  bloquearMontaje(o);
   document.getElementById("ch_importe_total").value = o.importe_total ?? "";
   document.getElementById("ch_entrega_a_cuenta").value = o.entrega_a_cuenta ?? "";
   document.getElementById("ch_importe_pendiente").value = o.importe_pendiente ?? "";
@@ -1762,9 +1758,40 @@ async function eliminarOrdenActiva() {
   await cargarPedidos();
 }
 
-let montajeCerrado = false;
+/* Fecha y hora del montaje REALIZADO: siempre bloqueadas (las pone la firma del cliente). Para lo montado sin firma
+   (Menut y casos sueltos) se desbloquean a propósito con el botón, que pide confirmación; al grabar o abrir otra orden se vuelven a bloquear.
+   Montaje cerrado (completado con fecha) = no se toca ni con el botón. La fecha PREVISTA no se bloquea. */
+let montajeDesbloqueado = false;
+function pintarBloqueoMontaje(cerrado) {
+  ["ch_fecha_montaje", "ch_hora_montaje"].forEach(id => {
+    const el = document.getElementById(id);
+    el.disabled = !montajeDesbloqueado;
+    el.title = montajeDesbloqueado ? "" : cerrado ? "Montaje cerrado: la fecha y la hora ya no se tocan"
+      : "Bloqueada: se rellena sola con la firma del cliente";
+  });
+  document.getElementById("btn_desbloquear_montaje").style.display = (cerrado || montajeDesbloqueado) ? "none" : "";
+}
+function bloquearMontaje(o) {
+  montajeDesbloqueado = false;
+  document.getElementById("ch_fecha_montaje").value = fechaInput(o.fecha_montaje);
+  document.getElementById("ch_hora_montaje").value = horaInput(o.fecha_montaje);
+  marcarFechaVacia("ch_fecha_montaje");
+  pintarBloqueoMontaje(["completado", "terminado_incidencia"].includes(o.estado) && !!o.fecha_montaje);
+}
+function desbloquearMontaje() {
+  if (!pedidoActivo) return;
+  if (!confirm("Esta es la fecha del montaje YA REALIZADO, no la prevista.\n\nNormalmente se pone sola con la firma del cliente. Si la pones a mano, al grabar la orden pasa a «completado».\n\n¿Seguro que quieres ponerla a mano?")) return;
+  montajeDesbloqueado = true;
+  document.getElementById("ch_fecha_montaje").max = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  pintarBloqueoMontaje(false);
+  document.getElementById("ch_fecha_montaje").focus();
+}
 async function guardarCabecera() {
   if (!pedidoActivo) return;
+  if (montajeDesbloqueado && document.getElementById("ch_fecha_montaje").value > new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" })) {
+    alert("La fecha del montaje realizado no puede ser futura. Para un montaje que aún no se ha hecho, usa «Fecha prevista de montaje».\n\nNo se ha grabado nada.");
+    return;
+  }
   const valores = {
     tienda_id: document.getElementById("ch_tienda").value || null,
     dependiente_id: document.getElementById("ch_dependiente").value || null,
@@ -1780,7 +1807,7 @@ async function guardarCabecera() {
     fecha_prev_recepcion: document.getElementById("ch_fecha_prev_recepcion").value || null,
     fecha_recepcion: document.getElementById("ch_fecha_recepcion").value || null,
     fecha_prev_montaje: document.getElementById("ch_fecha_prev_montaje").value || null,
-    ...(montajeCerrado ? {} : { fecha_montaje: combinarFechaHora(document.getElementById("ch_fecha_montaje").value, document.getElementById("ch_hora_montaje").value) }),
+    ...(montajeDesbloqueado ? { fecha_montaje: combinarFechaHora(document.getElementById("ch_fecha_montaje").value, document.getElementById("ch_hora_montaje").value) } : {}),
     horamont: document.getElementById("ch_horamont").value.trim() || null,
     estado: document.getElementById("ch_estado").value,
     importe_total: document.getElementById("ch_importe_total").value ? parseFloat(document.getElementById("ch_importe_total").value) : null,
@@ -1802,6 +1829,7 @@ async function guardarCabecera() {
   if (ordNueva) {
     document.getElementById("ch_estado").value = ordNueva.estado;
     document.getElementById("ch_pendiente_facturar").checked = !!ordNueva.pendiente_facturar;
+    bloquearMontaje(ordNueva);
     pintarResumenOrden(ordNueva);
   }
   cargarPedidos();
