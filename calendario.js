@@ -16,6 +16,12 @@
   const deIso = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
   const corta = s => { const d = deIso(s); return d ? d.getDate() + " " + MESES[d.getMonth()].slice(0, 3).toLowerCase() : ""; };
 
+  /* nombre que se enseña de un festivo (SQL 150: tipo nacional / autonomico / local / puente) */
+  function nombreFestivo(x) {
+    if (x.tipo === "puente") return "Puente" + (x.nombre ? ": " + x.nombre : "");
+    return x.nombre || (x.tipo === "local" ? "Festivo local" : "Festivo");
+  }
+
   /* ---------- datos: festivos + ausencias, guardados 10 min en la pestaña ---------- */
   let datos = null, cargando = null;
   function cli() { try { return typeof client !== "undefined" ? client : null; } catch (e) { return null; } }
@@ -27,10 +33,10 @@
     cargando = (async () => {
       const desde = new Date(); desde.setFullYear(desde.getFullYear() - 2);
       const [f, a] = await Promise.all([
-        c.from("festivos").select("fecha, nombre").then(r => r, () => ({ data: [] })),
+        c.from("festivos").select("*").then(r => r, () => ({ data: [] })),
         c.from("ausencias").select("tipo, desde, hasta, motivo, montadores(nombre), staff(nombre)").gte("hasta", iso(desde)).order("desde").limit(5000).then(r => r, () => ({ data: [] }))]);
       const d = { festivos: {}, ausencias: [] };
-      (f.data || []).forEach(x => d.festivos[x.fecha] = x.nombre || "Festivo");
+      (f.data || []).forEach(x => d.festivos[x.fecha] = nombreFestivo(x));
       (a.data || []).forEach(x => d.ausencias.push({ tipo: x.tipo, desde: x.desde, hasta: x.hasta, motivo: x.motivo || "", nombre: (x.montadores && x.montadores.nombre) || (x.staff && x.staff.nombre) || "?" }));
       try { sessionStorage.setItem(CLAVE, JSON.stringify({ t: Date.now(), d })); } catch (e) {}
       cargando = null; return datos = d;
@@ -173,5 +179,5 @@ input[type=date]:not([data-calendario=no]):not(:disabled):not([readonly]:not([da
   window.addEventListener("resize", () => { if (pop) colocar(); });
   document.addEventListener("scroll", e => { if (pop && !pop.contains(e.target)) colocar(); }, true);
 
-  window.Calendario = { cargar, invalidar, ausentesDel, esLaborable, TIPOS, iso, deIso };
+  window.Calendario = { cargar, invalidar, ausentesDel, esLaborable, nombreFestivo, TIPOS, iso, deIso };
 })();

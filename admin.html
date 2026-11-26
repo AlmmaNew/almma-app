@@ -6,6 +6,7 @@
 <title>ALMMA - Administración</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="calendario.js"></script>
+<script src="festivos.js"></script>
 <script src="tiendas_activas.js"></script>
 <script src="busqueda.js"></script>
 <script src="condiciones.js"></script>
@@ -170,15 +171,9 @@ tr.eq td{background:#eff6ff;border-top:2px solid #93c5fd;}
 </div>
 
 <div class="panel" id="p_festivos">
-  <p class="muted" style="margin-top:0">Días que <b>no cuentan</b> para el plazo de la <b>🚚 Entrega 24h–48h</b> (los sábados y domingos ya no cuentan nunca). Hay puestos los nacionales y de la Comunitat Valenciana que caen entre semana: revísalos con el calendario oficial y añade los locales.</p>
-  <div class="caja" style="margin-bottom:14px">
-    <div class="barra" style="margin-bottom:0">
-      <input id="fs_fecha" type="date">
-      <input id="fs_nombre" placeholder="Nombre (p. ej. San Vicente Mártir)" style="width:260px">
-      <button onclick="anadirFestivo()">Añadir festivo</button>
-    </div>
-  </div>
-  <div id="fs_tabla"><span class="muted">Cargando...</span></div>
+  <p class="muted" style="margin-top:0">Festivos (nacionales, autonómicos y <b>locales</b>) y <b>puentes</b>: no cuentan para el plazo de la <b>🚚 Entrega 24h–48h</b>, salen en rojo en el calendario de las fechas y Planificar no propone montajes ese día (los sábados y domingos ya no cuentan nunca). También se pueden añadir desde <b>🏖 Ausencias y vacaciones</b>.</p>
+  <div class="caja" id="fs_editor"></div>
+</div>
 </div>
 
 <script>
@@ -269,31 +264,8 @@ async function borrarCamion(id){
   const r = await client.from("camiones").delete().eq("id", id); if (r.error) alert(r.error.message); else cargarCamiones();
 }
 
-/* ---------- Festivos (SQL 136): no cuentan para el plazo de la entrega 24h–48h ---------- */
-async function cargarFestivos(){
-  const el = document.getElementById("fs_tabla");
-  const desde = new Date(); desde.setMonth(desde.getMonth() - 1);
-  const { data, error } = await client.from("festivos").select("fecha, nombre").gte("fecha", desde.toISOString().slice(0, 10)).order("fecha");
-  if (error) { el.innerHTML = '<span class="muted">Falta ejecutar el SQL 136 en Supabase.</span>'; return; }
-  if (!data.length) { el.innerHTML = '<span class="muted">No hay festivos próximos. Añade el primero arriba.</span>'; return; }
-  const dia = f => new Date(f + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  el.innerHTML = '<table><tr><th>Día</th><th>Nombre</th><th></th></tr>' + data.map(f =>
-    '<tr><td>'+esc(dia(f.fecha))+'</td><td><input value="'+esc(f.nombre||"")+'" onchange="guardarFestivo(\''+f.fecha+'\',this.value.trim()||null)" style="width:260px"></td>'
-    + '<td><button class="secondary" onclick="borrarFestivo(\''+f.fecha+'\')">Quitar</button></td></tr>').join("") + '</table>';
-}
-async function anadirFestivo(){
-  const fecha = document.getElementById("fs_fecha").value;
-  if (!fecha) { alert("Elige el día."); return; }
-  const r = await client.from("festivos").upsert({ fecha, nombre: document.getElementById("fs_nombre").value.trim() || null });
-  if (r.error) { alert(r.error.message); return; }
-  document.getElementById("fs_fecha").value = ""; document.getElementById("fs_nombre").value = "";
-  cargarFestivos();
-}
-async function guardarFestivo(fecha, nombre){ const r = await client.from("festivos").update({ nombre }).eq("fecha", fecha); if (r.error) alert(r.error.message); }
-async function borrarFestivo(fecha){
-  if (!confirm("¿Quitar este festivo? Ese día volverá a contar para el plazo de las entregas 24h–48h que se confirmen a partir de ahora.")) return;
-  const r = await client.from("festivos").delete().eq("fecha", fecha); if (r.error) alert(r.error.message); else cargarFestivos();
-}
+/* ---------- Festivos y puentes (SQL 136 + 150): el editor está en festivos.js (lo usa también ausencias.html) ---------- */
+function cargarFestivos(){ montarFestivos(document.getElementById("fs_editor")); }
 
 /* ---------- Tarifas (PDF de consulta, asignadas a tiendas) ---------- */
 let tfLista = [], tfAsign = [], tfTiendas = null, tfAbierta = null;

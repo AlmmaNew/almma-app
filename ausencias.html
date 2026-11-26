@@ -6,6 +6,7 @@
 <title>ALMMA - Ausencias y vacaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="calendario.js"></script>
+<script src="festivos.js"></script>
 <style>
 /* ALMMA · Ausencias y vacaciones del personal (26-11-2026, migracion/149_ausencias_y_vacaciones.sql).
    Montadores y gente de la oficina/almacén. Las apunta y cambia cualquiera de la oficina (is_staff); cada alta, cambio o borrado
@@ -102,6 +103,12 @@ table.lista td.acc{white-space:nowrap;text-align:right;} table.lista td.acc butt
 </section>
 
 <section class="tarjeta">
+  <h2>🎉 Festivos locales y puentes</h2>
+  <p class="muted" style="margin-top:0">Para toda la empresa: no se trabaja. Salen en rojo en el calendario de las fechas y en el cuadro de arriba, Planificar no propone montajes ese día y no cuentan para el plazo de la entrega 24h–48h. Para un puente de varios días, pon también «Hasta».</p>
+  <div id="festivos_editor"></div>
+</section>
+
+<section class="tarjeta">
   <div class="nav" style="margin-bottom:6px"><h2 style="margin:0;flex:1">📋 Listado</h2>
     <label class="muted"><input type="checkbox" id="ver_pasadas" onchange="pintarLista()"> Ver también las ya pasadas</label></div>
   <div id="lista"></div>
@@ -146,15 +153,17 @@ async function init() {
     '<optgroup label="' + g + '">' + personas.filter(p => p.grupo === g).map(p => '<option value="' + p.k + '">' + esc(p.nombre) + '</option>').join("") + '</optgroup>').join("");
   await cargar();
   if (esAdmin) cargarAvisos();
+  window.onFestivosCambiados = cargar;   // al añadir o quitar un festivo, el cuadro del mes y los laborables se ponen al día
+  montarFestivos($("festivos_editor"));
 }
 
 async function cargar() {
   const desde = new Date(); desde.setFullYear(desde.getFullYear() - 3);
   const [a, f] = await Promise.all([
     client.from("ausencias").select("*, montadores(nombre), staff(nombre)").gte("hasta", iso(desde)).order("desde").limit(5000),
-    client.from("festivos").select("fecha, nombre")]);
+    client.from("festivos").select("*")]);
   if (a.error) { $("lista").innerHTML = '<div class="vacio">No se pudieron cargar las ausencias: ' + esc(a.error.message) + (/does not exist|schema cache/.test(a.error.message) ? " (falta ejecutar el SQL 149 en Supabase)" : "") + '</div>'; return; }
-  ausencias = a.data || []; festivos = {}; (f.data || []).forEach(x => festivos[x.fecha] = x.nombre || "Festivo");
+  ausencias = a.data || []; festivos = {}; (f.data || []).forEach(x => festivos[x.fecha] = Calendario.nombreFestivo(x));
   pintarRejilla(); pintarLista();
 }
 

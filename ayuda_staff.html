@@ -120,7 +120,7 @@ La ficha sale al momento de pulsar la orden. Las líneas, fotos, documentos e hi
 <ol>
 <li><b>🚚 Proponer entrega 24h–48h</b>: pones el precio especial de este pedido, que puede ser un <b>importe fijo</b> (€) o un <b>porcentaje sobre un importe</b> (sale ya puesto el valor del servicio de la orden, se puede cambiar). Abajo sale lo que se cobrará a la tienda. Opcional: de dónde sale la mercancía y unas notas. Pulsa <b>💾 Guardar propuesta</b> y díselo a la tienda.</li>
 <li>Cuando la tienda <b>acepta el precio</b>: escribe quién de la tienda lo acepta, por dónde (llamada, WhatsApp, email, en persona) y pulsa <b>✅ La tienda acepta el precio</b>. Si no lo acepta, <b>✗ No lo acepta</b>. Con <b>✎ Cambiar precio</b> se corrige la propuesta.</li>
-<li><b>🚚 Confirmar el servicio a la tienda</b>: en ese momento <b>empieza el plazo</b>. Hay que entregar entre las 24 h y las 48 h siguientes, <b>contando solo días laborables</b>: no cuentan sábados, domingos ni festivos (por ejemplo, confirmada el viernes a las 10:00 → entre el lunes a las 10:00 y el martes a las 10:00). Los festivos se ponen en <b>🔐 Administración → Festivos</b>. Se añade sola a la orden la línea de importes <b>«SERVICIO ENTREGA 24-48H»</b> con el precio. Se factura con el resto y <b>en la factura sale dentro de esa orden, junto al concepto del montaje</b>, con su importe.</li>
+<li><b>🚚 Confirmar el servicio a la tienda</b>: en ese momento <b>empieza el plazo</b>. Hay que entregar entre las 24 h y las 48 h siguientes, <b>contando solo días laborables</b>: no cuentan sábados, domingos ni festivos (por ejemplo, confirmada el viernes a las 10:00 → entre el lunes a las 10:00 y el martes a las 10:00). Los festivos y puentes se ponen en <b>🏖 Ausencias y vacaciones</b> o en <b>🔐 Administración → Festivos</b>. Se añade sola a la orden la línea de importes <b>«SERVICIO ENTREGA 24-48H»</b> con el precio. Se factura con el resto y <b>en la factura sale dentro de esa orden, junto al concepto del montaje</b>, con su importe.</li>
 </ol>
 <p><b>Si solo una parte del pedido se entrega ya</b> (por ejemplo, lo que está en el almacén, y el resto va a tardar): pulsa <b>✂ Separar líneas a una orden nueva 24h–48h</b>. Marca las líneas que se entregan ya (salen marcadas las recibidas), pon el precio y pulsa <b>✂ Separar y crear la orden nueva</b>. Esas líneas <b>se mueven</b> (con su recepción, ubicación y albarán) a una orden nueva del mismo cliente, que nace con la propuesta de entrega 24h–48h; las demás se quedan en la orden original. La orden nueva se abre sola y sigue los mismos pasos 2 y 3. Las dos quedan enlazadas en <b>🕘 Historial</b> («Viene de» / «Continúa en»). La orden nueva lleva su línea «Montaje» vacía: <b>reparte tú el importe del montaje</b> entre las dos.</p>
 <p>El recuadro enseña las horas laborables que quedan, y en rojo si se ha pasado el plazo. Cuando la orden tiene fecha de montaje, sale <b>✔ Cumplida</b>. En <b>Planificar montajes</b>, las órdenes confirmadas salen arriba en su propio recuadro azul <b>🚚 Entregas 24h–48h</b>, con su plazo. Cada paso queda apuntado en <b>📞 Llamadas</b>. <b>Anular</b> lo cancela en cualquier momento y, si ya estaba confirmado, quita la línea (si aún no está facturada).</p>
@@ -199,6 +199,8 @@ La ficha sale al momento de pulsar la orden. Las líneas, fotos, documentos e hi
 </table>
 <ul>
 <li>Un equipo con el día lleno sale en <b>amarillo «✔ Día completo»</b>; si pasa de la jornada, en <b>rojo «⚠ Sobrecarga»</b>. Si propones algo que hace pasar de la jornada, la pantalla <b>avisa de la sobrecarga</b> pero te deja hacerlo.</li>
+<li><b>Vacaciones y festivos:</b> si alguien del equipo está de vacaciones, ausente o de baja ese día (lo apuntado en <b>🏖 Ausencias y vacaciones</b>), en la tabla sale en rojo bajo el equipo (<b>🏖 Luis de vacaciones</b>) y en el calendario con 🏖 delante del equipo. Los festivos y puentes salen con <b>🎉</b> en el día.
+Al <b>proponer</b> una cita, <b>proponer la ruta</b> o <b>✅ Confirmar</b> en un día así, la pantalla <b>avisa</b> y pregunta si seguir. Las sugerencias de día de cada orden no proponen nunca esos días a ese equipo.</li>
 </ul>
 <h3>Los tres pasos de una cita</h3>
 <ol>
@@ -311,7 +313,9 @@ Debajo te dice cuántos días son y cuántos <b>laborables</b> (sin sábados, do
 <li>En el <b>📋 Listado</b> están las de hoy en adelante, con <b>✎ Cambiar</b> y <b>🗑 Borrar</b>. La casilla <b>Ver también las ya pasadas</b> enseña las antiguas.</li>
 </ol>
 <p><b>Aviso a los administradores:</b> cada vez que alguien apunta, cambia o borra una ausencia queda anotado (quién, cuándo, cómo estaba y cómo queda). Los superusuarios lo ven en rojo en el botón de Inicio (<b>🔔 X cambios nuevos</b>) y arriba de la pantalla, hasta que pulsan <b>✔ Visto</b>. <b>Ver todos los cambios</b> enseña los últimos aunque ya estén vistos.</p>
-<p><b>Calendario de las fechas:</b> en toda la web, al pinchar una casilla de fecha sale el calendario de ALMMA: los <b>festivos en rojo</b>, sábados y domingos en gris y, en la oficina, un <b>puntito</b> de color los días que falta alguien. Debajo salen los festivos y las ausencias de ese mes. Con <b>Hoy</b>, <b>Borrar</b> y <b>Cerrar</b>. En el ordenador también se puede seguir escribiendo la fecha a mano. Los festivos se ponen en <b>🔐 Administración → Festivos</b>.</p>
+<p><b>Calendario de las fechas:</b> en toda la web, al pinchar una casilla de fecha sale el calendario de ALMMA: los <b>festivos en rojo</b>, sábados y domingos en gris y, en la oficina, un <b>puntito</b> de color los días que falta alguien. Debajo salen los festivos y las ausencias de ese mes. Con <b>Hoy</b>, <b>Borrar</b> y <b>Cerrar</b>. En el ordenador también se puede seguir escribiendo la fecha a mano.</p>
+<p><b>🎉 Festivos locales y puentes:</b> en esta misma pantalla (y en <b>🔐 Administración → Festivos</b>) cualquiera de la oficina puede añadir un día que no se trabaja: elige el <b>Día</b>, el <b>Tipo</b> (Nacional, Autonómico, <b>Local</b> o <b>Puente</b>) y el <b>Nombre</b>, y pulsa <b>➕ Añadir</b>. Para un puente de varios días pon también <b>Hasta</b>: se apuntan todos los días entre semana (los sábados y domingos no hace falta). En la lista se puede cambiar el tipo o el nombre, o <b>🗑 Quitar</b>.
+Un festivo o puente vale para toda la empresa: sale en rojo en el calendario, Planificar no lo propone para montar y no cuenta para el plazo de la entrega 24h–48h. Las vacaciones de UNA persona se apuntan arriba, como ausencia.</p>
 
 <h2>15. Otras pantallas</h2>
 <table>
@@ -319,7 +323,7 @@ Debajo te dice cuántos días son y cuántos <b>laborables</b> (sin sábados, do
 <tr><td>🧾 Facturación</td><td>Pendientes, borradores y emitidas. Normalmente solo oficina/dirección.</td></tr>
 <tr><td>🛠️ DeCA</td><td>Pantalla específica de DeCA (hoja de ruta de sus montajes).</td></tr>
 <tr><td>⚙️ Sistema</td><td>Catálogos: tiendas, fabricantes, dependientes, montadores, artículos.</td></tr>
-<tr><td>🔐 Administración</td><td>Solo administradores: cuentas, permisos y quitar acceso. En la pestaña <b>Festivos</b>, los días que no cuentan para el plazo de la entrega 24h–48h; salen en rojo en el calendario de todas las fechas.</td></tr>
+<tr><td>🔐 Administración</td><td>Solo administradores: cuentas, permisos y quitar acceso. En la pestaña <b>Festivos</b>, los festivos (también locales) y puentes: no cuentan para el plazo de la entrega 24h–48h, salen en rojo en el calendario de todas las fechas y Planificar no los propone.</td></tr>
 </table>
 
 <h2>Reglas de oro</h2>
