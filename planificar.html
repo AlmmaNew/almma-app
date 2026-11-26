@@ -1647,15 +1647,23 @@ async function guardarEdicion(anyo, orden){
 async function quitar(anyo, orden, citaId, estado){
   const o = buscarOrden(anyo, orden);
   if (!citaId) { if (confirm("La orden " + anyo + "/" + orden + " se agendó desde Órdenes o Rutas (no tiene cita aquí).\n\n¿Abrirla en Órdenes para quitarle la fecha?")) window.open("pedidos.html?anyo=" + anyo + "&orden=" + orden, "_blank"); return; }
-  const msg = estado === "confirmada"
-    ? "La cita de " + anyo + "/" + orden + " está CONFIRMADA con el cliente.\n\nSi la quitas, la orden pierde la fecha y los montadores y vuelve a «Recepcionada». Habrá que avisar al cliente.\n\n¿Quitarla?"
-    : estado === "avisada"
-    ? "Al cliente de " + anyo + "/" + orden + " YA se le ha avisado por WhatsApp de esta cita.\n\n¿Quitarla? La orden vuelve a «Sin agendar» (si hace falta, avisa al cliente de que se cambia)."
-    : "¿Quitar la cita propuesta de " + anyo + "/" + orden + "? La orden vuelve a «Sin agendar».";
-  if (!confirm(msg)) return;
-  const { error } = await client.rpc("cancelar_cita", { p_id: citaId, p_motivo: "Quitada desde Planificar montajes" });
+  let quitarFecha = false;
+  if (estado !== "confirmada" && o && o.fprev) {   // ya tenía fecha (cita confirmada o puesta a mano): ¿se le quita también? (SQL 146)
+    quitarFecha = await preguntarFecha(o, "↩ Quitar la cita propuesta" + (estado === "avisada" ? " (el cliente YA está avisado por WhatsApp)" : ""));
+    if (quitarFecha === null) return;
+  } else {
+    const msg = estado === "confirmada"
+      ? "La cita de " + anyo + "/" + orden + " está CONFIRMADA con el cliente.\n\nSi la quitas, la orden pierde la fecha y los montadores y vuelve a «Recepcionada». Habrá que avisar al cliente.\n\n¿Quitarla?"
+      : estado === "avisada"
+      ? "Al cliente de " + anyo + "/" + orden + " YA se le ha avisado por WhatsApp de esta cita.\n\n¿Quitarla? La orden vuelve a «Sin agendar» (si hace falta, avisa al cliente de que se cambia)."
+      : "¿Quitar la cita propuesta de " + anyo + "/" + orden + "? La orden vuelve a «Sin agendar».";
+    if (!confirm(msg)) return;
+  }
+  const p = { p_id: citaId, p_motivo: "Quitada desde Planificar montajes" }; if (quitarFecha) p.p_quitar_fecha = true;
+  const { error } = await client.rpc("cancelar_cita", p);
   if (error) { alert("No se ha podido quitar: " + error.message); return; }
-  if (estado === "confirmada") await cargarTodo(); else await recargarCitas();
+  if (estado === "confirmada" || quitarFecha) await cargarTodo(); else await recargarCitas();
+  if (o && o.fprev && !quitarFecha && estado !== "confirmada") { toast(o.n + ": propuesta quitada. Sigue con su fecha del " + fdia(o.fprev) + "."); return; }
   toast((o ? o.n : anyo + "/" + orden) + " vuelve a «Sin agendar».");
 }
 async function confirmar(id){
@@ -1671,13 +1679,33 @@ async function confirmar(id){
 }
 async function rechazar(id){
   const c = citasAbiertas.find(x => x.id === id); if (!c) return;
-  const motivo = prompt("Al cliente de " + c.anyo + "/" + c.orden + " no le va bien. La orden vuelve a «Sin agendar».\n\nMotivo u otra fecha que prefiere (queda anotado en Llamadas):", "Al cliente no le va bien");
+  const o = buscarOrden(c.anyo, c.orden);
+  const motivo = prompt("Al cliente de " + c.anyo + "/" + c.orden + " no le va bien esta cita.\n\nMotivo u otra fecha que prefiere (queda anotado en Llamadas):", "Al cliente no le va bien");
   if (motivo === null) return;
-  const { error } = await client.rpc("cancelar_cita", { p_id: id, p_motivo: motivo || "Al cliente no le va bien" });
+  let quitarFecha = false;
+  if (o && o.fprev) { quitarFecha = await preguntarFecha(o, "✖ Al cliente no le va bien la cita nueva"); if (quitarFecha === null) return; }   // SQL 146
+  const p = { p_id: id, p_motivo: motivo || "Al cliente no le va bien" }; if (quitarFecha) p.p_quitar_fecha = true;
+  const { error } = await client.rpc("cancelar_cita", p);
   if (error) { alert("No se ha podido anular: " + error.message); return; }
-  await recargarCitas();
-  toast(c.anyo + "/" + c.orden + " vuelve a «Sin agendar».");
+  if (quitarFecha) await cargarTodo(); else await recargarCitas();
+  toast(o && o.fprev && !quitarFecha ? c.anyo + "/" + c.orden + ": cita nueva anulada. Sigue con su fecha del " + fdia(o.fprev) + "." : c.anyo + "/" + c.orden + " vuelve a «Sin agendar».");
 }
+/* La orden ya tenía fecha (cita confirmada antes, o puesta a mano) y se anula la cita NUEVA: ¿se le quita también esa fecha? (Arturo, 26-11-2026)
+   Devuelve true (quitar → «Sin agendar»), false (mantener) o null (se cierra la ventana sin elegir). */
+let resFechaFn = null;
+function preguntarFecha(o, titulo){
+  return new Promise(res => {
+    resFechaFn = res;
+    const conf = citasConf[o.n];
+    abrirVentana('<h3>' + esc(titulo) + '</h3><p>La orden <b>' + o.n + '</b> · ' + esc(o.cli) + ' ya tiene fecha: <b>' + fdia(o.fprev) + (o.hora ? " · " + esc(o.hora) : "") + '</b>' +
+      (conf ? " (cita confirmada antes)" : "") + '.</p><p>¿Qué hacemos con esa fecha?</p>' +
+      '<div class="fila2"><button class="rojo" onclick="elegirFecha(true)">Quitarle también esa fecha → vuelve a «Sin agendar»</button>' +
+      '<button class="secondary" onclick="elegirFecha(false)">Mantener la fecha del ' + fdia(o.fprev) + '</button></div>' +
+      '<div class="muted">«Quitar» deja la orden en «Recepcionada», sin fecha, sin franja y sin montadores (y anula la cita confirmada anterior). Si hace falta, avisa al cliente.</div>');
+    const v = document.getElementById("ventana"), mira = setInterval(() => { if (v.style.display !== "block") { clearInterval(mira); if (resFechaFn === res) { resFechaFn = null; res(null); } } }, 300);
+  });
+}
+function elegirFecha(v){ const r = resFechaFn; resFechaFn = null; cerrarVentana(); if (r) r(v); }
 
 /* ---------- aviso por WhatsApp ---------- */
 /* Franja de llegada de 2 horas (petición de Arturo, 21-11-2026): «Llegamos de 10 a 12 h». Por defecto empieza en la hora en punto de la cita. */
