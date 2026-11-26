@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALMMA - Ausencias y vacaciones</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="calendario.js"></script>
+<style>
+/* ALMMA · Ausencias y vacaciones del personal (26-11-2026, migracion/149_ausencias_y_vacaciones.sql).
+   Montadores y gente de la oficina/almacén. Las apunta y cambia cualquiera de la oficina (is_staff); cada alta, cambio o borrado
+   queda apuntado y los superusuarios (staff.es_admin) lo ven arriba como aviso hasta pulsar «✔ Visto».
+   Se ven también, con los festivos, en el calendario de todas las fechas de la web (calendario.js). */
+:root{--primary:#2563eb;--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+#toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 20px;background:#fff;border-bottom:1px solid var(--border);}
+#toolbar .spacer{flex:1;}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#fff;padding:8px 14px;font-size:14px;}
+button.primario{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700;}
+button.rojo{color:#b91c1c;}
+.muted{color:var(--muted);font-size:13px;}
+main{max-width:1250px;margin:0 auto;padding:18px 20px 60px;}
+h1{font-size:20px;margin:0 0 14px;}
+.tarjeta{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 14px -6px rgba(15,23,42,.10);}
+.tarjeta h2{font-size:16px;margin:0 0 10px;}
+.form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#475569;}
+.form select,.form input{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:#fff;}
+.form input[type=text]{min-width:240px;}
+#f_info{font-size:13px;color:#1e3a8a;min-height:18px;margin-top:8px;}
+#avisos{display:none;border-color:#fca5a5;background:#fff7f7;}
+#avisos h2{color:#b91c1c;}
+.cambio{font-size:13px;padding:6px 0;border-top:1px solid #fde2e2;} .cambio:first-of-type{border-top:0;}
+.cambio .ac{font-weight:700;} .cambio s{color:#94a3b8;}
+.nav{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.nav b{font-size:16px;min-width:150px;text-align:center;}
+.rejilla{overflow-x:auto;}
+.rejilla table{border-collapse:collapse;font-size:12px;}
+.rejilla th,.rejilla td{border:1px solid #eef2f7;text-align:center;padding:0;height:28px;min-width:26px;}
+.rejilla th{background:#f8fafc;font-weight:600;color:#475569;}
+.rejilla th.persona,.rejilla td.persona{position:sticky;left:0;background:#fff;text-align:left;padding:0 10px;min-width:150px;white-space:nowrap;font-weight:600;z-index:1;}
+.rejilla tr.grupo td{background:#f1f5f9;text-align:left;padding:4px 10px;font-weight:700;color:#334155;position:sticky;left:0;}
+.rejilla .finde{background:#f8fafc;color:#94a3b8;}
+.rejilla .fest{background:#fee2e2;color:#b91c1c;}
+.rejilla .hoy{outline:2px solid var(--primary);outline-offset:-2px;}
+.rejilla td.a{cursor:pointer;color:#fff;font-weight:700;}
+.rejilla td.vacaciones{background:#0284c7;} .rejilla td.ausencia{background:#d97706;} .rejilla td.baja{background:#7c3aed;}
+.rejilla td.libre{cursor:copy;} .rejilla td.libre:hover{background:#eff6ff;}
+.ley{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:10px;}
+.ley span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px;background:var(--c);}
+table.lista{width:100%;border-collapse:collapse;font-size:14px;}
+table.lista th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);}
+table.lista td{padding:7px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
+table.lista td.acc{white-space:nowrap;text-align:right;} table.lista td.acc button{padding:5px 10px;font-size:13px;}
+.etq{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;color:#fff;}
+.vacio{color:var(--muted);font-size:14px;padding:10px 0;}
+@media print{#toolbar,.form,.acc,#avisos,.nav button{display:none!important}}
+</style>
+<link rel="stylesheet" href="estilo_oficina.css">
+<script src="volver.js" defer></script>
+</head>
+<body>
+<div id="toolbar">
+  <button class="secondary" onclick="location.href='inicio.html'">🏠 Inicio</button>
+  <button class="secondary" onclick="location.href='pedidos.html'">Ordenes</button>
+  <button class="secondary" onclick="location.href='rutas.html'">Rutas</button>
+  <button class="secondary" onclick="location.href='planificar.html'">📍 Planificar montajes</button>
+  <button class="secondary activo" onclick="location.href='ausencias.html'">🏖 Ausencias y vacaciones</button>
+  <div class="spacer"></div>
+  <span id="quien" class="muted"></span>
+  <button class="secondary" onclick="logout()">Salir</button>
+</div>
+<main>
+<h1>🏖 Ausencias y vacaciones</h1>
+
+<section class="tarjeta" id="avisos">
+  <h2>🔔 Cambios nuevos en ausencias y vacaciones</h2>
+  <div id="avisos_lista"></div>
+  <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="primario" onclick="marcarVisto()">✔ Visto</button><button onclick="verHistorial()">Ver todos los cambios</button></div>
+</section>
+
+<section class="tarjeta">
+  <h2 id="f_titulo">➕ Apuntar ausencia o vacaciones</h2>
+  <div class="form">
+    <label>Persona<select id="f_persona"></select></label>
+    <label>Tipo<select id="f_tipo"><option value="vacaciones">🏖 Vacaciones</option><option value="ausencia">🚫 Ausencia</option><option value="baja">🩺 Baja médica</option></select></label>
+    <label>Desde<input type="date" id="f_desde" oninput="infoDias()" onchange="if(!f_hasta.value||f_hasta.value<this.value)f_hasta.value=this.value;infoDias()"></label>
+    <label>Hasta (incluido)<input type="date" id="f_hasta" onchange="infoDias()"></label>
+    <label>Motivo<input type="text" id="f_motivo" placeholder="Médico, asuntos propios, boda…" maxlength="200"></label>
+    <button class="primario" id="f_guardar" onclick="guardar()">Guardar</button>
+    <button id="f_cancelar" style="display:none" onclick="limpiar()">Cancelar</button>
+  </div>
+  <div id="f_info"></div>
+</section>
+
+<section class="tarjeta">
+  <div class="nav"><button onclick="mover(-1)">‹</button><b id="mes"></b><button onclick="mover(1)">›</button><button onclick="mover(0)">Este mes</button>
+    <span class="muted">Pinche un día vacío para apuntar desde ese día, o uno coloreado para cambiarlo.</span></div>
+  <div class="rejilla" id="rejilla"></div>
+  <div class="ley"><span style="--c:#0284c7">Vacaciones</span><span style="--c:#d97706">Ausencia</span><span style="--c:#7c3aed">Baja médica</span><span style="--c:#fee2e2">Festivo</span><span style="--c:#f8fafc">Sábado y domingo</span></div>
+</section>
+
+<section class="tarjeta">
+  <div class="nav" style="margin-bottom:6px"><h2 style="margin:0;flex:1">📋 Listado</h2>
+    <label class="muted"><input type="checkbox" id="ver_pasadas" onchange="pintarLista()"> Ver también las ya pasadas</label></div>
+  <div id="lista"></div>
+</section>
+</main>
+<script>
+const client = supabase.createClient(
+  "https://uamgbtbsxbrgymhqalak.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k"
+);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const TIPOS = { vacaciones: { t: "Vacaciones", i: "🏖", c: "#0284c7" }, ausencia: { t: "Ausencia", i: "🚫", c: "#d97706" }, baja: { t: "Baja médica", i: "🩺", c: "#7c3aed" } };
+const iso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const deIso = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const fecha = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4) : "";
+const HOY = iso(new Date());
+
+let yo = null, esAdmin = false, personas = [], ausencias = [], festivos = {}, editando = null, vista = new Date();
+vista.setDate(1);
+
+/* persona: clave «m:<id montador>» o «s:<user_id staff>» */
+const claveDe = a => a.montador_id ? "m:" + a.montador_id : "s:" + a.staff_user_id;
+const nombreDe = a => { const p = personas.find(x => x.k === claveDe(a)); return p ? p.nombre : ((a.montadores && a.montadores.nombre) || (a.staff && a.staff.nombre) || "?"); };
+
+async function init() {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) { location.href = "login.html"; return; }
+  yo = user.id;
+  const { data: st } = await client.from("staff").select("nombre, es_admin, solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle();
+  if (!st || st.solo_montajes || st.solo_deca) { location.href = "inicio.html"; return; }
+  $("quien").textContent = st.nombre || ""; esAdmin = !!st.es_admin;
+  const [m, s] = await Promise.all([
+    client.from("montadores").select("id, nombre, activo, especial, staff_user_id").order("nombre"),
+    client.from("staff").select("user_id, nombre, solo_montajes, solo_deca, baja_at").order("nombre")]);
+  const vinculados = new Set((m.data || []).filter(x => x.staff_user_id).map(x => x.staff_user_id));
+  personas = [
+    ...(m.data || []).filter(x => x.activo && !x.especial).map(x => ({ k: "m:" + x.id, nombre: x.nombre, grupo: "Montadores" })),
+    ...(s.data || []).filter(x => !x.baja_at && !x.solo_montajes && !x.solo_deca && !vinculados.has(x.user_id)).map(x => ({ k: "s:" + x.user_id, nombre: x.nombre || "(sin nombre)", grupo: "Oficina y almacén" }))];
+  $("f_persona").innerHTML = '<option value="">— Elija —</option>' + ["Montadores", "Oficina y almacén"].map(g =>
+    '<optgroup label="' + g + '">' + personas.filter(p => p.grupo === g).map(p => '<option value="' + p.k + '">' + esc(p.nombre) + '</option>').join("") + '</optgroup>').join("");
+  await cargar();
+  if (esAdmin) cargarAvisos();
+}
+
+async function cargar() {
+  const desde = new Date(); desde.setFullYear(desde.getFullYear() - 3);
+  const [a, f] = await Promise.all([
+    client.from("ausencias").select("*, montadores(nombre), staff(nombre)").gte("hasta", iso(desde)).order("desde").limit(5000),
+    client.from("festivos").select("fecha, nombre")]);
+  if (a.error) { $("lista").innerHTML = '<div class="vacio">No se pudieron cargar las ausencias: ' + esc(a.error.message) + (/does not exist|schema cache/.test(a.error.message) ? " (falta ejecutar el SQL 149 en Supabase)" : "") + '</div>'; return; }
+  ausencias = a.data || []; festivos = {}; (f.data || []).forEach(x => festivos[x.fecha] = x.nombre || "Festivo");
+  pintarRejilla(); pintarLista();
+}
+
+/* días laborables entre dos fechas (sin sábados, domingos ni festivos) */
+function laborables(d, h) {
+  let n = 0; for (let x = deIso(d); iso(x) <= h; x.setDate(x.getDate() + 1)) if (x.getDay() && x.getDay() !== 6 && !festivos[iso(x)]) n++;
+  return n;
+}
+function infoDias() {
+  const d = $("f_desde").value, h = $("f_hasta").value;
+  if (!d || !h || h < d) { $("f_info").textContent = h && d && h < d ? "⚠ «Hasta» no puede ser antes que «Desde»." : ""; return; }
+  const nat = Math.round((deIso(h) - deIso(d)) / 864e5) + 1, lab = laborables(d, h);
+  const p = $("f_persona").value, otras = p ? ausencias.filter(a => claveDe(a) === p && (!editando || a.id !== editando.id) && a.desde <= h && a.hasta >= d) : [];
+  $("f_info").innerHTML = nat + (nat === 1 ? " día" : " días") + " · <b>" + lab + (lab === 1 ? " laborable" : " laborables") + "</b> (sin sábados, domingos ni festivos)" +
+    (otras.length ? ' · <span style="color:#b91c1c">⚠ Ya tiene apuntado algo en esas fechas (' + otras.map(a => TIPOS[a.tipo].t.toLowerCase() + " " + fecha(a.desde) + "–" + fecha(a.hasta)).join(", ") + ')</span>' : "");
+}
+$("f_persona").addEventListener("change", infoDias);
+
+async function guardar() {
+  const p = $("f_persona").value, d = $("f_desde").value, h = $("f_hasta").value || d;
+  if (!p) return alert("Elija la persona.");
+  if (!d) return alert("Ponga la fecha «Desde».");
+  if (h < d) return alert("«Hasta» no puede ser antes que «Desde».");
+  const fila = { montador_id: p.startsWith("m:") ? p.slice(2) : null, staff_user_id: p.startsWith("s:") ? p.slice(2) : null,
+                 tipo: $("f_tipo").value, desde: d, hasta: h, motivo: $("f_motivo").value.trim() || null };
+  $("f_guardar").disabled = true;
+  const r = editando ? await client.from("ausencias").update(fila).eq("id", editando.id) : await client.from("ausencias").insert(fila);
+  $("f_guardar").disabled = false;
+  if (r.error) return alert("No se pudo guardar: " + r.error.message);
+  if (window.Calendario) Calendario.invalidar();
+  limpiar(); await cargar(); if (esAdmin) cargarAvisos();
+}
+function editar(id) {
+  const a = ausencias.find(x => x.id === id); if (!a) return;
+  editando = a;
+  if (![...$("f_persona").options].some(o => o.value === claveDe(a))) { // persona ya dada de baja: que siga saliendo en su ausencia
+    const o = document.createElement("option"); o.value = claveDe(a); o.textContent = nombreDe(a) + " (ya no activa)"; $("f_persona").appendChild(o);
+  }
+  $("f_persona").value = claveDe(a); $("f_tipo").value = a.tipo; $("f_desde").value = a.desde; $("f_hasta").value = a.hasta; $("f_motivo").value = a.motivo || "";
+  $("f_titulo").textContent = "✎ Cambiar la ausencia de " + nombreDe(a); $("f_guardar").textContent = "Guardar cambios"; $("f_cancelar").style.display = "";
+  infoDias(); window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function limpiar() {
+  editando = null; $("f_persona").value = ""; $("f_tipo").value = "vacaciones"; $("f_desde").value = ""; $("f_hasta").value = ""; $("f_motivo").value = "";
+  $("f_titulo").textContent = "➕ Apuntar ausencia o vacaciones"; $("f_guardar").textContent = "Guardar"; $("f_cancelar").style.display = "none"; $("f_info").textContent = "";
+}
+async function borrar(id) {
+  const a = ausencias.find(x => x.id === id); if (!a) return;
+  if (!confirm("¿Borrar " + TIPOS[a.tipo].t.toLowerCase() + " de " + nombreDe(a) + " (" + fecha(a.desde) + " – " + fecha(a.hasta) + ")?")) return;
+  const r = await client.from("ausencias").delete().eq("id", id);
+  if (r.error) return alert("No se pudo borrar: " + r.error.message);
+  if (window.Calendario) Calendario.invalidar();
+  if (editando && editando.id === id) limpiar();
+  await cargar(); if (esAdmin) cargarAvisos();
+}
+
+/* ---------- cuadro del mes: personas × días ---------- */
+function mover(n) { vista = n ? new Date(vista.getFullYear(), vista.getMonth() + n, 1) : new Date(new Date().getFullYear(), new Date().getMonth(), 1); pintarRejilla(); }
+function pintarRejilla() {
+  const y = vista.getFullYear(), m = vista.getMonth(), n = new Date(y, m + 1, 0).getDate();
+  $("mes").textContent = MESES[m] + " " + y;
+  const dias = []; for (let i = 1; i <= n; i++) { const d = new Date(y, m, i); dias.push({ v: iso(d), n: i, s: "LMXJVSD"[(d.getDay() + 6) % 7], finde: d.getDay() === 0 || d.getDay() === 6 }); }
+  const ini = dias[0].v, fin = dias[n - 1].v;
+  const cls = d => (festivos[d.v] ? "fest" : d.finde ? "finde" : "") + (d.v === HOY ? " hoy" : "");
+  let h = '<table><tr><th class="persona">Persona</th>' + dias.map(d => '<th class="' + cls(d) + '"' + (festivos[d.v] ? ' title="' + esc(festivos[d.v]) + '"' : "") + '>' + d.s + '<br>' + d.n + '</th>').join("") + '</tr>';
+  // personas activas + las que tengan algo este mes aunque ya no estén activas
+  const lista = [...personas];
+  ausencias.filter(a => a.desde <= fin && a.hasta >= ini && !lista.some(p => p.k === claveDe(a))).forEach(a => lista.push({ k: claveDe(a), nombre: nombreDe(a), grupo: a.montador_id ? "Montadores" : "Oficina y almacén" }));
+  ["Montadores", "Oficina y almacén"].forEach(g => {
+    const ps = lista.filter(p => p.grupo === g); if (!ps.length) return;
+    h += '<tr class="grupo"><td colspan="' + (n + 1) + '">' + g + '</td></tr>';
+    ps.forEach(p => {
+      const suyas = ausencias.filter(a => claveDe(a) === p.k && a.desde <= fin && a.hasta >= ini);
+      h += '<tr><td class="persona">' + esc(p.nombre) + '</td>' + dias.map(d => {
+        const a = suyas.find(x => x.desde <= d.v && x.hasta >= d.v);
+        if (a) return '<td class="a ' + a.tipo + '" onclick="editar(\'' + a.id + '\')" title="' + esc(TIPOS[a.tipo].t + (a.motivo ? ": " + a.motivo : "") + " · " + fecha(a.desde) + " – " + fecha(a.hasta)) + '">' + (d.v === a.desde || d.n === 1 ? TIPOS[a.tipo].i : "") + '</td>';
+        return '<td class="libre ' + cls(d) + '" onclick="nuevaDesde(\'' + p.k + '\',\'' + d.v + '\')"></td>';
+      }).join("") + '</tr>';
+    });
+  });
+  $("rejilla").innerHTML = h + '</table>';
+}
+function nuevaDesde(k, d) {
+  limpiar(); $("f_persona").value = k; $("f_desde").value = d; $("f_hasta").value = d; infoDias();
+  window.scrollTo({ top: 0, behavior: "smooth" }); $("f_hasta").focus();
+}
+
+/* ---------- listado ---------- */
+function pintarLista() {
+  const todas = $("ver_pasadas").checked;
+  const ls = ausencias.filter(a => todas || a.hasta >= HOY).sort((a, b) => todas ? b.desde.localeCompare(a.desde) : a.desde.localeCompare(b.desde));
+  if (!ls.length) { $("lista").innerHTML = '<div class="vacio">' + (todas ? "No hay nada apuntado." : "No hay ausencias ni vacaciones de hoy en adelante.") + '</div>'; return; }
+  $("lista").innerHTML = '<table class="lista"><tr><th>Persona</th><th>Tipo</th><th>Desde</th><th>Hasta</th><th>Laborables</th><th>Motivo</th><th></th></tr>' + ls.map(a =>
+    '<tr' + (a.hasta < HOY ? ' style="opacity:.6"' : '') + '><td><b>' + esc(nombreDe(a)) + '</b>' + (a.desde <= HOY && a.hasta >= HOY ? ' <span class="muted">(hoy)</span>' : '') + '</td>' +
+    '<td><span class="etq" style="background:' + TIPOS[a.tipo].c + '">' + TIPOS[a.tipo].i + ' ' + TIPOS[a.tipo].t + '</span></td><td>' + fecha(a.desde) + '</td><td>' + fecha(a.hasta) + '</td>' +
+    '<td>' + laborables(a.desde, a.hasta) + '</td><td>' + esc(a.motivo || "") + '</td>' +
+    '<td class="acc"><button onclick="editar(\'' + a.id + '\')">✎ Cambiar</button> <button class="rojo" onclick="borrar(\'' + a.id + '\')">🗑 Borrar</button></td></tr>').join("") + '</table>';
+}
+
+/* ---------- avisos a los administradores (solo superusuarios: RLS del SQL 149) ---------- */
+const accTxt = { alta: "➕ ha apuntado", cambio: "✎ ha cambiado", borrado: "🗑 ha borrado" };
+function txtCambio(c) {
+  const fmt = x => x ? (TIPOS[x.tipo] ? TIPOS[x.tipo].i + " " + TIPOS[x.tipo].t.toLowerCase() : x.tipo) + " " + fecha(x.desde) + (x.hasta !== x.desde ? " – " + fecha(x.hasta) : "") + (x.motivo ? " (" + esc(x.motivo) + ")" : "") : "";
+  const cuando = new Date(c.hecho_at).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return '<div class="cambio"><span class="muted">' + cuando + '</span> · <b>' + esc(c.hecho_por_nombre || "¿?") + '</b> <span class="ac">' + accTxt[c.accion] + '</span> · <b>' + esc(c.persona || "?") + '</b>: ' +
+    (c.accion === "alta" ? fmt(c.ahora) : c.accion === "borrado" ? "<s>" + fmt(c.antes) + "</s>" : "<s>" + fmt(c.antes) + "</s> → " + fmt(c.ahora)) + '</div>';
+}
+let ultimoAviso = null;
+async function cargarAvisos(todos) {
+  const { data: v } = await client.from("ausencias_vistos").select("visto_hasta").eq("user_id", yo).maybeSingle();
+  let q = client.from("ausencias_cambios").select("*").order("hecho_at", { ascending: false }).limit(todos ? 200 : 100);
+  if (!todos) { q = q.neq("hecho_por", yo); if (v) q = q.gt("hecho_at", v.visto_hasta); }
+  const { data, error } = await q;
+  if (error) return;
+  if (!todos && !data.length) { $("avisos").style.display = "none"; return; }
+  ultimoAviso = data.length ? data[0].hecho_at : null;
+  $("avisos").querySelector("h2").textContent = todos ? "🕘 Últimos cambios en ausencias y vacaciones" : "🔔 Cambios nuevos en ausencias y vacaciones (" + data.length + ")";
+  $("avisos_lista").innerHTML = data.length ? data.map(txtCambio).join("") : '<div class="vacio">Todavía no hay cambios.</div>';
+  $("avisos").style.display = "block";
+}
+function verHistorial() { cargarAvisos(true); }
+async function marcarVisto() {
+  const r = await client.from("ausencias_vistos").upsert({ user_id: yo, visto_hasta: new Date().toISOString() });
+  if (r.error) return alert("No se pudo marcar: " + r.error.message);
+  $("avisos").style.display = "none";
+}
+async function logout() { await client.auth.signOut(); location.href = "login.html"; }
+init();
+</script>
+</body>
+</html>

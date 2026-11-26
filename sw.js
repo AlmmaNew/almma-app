@@ -4,8 +4,8 @@
 // guarda la propia pantalla en el móvil; esto solo cubre el "programa".
 // Estrategia: primero intenta la red (para recibir mejoras) pero con un límite de 4 segundos;
 // si no hay cobertura o va muy lenta, usa lo guardado.
-const V = "almma-mi-dia-v4";
-const PROPIOS = ["mi-dia.html", "subir_archivos.js", "reducir_video.js", "mediabunny.min.js", "instrucciones_orden.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
+const V = "almma-mi-dia-v5";
+const PROPIOS = ["mi-dia.html", "subir_archivos.js", "reducir_video.js", "mediabunny.min.js", "instrucciones_orden.js", "calendario.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 const LIBRERIAS = ["cdn.jsdelivr.net"];
 
 self.addEventListener("install", e => {

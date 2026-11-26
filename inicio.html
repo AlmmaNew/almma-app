@@ -65,6 +65,7 @@ async function init() {
       B("✅", "Punteo", "Repaso de lo que falta por llegar", "punteo.html"),
       B("🗺️", "Rutas", "Montajes de la semana y montadores", "rutas.html"),
       B("📍", "Planificar montajes", "Agendar por zonas, avisar y confirmar con el cliente", "planificar.html"),
+      B("🏖", "Ausencias y vacaciones", "Días libres, ausencias y bajas del personal", "ausencias.html"),
       B("📷", "Galería de fotos", "Fotos de los montajes, por orden y cliente", "galeria.html"),
       B("📘", "Buzón de instrucciones", "Instrucciones de montaje por fabricante y modelo", "instrucciones.html"),
       B("🧾", "Facturación", "Pendientes, borradores y emitidas", "facturas.html"),
@@ -108,6 +109,20 @@ async function init() {
   document.getElementById("botones").innerHTML = botones.map(b =>
     '<a class="boton" href="' + b.href + '"><div class="ico">' + b.ico + '</div><b>' + b.t + '</b><span>' + b.d + '</span></a>').join("");
   cargarBuzon();
+  if (st && st.es_admin) avisoAusencias(user.id);
+}
+/* Superusuarios: cambios en ausencias y vacaciones hechos por otros y sin ver (SQL 149). Sin el SQL, no sale nada. */
+async function avisoAusencias(yo) {
+  try {
+    const { data: v } = await client.from("ausencias_vistos").select("visto_hasta").eq("user_id", yo).maybeSingle();
+    let q = client.from("ausencias_cambios").select("id", { count: "exact", head: true }).neq("hecho_por", yo);
+    if (v) q = q.gt("hecho_at", v.visto_hasta);
+    const { count, error } = await q;
+    if (error || !count) return;
+    const a = document.querySelector('a.boton[href="ausencias.html"]'); if (!a) return;
+    a.style.borderLeftColor = "#dc2626"; a.style.background = "#fff7f7";
+    a.querySelector("span").innerHTML = '<b style="display:inline;color:#b91c1c;font-size:13px;margin:0">🔔 ' + count + (count === 1 ? " cambio nuevo" : " cambios nuevos") + '</b> · Días libres, ausencias y bajas';
+  } catch (e) { /* sin el SQL 149 */ }
 }
 /* Buzón de instrucciones: listado de fabricantes con sus modelos. La oficina los ve todos; cada tienda, solo los que ha subido ella (RLS del SQL 144) */
 const escB = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
