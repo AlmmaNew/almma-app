@@ -43,7 +43,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 #modal_nuevo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:10;}
 #modal_nuevo .card{width:100%;max-width:640px;margin:0;}
 /* dentro de «Mi tienda» solo se ve la ventana de nuevo pedido */
-body.emb{background:transparent;} body.emb > *:not(#modal_nuevo){display:none !important;}
+body.emb{background:transparent;} body.emb > *:not(#modal_nuevo):not(.emergente){display:none !important;}   /* .emergente = avisos que salen encima (p. ej. «ya tiene una orden abierta»): si se ocultaban, la ventana se quedaba parada */
 /* --- listados con el formato de las líneas de la orden: cabecera azul, filas alternas y banda de color a la izquierda --- */
 .tabulator{border:1px solid #bfdbfe;border-radius:8px;}
 .tabulator .tabulator-header{background:#dbeafe;border-bottom:2px solid #93c5fd;color:#1e3a8a;}
@@ -411,6 +411,7 @@ const TXT_ESTADO = { en_proceso: "En proceso", recepcionado_parcial: "Recepción
 function preguntarOrdenExistente(nombre, lista) {
   return new Promise(resolve => {
     const f = document.createElement("div");
+    f.className = "emergente";
     f.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px";
     f.innerHTML = '<div style="background:#fff;border-radius:10px;max-width:520px;width:100%;padding:18px 20px;max-height:90vh;overflow:auto">' +
       '<h3 style="margin:0 0 8px">«' + esc(nombre) + '» ya tiene ' + (lista.length === 1 ? 'una orden abierta' : 'órdenes abiertas') + '</h3>' +
