@@ -165,7 +165,8 @@ document.querySelectorAll(".tab[data-t]").forEach(b => b.onclick = () => {
 function abrirNuevoPedido(){
   if (document.getElementById("nuevo_if")) return;
   const f = document.createElement("iframe"); f.id = "nuevo_if";
-  f.src = "mis-pedidos.html?embebido=1&tienda=" + encodeURIComponent(tiendaSel || "");
+  // «v» distinto cada vez: así el navegador no usa una copia vieja guardada y los arreglos llegan al momento
+  f.src = "mis-pedidos.html?embebido=1&tienda=" + encodeURIComponent(tiendaSel || "") + "&v=" + Date.now();
   f.setAttribute("allowtransparency", "true");
   f.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0;z-index:60;background:transparent;color-scheme:normal";
   document.body.appendChild(f);
