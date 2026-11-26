@@ -8,6 +8,7 @@
 <script src="tiendas_activas.js"></script>
 <script src="busqueda.js"></script>
 <script src="distancia.js"></script>
+<script src="completar_pedido.js"></script>
 <script src="subir_archivos.js"></script>
 <script src="reducir_video.js"></script>
 <script src="instrucciones_orden.js"></script>
@@ -268,6 +269,11 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
   <summary style="cursor:pointer;font-weight:600;color:#1e3a8a;" id="aviso_e2448_t"></summary>
   <div id="aviso_e2448_l" style="margin-top:8px;font-size:13px;"></div>
 </details>
+<!-- una tienda ha cambiado una orden YA AGENDADA (SQL 147): rojo y abierto, hasta «Marcar visto» -->
+<div id="aviso_cambios_tienda" style="display:none;margin:12px 24px 0;background:#fee2e2;border:2px solid #dc2626;border-radius:8px;padding:10px 14px;">
+  <div style="font-weight:700;color:#991b1b;font-size:15px;" id="aviso_cambios_tienda_t"></div>
+  <div id="aviso_cambios_tienda_l" style="margin-top:6px;font-size:13px;color:#7f1d1d;"></div>
+</div>
 <details id="aviso_servicios"style="display:none;margin:12px 24px 0;background:#fffbeb;border:1px solid #f59e0b;border-radius:8px;padding:8px 14px;">
   <summary style="cursor:pointer;font-weight:600;color:#92400e;" id="aviso_servicios_t"></summary>
   <div id="aviso_servicios_l" style="margin-top:8px;font-size:13px;"></div>
@@ -454,6 +460,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
     <div class="ph-meta" id="d_meta"></div>
     <div class="ph-pasos" id="d_pasos"></div>
     <div class="ph-auditoria" id="d_auditoria"></div>
+    <div id="d_cambios_tienda" style="display:none;margin-top:8px;background:#fee2e2;border:2px solid #dc2626;border-radius:8px;padding:8px 12px;font-size:13px;color:#7f1d1d;"></div>
   </div>
 
   <div class="tabs">
@@ -636,7 +643,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 
     <div style="margin-top:14px;">
       <button id="btn_nueva_linea" onclick="mostrarNuevaLinea(true)">+ Nueva línea</button>
-      <button class="secondary" onclick="document.getElementById('cp_archivo').click()" title="Sube el pedido de la tienda: la IA rellena lo que falte en la cabecera y añade las líneas que no estén">📄 Completar con pedido de la tienda</button>
+      <button class="secondary" onclick="document.getElementById('cp_archivo').click()" title="Sube el pedido de la tienda: compara los datos con la orden (rellena lo que falta y eliges qué dato se queda si no coinciden) y eliges qué mercancía añadir">📄 Completar con pedido de la tienda</button>
       <input type="file" id="cp_archivo" accept="application/pdf,.pdf,image/*" style="display:none" onchange="completarConPedido(this)">
       <span class="meta" id="cp_estado"></span>
     </div>
@@ -871,6 +878,7 @@ async function comprobarSesion() {
     document.getElementById("filtro_tienda").innerHTML = '<option value="">Todas las tiendas</option>' + ts.map(t => `<option value="${t.id}">${escMont(t.nombre)}</option>`).join("");
   } catch (_) {}
   cargarAvisoServicios();
+  cargarAvisoCambiosTienda();
   cargarAvisoE2448();
   await cargarPedidos();   // sin filtros no carga nada: avisa de que hay que buscar
   document.getElementById("anyo_desde").value = new Date().getFullYear();   // "Año desde" ya puesto; solo hay que pulsar Buscar
@@ -1284,6 +1292,35 @@ async function crearNuevaOrden() {
   const tiendaId = document.getElementById("no_tienda").value;
   if (!tiendaId) { errorBox.textContent = "Selecciona una tienda."; errorBox.style.display = "block"; return; }
 
+  // ¿ese cliente ya tiene una orden abierta en esa tienda? Si viene de un PDF, se ofrece completarla (completar_pedido.js)
+  const nombreCli = document.getElementById("no_nombre_cli").value.trim();
+  if (pdfNuevaOrden && nombreCli) {
+    let abiertas = [];
+    try { abiertas = await CompletarPedido.buscarAbiertas(client, tiendaId, nombreCli); } catch (_) { abiertas = []; }
+    if (abiertas.length) {
+      const eleccion = await CompletarPedido.elegirOrden(nombreCli, abiertas);
+      if (eleccion === null) return;
+      if (eleccion !== "nueva") {
+        const { anyo, orden } = eleccion;
+        const v = id => document.getElementById(id).value.trim();
+        try {
+          const cambios = await CompletarPedido.comparar(client, anyo, orden, { nombre_cli: nombreCli, telefono_cli: v("no_telefono_cli"),
+            domicilio_cli: v("no_domicilio_cli"), localidad_cli: v("no_localidad_cli"), num_pedido: v("no_num_pedido"), lineas: lineasPdfNuevaOrden });
+          if (cambios === null) return;
+          await resolverFabricantesLineas(cambios.lineas);   // solo las que se van a añadir
+          const r = await CompletarPedido.aplicar(client, anyo, orden, cambios);
+          lineasPdfNuevaOrden = [];
+          const fallos = await guardarPdfEnOrdenNueva(anyo, orden);   // sin líneas: solo guarda el documento
+          alert("Orden " + anyo + "/" + orden + ": " + CompletarPedido.resumen(r) + ". No se ha creado ninguna orden nueva." + (fallos ? "\n\nNo se pudo guardar " + fallos + ": añádelo a mano." : "\nEl documento se ha guardado en la orden."));
+        } catch (e) { errorBox.textContent = e.message; errorBox.style.display = "block"; return; }
+        cerrarModalNuevaOrden();
+        await cargarPedidos();
+        await abrirPanel({ anyo, orden });
+        return;
+      }
+    }
+  }
+
   try { await resolverFabricantesLineas(lineasPdfNuevaOrden); }
   catch (e) { errorBox.textContent = e.message; errorBox.style.display = "block"; return; }
 
@@ -1330,7 +1367,7 @@ async function asegurarLinea4(anyo, orden) {
 }
 
 // Completa una orden a medio rellenar (p. ej. creada desde un albarán) con el pedido de la tienda (PDF o foto):
-// rellena SOLO los datos de cabecera que estén vacíos y añade las líneas del pedido que aún no estén en la orden.
+// compara la cabecera campo a campo (rellena lo vacío; si no coincide, se elige) y deja elegir con casillas qué mercancía se añade.
 async function completarConPedido(input) {
   const file = input.files[0]; input.value = "";
   if (!file || !pedidoActivo) return;
@@ -1346,32 +1383,12 @@ async function completarConPedido(input) {
       try { const c = await error.context.json(); if (c?.error) m = c.error; } catch (_) {}
       throw new Error(m);
     }
-    const { data: o } = await client.from("ordenes").select("nombre_cli, telefono_cli, domicilio_cli, localidad_cli, num_pedido").eq("anyo", anyo).eq("orden", orden).single();
-    const etiquetas = { nombre_cli: "Cliente", telefono_cli: "Teléfono", domicilio_cli: "Domicilio", localidad_cli: "Localidad", num_pedido: "Nº pedido" };
-    const cambios = {};
-    for (const k of Object.keys(etiquetas)) if (!(o?.[k] || "").trim() && data[k]) cambios[k] = data[k];
-    const toks = t => new Set(sinAcentos(t).replace(/[^a-z0-9]+/g, " ").split(" ").filter(w => w.length >= 4));
-    const existentes = (window._lineasOrden || []).filter(l => l.tipolinea !== 4).map(l => toks(l.descripcion || ""));
-    const nuevas = (data.lineas || []).filter(l => {
-      const t = toks(l.descripcion);
-      return !existentes.some(e => { const comunes = [...t].filter(w => e.has(w)).length; return comunes >= Math.min(2, t.size, e.size) && comunes > 0; });
-    });
-    const resumen = (Object.keys(cambios).length ? "Datos que se rellenarán:\n" + Object.entries(cambios).map(([k, v]) => "  · " + etiquetas[k] + ": " + v).join("\n") : "No hay datos de cabecera vacíos que rellenar.")
-      + "\n\n" + (nuevas.length ? "Líneas que se añadirán (" + nuevas.length + "):\n" + nuevas.map(l => "  · " + l.cantidad + " × " + l.descripcion + (l.fabricante ? " (" + l.fabricante + ")" : "")).join("\n") : "No hay líneas nuevas: las del pedido ya están en la orden.")
-      + ((data.avisos || []).length ? "\n\nAvisos de la lectura:\n" + data.avisos.map(a => "  · " + a).join("\n") : "")
-      + "\n\nEl pedido también se guardará en Documentos adjuntos. ¿Aplicar?";
-    if (!confirm(resumen)) { estado.textContent = ""; return; }
-    await resolverFabricantesLineas(nuevas);   // antes de tocar nada: si se cancela, no se cambia la orden
-    if (Object.keys(cambios).length) {
-      const { error: e1 } = await client.from("ordenes").update(cambios).eq("anyo", anyo).eq("orden", orden);
-      if (e1) throw new Error("No se pudo rellenar la cabecera: " + e1.message);
-    }
-    if (nuevas.length) {
-      const { data: ult } = await client.from("linorden").select("linea").eq("anyo", anyo).eq("orden", orden).order("linea", { ascending: false }).limit(1).maybeSingle();
-      let linea = ult?.linea || 0;
-      const { error: e2 } = await client.from("linorden").insert(nuevas.map(l => ({ anyo, orden, linea: ++linea, tipolinea: 1, articulo: ARTICULO_GENERICO_PDF, descripcion: l.descripcion, cantidad: l.cantidad || 1, porcentaje: 100, proveedor: l.proveedor ?? null })));
-      if (e2) throw new Error("No se pudieron añadir las líneas: " + e2.message);
-    }
+    // misma ventana que al subir el pedido de un cliente con orden abierta (completar_pedido.js): cabecera campo a campo y mercancía con casillas
+    if ((data.avisos || []).length) alert("Avisos de la lectura:\n" + data.avisos.map(a => "  · " + a).join("\n"));
+    const cambios = await CompletarPedido.comparar(client, anyo, orden, { ...data, lineas: data.lineas || [] });
+    if (cambios === null) { estado.textContent = ""; return; }
+    await resolverFabricantesLineas(cambios.lineas);   // antes de tocar nada: si se cancela, no se cambia la orden
+    await CompletarPedido.aplicar(client, anyo, orden, cambios);
     const ruta = `${anyo}/${orden}/documentos/${Date.now()}_${nombreSeguroArchivo(archivo)}`;
     const up = await client.storage.from("ordenes-adjuntos").upload(ruta, archivo, { contentType: archivo.type });
     if (!up.error) await client.from("documentos_orden").insert({ anyo, orden, storage_path: ruta, nombre: file.name });
@@ -1642,6 +1659,7 @@ async function abrirPanel(orden) {
   if (errFull) console.error("error recargando orden completa:", errFull);
   const o = full || orden;
   pedidoActivo = { anyo: o.anyo, orden: o.orden };
+  pintarCambiosTiendaFicha(o.anyo, o.orden);   // recuadro rojo si una tienda la cambió estando agendada (SQL 147)
   // la caja del albarán de salida de la orden anterior no debe quedarse abierta
   const cajaAlb = document.getElementById("caja_albaran_salida"); if (cajaAlb) cajaAlb.style.display = "none";
   const listaAlb = document.getElementById("lista_albaran_salida"); if (listaAlb) listaAlb.innerHTML = "";
@@ -1883,6 +1901,45 @@ async function cargarAvisoServicios(){
 async function marcarServiciosVistos(anyo, orden){
   await client.from("servicios_orden").update({ revisado: true }).eq("anyo", anyo).eq("orden", orden);
   cargarAvisoServicios();
+}
+
+/* Aviso en rojo: una TIENDA ha cambiado datos o añadido mercancía en una orden que ya estaba agendada (SQL 147,
+   completar_orden_con_pedido). No se quita al abrir la orden: hay que revisar la cita y pulsar «Marcar visto». */
+const fechaHoraAviso = s => s ? new Date(s).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+const citaAviso = x => x.fecha_prev_montaje ? new Date(x.fecha_prev_montaje).toLocaleDateString("es-ES", { day: "numeric", month: "short" }) + (x.horamont ? " " + x.horamont : "") : "";
+const textoAviso = x => '<div style="white-space:pre-line;margin:2px 0 0 10px">' + escMont(x.detalle) + "</div>" +
+  '<div style="font-size:12px;color:#991b1b;margin-left:10px">' + escMont((x.quien ? x.quien + " · " : "") + fechaHoraAviso(x.creado_at) + (citaAviso(x) ? " · cita que tenía: " + citaAviso(x) : "")) + "</div>";
+async function cargarAvisoCambiosTienda(){
+  const box = document.getElementById("aviso_cambios_tienda");
+  const { data, error } = await client.from("avisos_cambios_tienda").select("id, anyo, orden, detalle, quien, creado_at, fecha_prev_montaje, horamont").eq("visto", false).order("creado_at");
+  if (error || !data || !data.length) { box.style.display = "none"; return; }   // sin el SQL 147, la tabla no existe: no sale nada
+  const por = {}; data.forEach(x => (por[x.anyo + "/" + x.orden] ||= []).push(x));
+  const claves = Object.keys(por);
+  document.getElementById("aviso_cambios_tienda_t").textContent = "⚠ La tienda ha cambiado " + (claves.length === 1 ? "una orden que ya estaba agendada" : claves.length + " órdenes que ya estaban agendadas") + ": revisa la cita";
+  document.getElementById("aviso_cambios_tienda_l").innerHTML = claves.map(k => {
+    const [a, n] = k.split("/");
+    return '<div style="padding:5px 0;border-top:1px solid #fecaca"><a href="pedidos.html?anyo=' + a + '&orden=' + n + '" style="color:#991b1b"><b>' + k + "</b></a>" +
+      ' <button class="secondary" style="padding:2px 8px;font-size:12px;margin-left:6px" onclick="marcarCambiosTiendaVistos(' + a + "," + n + ')">✔ Marcar visto</button>' +
+      por[k].map(textoAviso).join("") + "</div>";
+  }).join("");
+  box.style.display = "block";
+}
+// recuadro rojo dentro de la ficha de la orden
+async function pintarCambiosTiendaFicha(anyo, orden){
+  const box = document.getElementById("d_cambios_tienda");
+  box.style.display = "none";
+  const { data, error } = await client.from("avisos_cambios_tienda").select("id, detalle, quien, creado_at, fecha_prev_montaje, horamont").eq("anyo", anyo).eq("orden", orden).eq("visto", false).order("creado_at");
+  if (error || !data || !data.length || !pedidoActivo || pedidoActivo.anyo !== anyo || pedidoActivo.orden !== orden) return;
+  box.innerHTML = '<b style="font-size:14px;color:#991b1b">⚠ La tienda ha cambiado esta orden cuando ya estaba agendada: revisa la cita.</b>' + data.map(textoAviso).join("") +
+    '<div style="margin-top:6px"><button class="secondary" style="padding:3px 10px;font-size:12px" onclick="marcarCambiosTiendaVistos(' + anyo + "," + orden + ')">✔ Marcar visto</button></div>';
+  box.style.display = "block";
+}
+async function marcarCambiosTiendaVistos(anyo, orden){
+  const { data: { user } } = await client.auth.getUser();
+  const { error } = await client.from("avisos_cambios_tienda").update({ visto: true, visto_at: new Date().toISOString(), visto_por: user ? user.id : null }).eq("anyo", anyo).eq("orden", orden).eq("visto", false);
+  if (error) { alert("No se pudo marcar: " + error.message); return; }
+  cargarAvisoCambiosTienda();
+  if (pedidoActivo && pedidoActivo.anyo === anyo && pedidoActivo.orden === orden) pintarCambiosTiendaFicha(anyo, orden);
 }
 /* ---------- 🚚 Entrega 24h–48h (SQL 136) ----------
    Servicio con precio especial (fijo o %), valorado en cada pedido. Solo oficina: las tiendas no lo ven todavía.
