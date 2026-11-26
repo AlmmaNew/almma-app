@@ -133,6 +133,7 @@ tr.eq td{background:#eff6ff;border-top:2px solid #93c5fd;}
 
 <div class="panel" id="p_tarifas">
   <p class="muted" style="margin-top:0">Cada tarifa es un PDF. Una misma tarifa puede aplicar a muchas tiendas; cada tienda tiene una sola. En la orden, el botón «Ver tarifa» (al crear una línea de importes) abre la de su tienda.</p>
+  <p style="margin-top:0"><button onclick="location.href='tarifas.html'">💶 Precios y artículos de las tarifas</button> <span class="muted">Los artículos de cada tarifa con su importe y %, qué tarifa usa cada tienda, la fecha desde la que se usan y qué artículos consume cada tienda.</span></p>
   <div class="caja" style="margin-bottom:14px">
     <div class="barra" style="margin-bottom:0">
       <input id="tf_nombre" placeholder="Nombre de la tarifa (p. ej. Tarifa 1)" style="width:260px">
@@ -335,6 +336,7 @@ async function subirTarifa(){
 }
 async function verTarifaAdmin(id){
   const t = tfLista.find(x => x.id === id);
+  if (!t.archivo) { alert("Esta tarifa todavía no tiene PDF. Se sube con «Cambiar PDF». Sus precios están en «💶 Precios y artículos de las tarifas»."); return; }
   const r = await client.storage.from("tarifas").createSignedUrl(t.archivo, 300);
   if (r.error) { alert(r.error.message); return; }
   abrirNueva(r.data.signedUrl);
@@ -345,16 +347,16 @@ function reemplazarTarifa(id){
     const t = tfLista.find(x => x.id === id), ruta = await subirArchivoTarifa(i.files[0]); if (!ruta) return;
     const r = await client.from("tarifas").update({ archivo: ruta }).eq("id", id);
     if (r.error) { alert(r.error.message); return; }
-    await client.storage.from("tarifas").remove([t.archivo]); cargarTarifas();
+    if (t.archivo) await client.storage.from("tarifas").remove([t.archivo]); cargarTarifas();
   };
   i.click();
 }
 async function borrarTarifa(id){
   const t = tfLista.find(x => x.id === id), n = tfAsign.filter(x => x.tarifa_id === id).length;
-  if (!confirm('¿Borrar la tarifa «'+t.nombre+'»?' + (n ? ' Sus '+n+' tiendas se quedarán sin tarifa.' : ''))) return;
+  if (!confirm('¿Borrar la tarifa «'+t.nombre+'»?' + (n ? ' Sus '+n+' tiendas se quedarán sin tarifa.' : '') + '\n\nSi tiene precios de artículos (Precios y artículos de las tarifas), también se borran y sus tiendas pasan a la tarifa por defecto.')) return;
   const r = await client.from("tarifas").delete().eq("id", id);
   if (r.error) { alert(r.error.message); return; }
-  await client.storage.from("tarifas").remove([t.archivo]);
+  if (t.archivo) await client.storage.from("tarifas").remove([t.archivo]);
   document.getElementById("tf_editor").style.display = "none"; cargarTarifas();
 }
 async function editarTarifa(id){

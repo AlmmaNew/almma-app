@@ -61,6 +61,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
 #visor_tarifa .vt-head{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);}
 #visor_tarifa .spacer{flex:1;}
 #visor_tarifa iframe{flex:1;border:0;width:100%;}
+input.bloq-tarifa{background:#e5e7eb;color:#374151;cursor:not-allowed;}
 @media (max-width:1100px){#visor_tarifa{right:0;}}
 /* --- ficha de la orden: cabecera con resumen --- */
 #panel_detalle{background:#f8fafc;}
@@ -229,6 +230,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
       <a href="sistema.html?cat=dependientes">Dependientes</a>
       <a href="sistema.html?cat=montadores">Montadores</a>
       <a href="sistema.html?cat=articulos">Artículos</a>
+      <a href="tarifas.html">💶 Tarifas y artículos (2027)</a>
     </div>
   </div>
   <div class="menu-item" data-menu="ordenes">
@@ -673,6 +675,7 @@ input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-rad
       <div class="campo lf-2"><label>Importe</label><input id="ln_importe" type="number" step="0.01" oninput="recalcularACobrar()"></div>
       <div class="campo lf-2"><label title="Porcentaje del importe que se cobra a la tienda. Viene del artículo y se puede cambiar.">% a cobrar a la tienda</label><input id="ln_porcentaje" type="number" step="0.01" value="100" oninput="recalcularACobrar()"></div>
       <div class="campo lf-2"><label title="Se calcula solo (importe × % × cantidad), pero puedes escribir otra cifra a mano, por ejemplo si se cobra un mínimo.">Importe a cobrar</label><input id="ln_importe_cobrar" type="number" step="0.01"></div>
+      <div class="campo lf-12" id="ln_nota_tarifa" style="display:none;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:7px 10px;border-radius:8px;font-size:13px;"></div>
       <div class="campo lf-4"><label>Nº Albarán proveedor</label><input id="ln_albaran"></div>
       <div class="campo lf-4"><label>Ubicación</label><input id="ln_ubicacion"></div>
       <div class="campo lf-2"><label>Bultos</label><input id="ln_bultos" type="number" value="0"></div>
@@ -1439,6 +1442,79 @@ function codigoLegadoTienda(tiendaId) {
   return t?.codigo_legado || null;
 }
 
+/* ---------- Tarifas con artículos (migracion/148) ----------
+   Desde tarifas_config.desde (fecha del montaje de la orden; si no, la prevista; si no, hoy), las líneas de importes
+   se hacen con los artículos de la tarifa de la tienda: al elegirlo se ponen importe y %. Quien no es Arturo o José
+   no puede cambiarlos (la base de datos también lo comprueba). Sin el SQL 148 todo sigue como antes. */
+let TARIFA_CFG;              // undefined = sin mirar; null = no hay SQL 148 / sin fecha
+let PUEDE_TARIFAS = false;
+let tarifaLinea = null;      // { id, nombre, precios[] } mientras se edita una línea de importes con tarifa nueva
+const preciosTarifaCache = {};
+async function cargarCfgTarifas() {
+  if (TARIFA_CFG !== undefined) return TARIFA_CFG;
+  try {
+    const [c, p] = await Promise.all([client.from("tarifas_config").select("desde, tarifa_defecto").eq("id", 1).maybeSingle(), client.rpc("puede_tarifas")]);
+    TARIFA_CFG = c.error ? null : (c.data || null);
+    PUEDE_TARIFAS = !p.error && p.data === true;
+  } catch (e) { TARIFA_CFG = null; }
+  return TARIFA_CFG;
+}
+function fechaRefOrden() {
+  return document.getElementById("ch_fecha_montaje").value || document.getElementById("ch_fecha_prev_montaje").value
+    || new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+}
+function usaTarifaNueva() { return !!(TARIFA_CFG && TARIFA_CFG.desde && fechaRefOrden() >= TARIFA_CFG.desde); }
+async function prepararTarifaLinea() {
+  tarifaLinea = null;
+  await cargarCfgTarifas();
+  if (!usaTarifaNueva()) return null;
+  const tiendaId = document.getElementById("ch_tienda").value;
+  let id = null;
+  if (tiendaId) { const { data } = await client.from("tarifas_asignadas").select("tarifa_id").eq("tienda_id", tiendaId).maybeSingle(); id = data?.tarifa_id || null; }
+  id = id || TARIFA_CFG.tarifa_defecto;
+  if (!id) return null;
+  if (!preciosTarifaCache[id]) {
+    const [t, p] = await Promise.all([
+      client.from("tarifas").select("nombre").eq("id", id).maybeSingle(),
+      client.from("tarifa_precios").select("codigo, importe, porcentaje, tarifa_conceptos ( descripcion, unidad, seccion, orden, activo )").eq("tarifa_id", id)]);
+    preciosTarifaCache[id] = { id, nombre: t.data?.nombre || "", precios: (p.data || []).filter(x => x.tarifa_conceptos && x.tarifa_conceptos.activo !== false)
+      .map(x => ({ codigo: x.codigo, importe: x.importe, porcentaje: x.porcentaje, descripcion: x.tarifa_conceptos.descripcion, unidad: x.tarifa_conceptos.unidad, seccion: x.tarifa_conceptos.seccion, orden: x.tarifa_conceptos.orden }))
+      .sort((a, b) => a.orden - b.orden) };
+  }
+  tarifaLinea = preciosTarifaCache[id];
+  return tarifaLinea;
+}
+function textoPrecioTarifa(p) {
+  if (p.unidad === "% PVP") return Number(p.porcentaje).toLocaleString("es-ES") + " % del PVP";
+  if (p.importe === null || p.importe === undefined) return "importe a escribir";
+  return Number(p.importe).toLocaleString("es-ES", { minimumFractionDigits: 2 }) + " " + (p.unidad || "€") + (Number(p.porcentaje) !== 100 ? " · " + p.porcentaje + " %" : "");
+}
+function pintarSugerenciasTarifa(texto) {
+  const caja = document.getElementById("ln_articulo_sugerencias");
+  const q = normBusq(texto || "");
+  let secc = null, html = "";
+  tarifaLinea.precios.filter(p => !q || normBusqDato(p.codigo + " " + p.descripcion).includes(q)).forEach(p => {
+    if (p.seccion !== secc) { secc = p.seccion; html += `<div style="padding:6px 10px;background:#f1f5f9;font-size:11px;font-weight:700;color:#475569;cursor:default;">${escMont(secc)}</div>`; }
+    html += `<div data-art="${escMont(p.codigo)}" data-desc="${escMont(p.descripcion)}" data-tarifa="1">${escMont(p.codigo)} — ${escMont(p.descripcion)} — <b>${escMont(textoPrecioTarifa(p))}</b></div>`;
+  });
+  caja.innerHTML = html || `<div style="padding:8px 10px;color:#6b7280;font-size:12px;">Ningún artículo de la tarifa con ese texto. Si no está, elige «Otros conceptos (fuera de tarifa)».</div>`;
+  caja.style.display = "block";
+}
+// Bloquea importe / % / a cobrar si el precio viene de la tarifa y no es Arturo o José
+function bloquearPrecioTarifa(p) {
+  const imp = document.getElementById("ln_importe"), pct = document.getElementById("ln_porcentaje"), cob = document.getElementById("ln_importe_cobrar");
+  const nota = document.getElementById("ln_nota_tarifa");
+  const bloq = !!p && !PUEDE_TARIFAS;
+  pct.readOnly = bloq; cob.readOnly = bloq; imp.readOnly = bloq && p.importe !== null && p.importe !== undefined;
+  [imp, pct, cob].forEach(e => e.classList.toggle("bloq-tarifa", e.readOnly));
+  if (!p) { nota.style.display = "none"; nota.innerHTML = ""; return; }
+  const falta = p.importe === null || p.importe === undefined ? (p.unidad === "% PVP" ? " Escribe el PVP del mueble en «Importe»." : " Escribe el importe en «Importe».") : "";
+  nota.innerHTML = PUEDE_TARIFAS
+    ? `💶 Precio de la ${escMont(tarifaLinea?.nombre || "tarifa")}: ${escMont(textoPrecioTarifa(p))}.${falta} Como administrador puedes cambiarlo.`
+    : `🔒 Precio de la ${escMont(tarifaLinea?.nombre || "tarifa")}: ${escMont(textoPrecioTarifa(p))}.${falta} Solo Arturo o José pueden cambiar el precio.`;
+  nota.style.display = "block";
+}
+
 async function cambioTipoLinea() {
   const tipo = document.getElementById("ln_tipo").value;
   const esServicio = tipo === "4";
@@ -1449,6 +1525,17 @@ async function cambioTipoLinea() {
   const desc = document.getElementById("ln_descripcion");
   if (esServicio) { if (!desc.value.trim()) desc.value = "Valor del Servicio"; }
   else if (desc.value === "Valor del Servicio") desc.value = "";
+  articuloSeleccionado = null; bloquearPrecioTarifa(null);
+  if (esServicio && await prepararTarifaLinea()) {
+    document.getElementById("label_articulo").textContent = `Artículo de la tarifa (${tarifaLinea.nombre})`;
+    if (desc.value === "Valor del Servicio") desc.value = "";
+    document.getElementById("ln_articulo_buscar").value = "";
+    document.getElementById("ln_articulo_buscar").placeholder = "Pulsa aquí para ver los artículos de la tarifa…";
+    pintarSugerenciasTarifa("");
+    return;
+  }
+  if (!esServicio) tarifaLinea = null;
+  document.getElementById("ln_articulo_buscar").placeholder = "Buscar por código o descripción...";
   if (esServicio) {
     const tiendaId = document.getElementById("ch_tienda").value;
     const codigo = codigoLegadoTienda(tiendaId);
@@ -1760,8 +1847,15 @@ async function abrirPanel(orden) {
   if (miApertura === aperturaPanel) btnGrabar.disabled = false;
 }
 
-/* Ver tarifa de la tienda de la orden (PDF subido en Administración → Tarifas) */
+/* Ver tarifa de la tienda de la orden (PDF subido en Administración → Tarifas).
+   Con las tarifas nuevas (SQL 148) se ve su lista de precios (tarifas.html en modo visor). */
 async function verTarifa() {
+  if (document.getElementById("ln_tipo").value === "4" && await prepararTarifaLinea()) {
+    document.getElementById("vt_titulo").textContent = "Tarifa: " + tarifaLinea.nombre;
+    document.getElementById("vt_frame").src = "tarifas.html?solo=1&ver=" + encodeURIComponent(tarifaLinea.id);
+    document.getElementById("visor_tarifa").style.display = "flex";
+    return;
+  }
   const tiendaId = document.getElementById("ch_tienda").value;
   if (!tiendaId) { alert("Esta orden no tiene tienda asignada."); return; }
   const { data: asig, error } = await client.from("tarifas_tiendas").select("tarifa_id").eq("tienda_id", tiendaId).maybeSingle();
@@ -2504,10 +2598,15 @@ async function marcarRecibida(linea, recibida) {
 }
 
 let debounceArt = null;
+document.getElementById("ln_articulo_buscar").addEventListener("focus", (e) => {
+  if (document.getElementById("ln_tipo").value === "4" && tarifaLinea && !articuloSeleccionado) pintarSugerenciasTarifa(e.target.value.trim());
+});
 document.getElementById("ln_articulo_buscar").addEventListener("input", (e) => {
   articuloSeleccionado = null;
+  bloquearPrecioTarifa(null);
   clearTimeout(debounceArt);
   const texto = e.target.value.trim();
+  if (document.getElementById("ln_tipo").value === "4" && tarifaLinea) { pintarSugerenciasTarifa(texto); return; }
   const caja = document.getElementById("ln_articulo_sugerencias");
   if (texto.length < 2) { caja.style.display = "none"; return; }
   debounceArt = setTimeout(async () => {
@@ -2525,6 +2624,23 @@ document.getElementById("ln_articulo_buscar").addEventListener("input", (e) => {
 document.getElementById("ln_articulo_sugerencias").addEventListener("click", (e) => {
   const fila = e.target.closest("[data-art]");
   if (!fila) return;
+  if (fila.dataset.tarifa && tarifaLinea) {   // artículo de la tarifa nueva: importe y % de la tarifa
+    const p = tarifaLinea.precios.find(x => x.codigo === fila.dataset.art);
+    articuloSeleccionado = { articulo: p.codigo, descripcion: p.descripcion, tarifa: p };
+    document.getElementById("ln_articulo_buscar").value = `${p.codigo} — ${p.descripcion}`;
+    document.getElementById("ln_descripcion").value = p.codigo === "X01" ? "" : p.descripcion;
+    const imp = document.getElementById("ln_importe");
+    if (p.importe !== null && p.importe !== undefined) imp.value = p.importe;
+    else if (imp.readOnly || imp.dataset.deTarifa) imp.value = "";
+    imp.dataset.deTarifa = p.importe !== null && p.importe !== undefined ? "1" : "";
+    document.getElementById("ln_porcentaje").value = p.porcentaje;
+    bloquearPrecioTarifa(p);
+    recalcularACobrar();
+    document.getElementById("ln_articulo_sugerencias").style.display = "none";
+    (p.importe === null || p.importe === undefined ? imp : document.getElementById("ln_cantidad")).focus();
+    if (p.codigo === "X01") document.getElementById("ln_descripcion").focus();
+    return;
+  }
   articuloSeleccionado = { articulo: fila.dataset.art, descripcion: fila.dataset.desc };
   document.getElementById("ln_articulo_buscar").value = `${fila.dataset.art} — ${fila.dataset.desc}`;
   // se rellenan la descripción y el importe del artículo (se pueden cambiar)
@@ -2579,6 +2695,7 @@ function limpiarFormularioLinea() {
   document.getElementById("ln_control_stock").checked = false;
   fabricanteSeleccionado = null;
   articuloSeleccionado = null;
+  bloquearPrecioTarifa(null);
 }
 
 async function editarLinea(linea) {
@@ -2612,6 +2729,14 @@ async function editarLinea(linea) {
   document.getElementById("ln_control_stock").checked = l.control_stock === "S";
   recalcularACobrar();
   if (l.importe_cobrar !== null && l.importe_cobrar !== undefined) document.getElementById("ln_importe_cobrar").value = Number(l.importe_cobrar).toFixed(2);   // respeta el importe escrito a mano
+  // línea de importes con tarifa nueva (SQL 148): el precio queda bloqueado si el artículo es de la tarifa
+  tarifaLinea = null;
+  if (l.tipolinea === 4 && await prepararTarifaLinea()) {
+    document.getElementById("label_articulo").textContent = `Artículo de la tarifa (${tarifaLinea.nombre})`;
+    const p = l.articulo ? tarifaLinea.precios.find(x => x.codigo === l.articulo) : null;
+    if (p) { articuloSeleccionado.tarifa = p; document.getElementById("ln_articulo_buscar").value = `${p.codigo} — ${p.descripcion}`; bloquearPrecioTarifa(p); }
+    else if (l.articulo) { articuloSeleccionado = null; document.getElementById("ln_articulo_buscar").value = ""; }   // código antiguo de tienda: hay que elegir uno de la tarifa
+  }
   mostrarNuevaLinea(true);
   document.getElementById("ln_titulo").textContent = `Editar línea ${linea}`;
   document.getElementById("ln_btn_guardar").textContent = "Guardar cambios";
@@ -2665,6 +2790,11 @@ async function anyadirLineaOrden() {
   const descripcionManual = document.getElementById("ln_descripcion").value.trim();
 
   if (tipolinea === 1 && !articuloSeleccionado) { alert("Busca y selecciona un artículo para una línea normal."); return; }
+  if (tipolinea === 4 && tarifaLinea) {
+    if (!articuloSeleccionado) { alert("Elige un artículo de la tarifa (" + tarifaLinea.nombre + ").\nSi no está, elige «Otros conceptos (fuera de tarifa)» y escribe la descripción."); return; }
+    if (articuloSeleccionado.articulo === "X01" && !descripcionManual) { alert("Escribe en «Descripción» qué es este concepto fuera de tarifa."); return; }
+    if (articuloSeleccionado.tarifa && articuloSeleccionado.tarifa.unidad === "% PVP" && !importe) { alert("Escribe en «Importe» el PVP del mueble (sobre él se calcula el %)."); return; }
+  }
 
   if (lineaEditando !== null) {
     const { error: errEd } = await client.from("linorden").update({
@@ -2712,6 +2842,7 @@ async function anyadirLineaOrden() {
   document.getElementById("ln_control_stock").checked = false;
   fabricanteSeleccionado = null;
   articuloSeleccionado = null;
+  bloquearPrecioTarifa(null);
   mostrarNuevaLinea(false);
   await cargarLineas();
 }

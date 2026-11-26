@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALMMA - Tarifas y artículos</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="tiendas_activas.js"></script>
+<script src="busqueda.js"></script>
+<style>
+:root{--primary:#2563eb;--bg:#f5f6fa;--card:#fff;--border:#e2e4eb;--text:#1f2430;--muted:#6b7280;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+button{background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px;}
+button:hover{opacity:.9;} button:disabled{opacity:.5;cursor:default;}
+button.secondary{background:#fff;color:var(--text);border:1px solid var(--border);}
+button.mini{padding:4px 10px;font-size:12px;}
+input,select{padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;}
+#toolbar{display:flex;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;}
+#toolbar .spacer{flex:1;}
+.tabs{display:flex;gap:6px;padding:12px 24px 0;flex-wrap:wrap;}
+.tabs button{background:#fff;color:#1e3a8a;border:1px solid #93c5fd;} .tabs button.on{background:#1e40af;color:#fff;}
+.panel{display:none;padding:12px 24px 40px;} .panel.on{display:block;}
+.barra{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;}
+.barra label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;}
+.aviso{color:var(--muted);font-size:13px;margin:0 0 10px;}
+.candado{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:12px;}
+.ok{background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:12px;}
+table{border-collapse:collapse;width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:13px;}
+th,td{padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;}
+th{background:#eff6ff;color:#1e3a8a;font-size:12px;}
+td.num,th.num{text-align:right;white-space:nowrap;}
+tr.seccion td{background:#f8fafc;font-weight:700;color:#334155;}
+tr.inactivo td{color:#9ca3af;}
+td input.precio{width:90px;text-align:right;}
+.cod{font-family:ui-monospace,Consolas,monospace;color:#475569;font-size:12px;}
+.peq{font-size:12px;color:var(--muted);}
+.caja{background:#fff;border:1px solid #93c5fd;border-radius:10px;padding:14px;margin:12px 0;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;} @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
+body.solo #toolbar,body.solo .tabs,body.solo .solo-no{display:none !important;}
+body.solo .panel{padding:10px 14px;}
+@media print{#toolbar,.tabs,.barra,.solo-no{display:none !important;} body{background:#fff;}}
+</style>
+<link rel="stylesheet" href="estilo_oficina.css">
+<script src="volver.js" defer></script>
+</head>
+<body>
+<div id="toolbar">
+  <button class="secondary" onclick="location.href='inicio.html'">🏠 Inicio</button>
+  <button class="secondary" onclick="location.href='pedidos.html'">Órdenes</button>
+  <button class="secondary" onclick="location.href='facturas.html'">Facturación</button>
+  <button class="secondary" id="btn_admin" style="display:none" onclick="location.href='admin.html'">Administración</button>
+  <span class="spacer"></span>
+  <b>💶 Tarifas y artículos</b>
+</div>
+
+<div class="tabs">
+  <button id="t_precios" class="on" onclick="pestana('precios')">Precios de cada tarifa</button>
+  <button id="t_tiendas" onclick="pestana('tiendas')">Tarifa de cada tienda</button>
+  <button id="t_estad" onclick="pestana('estad')">📊 Qué artículos se consumen</button>
+  <button id="t_ajustes" onclick="pestana('ajustes')">Fecha de inicio</button>
+</div>
+
+<div id="msg_sql" class="candado" style="display:none;margin:12px 24px 0">Falta ejecutar en Supabase el SQL 148 (tarifas con artículos). Hasta entonces esta pantalla no tiene datos y las órdenes siguen como siempre.</div>
+
+<!-- ============ PRECIOS ============ -->
+<div class="panel on" id="p_precios">
+  <div id="estado_fecha" class="solo-no"></div>
+  <div class="barra">
+    <div><label>Tarifa</label><select id="sel_tarifa" onchange="pintarPrecios()" style="min-width:260px"></select></div>
+    <div><label>Buscar artículo</label><input id="buscar_art" placeholder="colchón, km, montaje..." oninput="pintarPrecios()"></div>
+    <span id="pdf_tarifa"></span>
+    <span class="solo-no" id="acciones_tarifa"></span>
+  </div>
+  <div id="nota_permiso" class="solo-no"></div>
+  <div id="tabla_precios"></div>
+  <div class="caja solo-no" id="caja_nuevo" style="display:none">
+    <h4 style="margin:0 0 10px">➕ Artículo nuevo en esta tarifa</h4>
+    <div class="barra">
+      <div><label>Descripción (tal como sale en la tarifa)</label><input id="na_desc" style="width:340px"></div>
+      <div><label>Sección</label><input id="na_secc" list="dl_secciones" style="width:240px"><datalist id="dl_secciones"></datalist></div>
+      <div><label>Unidad</label><select id="na_uni"><option>€</option><option>€/ud</option><option>€/h</option><option>€/km</option><option>€/m</option><option>€/pieza</option><option>€/visita</option><option>% PVP</option></select></div>
+      <div><label>Importe (€)</label><input id="na_imp" type="number" step="0.01" style="width:100px" placeholder="vacío = a escribir"></div>
+      <div><label>% a cobrar</label><input id="na_pct" type="number" step="0.01" value="100" style="width:80px"></div>
+      <button onclick="crearArticulo()">Guardar</button>
+      <button class="secondary" onclick="$('caja_nuevo').style.display='none'">Cancelar</button>
+    </div>
+    <p class="peq" style="margin:0">El artículo se crea para todas las tiendas (para que la estadística sea común); el precio se pone solo en esta tarifa. En las demás se puede añadir con «➕ Añadir a esta tarifa».</p>
+  </div>
+</div>
+
+<!-- ============ TIENDAS ============ -->
+<div class="panel" id="p_tiendas">
+  <p class="aviso">Cada tienda usa UNA tarifa. Si no tiene ninguna puesta, usa la tarifa por defecto (<b id="nom_defecto">—</b>, se cambia en «Fecha de inicio»).
+  Esto es para las líneas de importes desde la fecha de inicio; el PDF que se ve hoy en «Ver tarifa» sigue en Administración → Tarifas.</p>
+  <div class="barra">
+    <div><label>Buscar tienda</label><input id="buscar_tienda" oninput="pintarTiendas()" placeholder="nombre..."></div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text);font-weight:400"><input type="checkbox" id="ver_antiguas" onchange="pintarTiendas()"> Ver también tiendas sin actividad reciente</label>
+  </div>
+  <div id="tabla_tiendas"></div>
+</div>
+
+<!-- ============ ESTADÍSTICA ============ -->
+<div class="panel" id="p_estad">
+  <p class="aviso">Líneas de importes con artículo de tarifa. La fecha de cada orden es la del montaje (si no tiene, la prevista; si tampoco, la de creación).</p>
+  <div class="barra">
+    <div><label>Desde</label><input type="date" id="e_desde"></div>
+    <div><label>Hasta</label><input type="date" id="e_hasta"></div>
+    <div><label>Tienda</label><select id="e_tienda" onchange="pintarEstad()"><option value="">Todas (global)</option></select></div>
+    <button onclick="cargarEstad()">Ver</button>
+    <button class="secondary" onclick="window.print()">🖨 Imprimir</button>
+  </div>
+  <div class="grid2">
+    <div><h4 style="margin:0 0 8px" id="e_titulo1">Artículos (todas las tiendas)</h4><div id="e_articulos"></div></div>
+    <div><h4 style="margin:0 0 8px" id="e_titulo2">Tiendas</h4><div id="e_tiendas"></div></div>
+  </div>
+</div>
+
+<!-- ============ AJUSTES ============ -->
+<div class="panel" id="p_ajustes">
+  <div class="caja" style="max-width:720px">
+    <p style="margin-top:0">Desde esta fecha, las <b>líneas de importes</b> de las órdenes se hacen con los artículos de las tarifas: al elegir el artículo se ponen solos el importe y el %.
+    Cuenta la fecha del montaje de la orden (si aún no tiene, la prevista; si tampoco, el día de hoy). Antes de esa fecha todo sigue como hasta ahora (artículos de cada tienda).</p>
+    <div class="barra">
+      <div><label>Fecha de inicio de las tarifas nuevas</label><input type="date" id="cfg_desde"></div>
+      <div><label>Tarifa por defecto (tiendas sin tarifa puesta)</label><select id="cfg_defecto" style="min-width:240px"></select></div>
+      <button id="cfg_guardar" onclick="guardarAjustes()">Guardar</button>
+    </div>
+    <p class="peq" style="margin:0">Dejar la fecha vacía = todavía no se usan. Solo Arturo y José pueden cambiar esto.</p>
+  </div>
+</div>
+
+<script>
+const client = supabase.createClient(
+  "https://uamgbtbsxbrgymhqalak.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k"
+);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const eur = n => n === null || n === undefined || n === "" ? "" : Number(n).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+const num = n => Number(n).toLocaleString("es-ES", { maximumFractionDigits: 2 });
+const params = new URLSearchParams(location.search);
+const SOLO = params.get("solo") === "1";     // dentro del visor de la orden: solo la lista de precios
+if (SOLO) document.body.classList.add("solo");
+
+let PUEDE = false, TARIFAS = [], CONCEPTOS = [], PRECIOS = [], ASIG = [], CFG = null, TIENDAS = [], T_ACT = null, ESTAD = [];
+
+async function init() {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) { location.href = "login.html"; return; }
+  const { data: st } = await client.from("staff").select("es_admin").eq("user_id", user.id).maybeSingle();
+  if (!st) { document.body.innerHTML = "<p style='padding:24px'>Esta pantalla es solo para la oficina.</p>"; return; }
+  if (st.es_admin) $("btn_admin").style.display = "";
+  const rp = await client.rpc("puede_tarifas"); PUEDE = !rp.error && rp.data === true;
+  await cargarTodo();
+  const hoy = new Date(); $("e_hasta").value = hoy.toISOString().slice(0, 10);
+  $("e_desde").value = (CFG && CFG.desde) || hoy.getFullYear() + "-01-01";
+  if (params.get("ver")) $("sel_tarifa").value = params.get("ver");
+  pintarPrecios();
+  if (params.get("tab")) pestana(params.get("tab"));
+}
+
+async function cargarTodo() {
+  const [t, c, p, a, g, ti] = await Promise.all([
+    client.from("tarifas").select("id, nombre, archivo, familia").order("nombre"),
+    client.from("tarifa_conceptos").select("*").order("orden"),
+    client.from("tarifa_precios").select("tarifa_id, codigo, importe, porcentaje, modificado_at"),
+    client.from("tarifas_asignadas").select("tienda_id, tarifa_id"),
+    client.from("tarifas_config").select("desde, tarifa_defecto").eq("id", 1).maybeSingle(),
+    client.from("tiendas").select("id, nombre, nombre_comercial").order("nombre")]);
+  if (c.error) { $("msg_sql").style.display = "block"; }
+  CONCEPTOS = c.data || []; PRECIOS = p.data || []; ASIG = a.data || []; CFG = g.data || null; TIENDAS = ti.data || [];
+  // solo las tarifas que tienen precios (las de solo PDF antiguas no sirven aquí)
+  const conPrecio = new Set(PRECIOS.map(x => x.tarifa_id));
+  TARIFAS = (t.data || []).filter(x => conPrecio.has(x.id) || (CFG && CFG.tarifa_defecto === x.id));
+  const ant = $("sel_tarifa").value;
+  $("sel_tarifa").innerHTML = TARIFAS.map(x => `<option value="${x.id}">${esc(x.nombre)}${x.familia ? " · " + x.familia : ""}</option>`).join("");
+  if (ant && TARIFAS.some(x => x.id === ant)) $("sel_tarifa").value = ant;
+  $("cfg_defecto").innerHTML = '<option value="">(ninguna)</option>' + TARIFAS.map(x => `<option value="${x.id}">${esc(x.nombre)}</option>`).join("");
+  $("cfg_defecto").value = CFG?.tarifa_defecto || "";
+  $("cfg_desde").value = CFG?.desde || "";
+  $("cfg_desde").disabled = $("cfg_defecto").disabled = $("cfg_guardar").disabled = !PUEDE;
+  $("nom_defecto").textContent = nombreTarifa(CFG?.tarifa_defecto) || "ninguna";
+  $("dl_secciones").innerHTML = [...new Set(CONCEPTOS.map(x => x.seccion))].map(s => `<option value="${esc(s)}">`).join("");
+  $("estado_fecha").innerHTML = CFG?.desde
+    ? `<div class="ok">✅ Las líneas de importes usan estas tarifas en las órdenes con montaje desde el <b>${new Date(CFG.desde + "T00:00").toLocaleDateString("es-ES")}</b>.</div>`
+    : `<div class="candado">Todavía no hay fecha de inicio: las órdenes siguen con los artículos de cada tienda. Se pone en «Fecha de inicio».</div>`;
+  $("e_tienda").innerHTML = '<option value="">Todas (global)</option>' + TIENDAS.map(x => `<option value="${x.id}">${esc(nomTienda(x))}</option>`).join("");
+  T_ACT = await idsTiendasActivas(client);
+}
+const nombreTarifa = id => (TARIFAS.find(x => x.id === id) || {}).nombre || "";
+const nomTienda = t => t.nombre_comercial && t.nombre_comercial !== t.nombre ? t.nombre_comercial + " · " + t.nombre : t.nombre;
+
+function pestana(n) {
+  ["precios", "tiendas", "estad", "ajustes"].forEach(x => { $("p_" + x).classList.toggle("on", x === n); $("t_" + x).classList.toggle("on", x === n); });
+  if (n === "tiendas") pintarTiendas();
+  if (n === "estad" && !ESTAD.length) cargarEstad();
+}
+
+/* ---------------- PRECIOS ---------------- */
+function pintarPrecios() {
+  const tid = $("sel_tarifa").value, t = TARIFAS.find(x => x.id === tid);
+  if (!t) { $("tabla_precios").innerHTML = '<p class="aviso">No hay tarifas con artículos todavía.</p>'; return; }
+  $("pdf_tarifa").innerHTML = t.archivo ? `<button class="secondary" onclick="verPdf('${t.id}')">📄 Ver el PDF</button>` : '<span class="peq">(sin PDF)</span>';
+  $("nota_permiso").innerHTML = PUEDE
+    ? '<div class="ok">Puedes cambiar los precios: escribe el importe o el % y se guarda al salir de la casilla. Las líneas ya hechas no cambian.</div>'
+    : '<div class="candado">🔒 Solo Arturo y José pueden cambiar precios.</div>';
+  $("acciones_tarifa").innerHTML = PUEDE
+    ? `<button class="secondary" onclick="$('caja_nuevo').style.display='block';$('na_desc').focus()">➕ Artículo nuevo</button> <button class="secondary" onclick="copiarTarifa()">📋 Nueva tarifa copiando esta</button> <button class="secondary" onclick="renombrarTarifa()">✎ Nombre</button>`
+    : "";
+  const q = normBusq($("buscar_art").value.trim());
+  const mios = new Map(PRECIOS.filter(p => p.tarifa_id === tid).map(p => [p.codigo, p]));
+  const fam = t.familia;
+  let html = '<table><tr><th>Código</th><th>Artículo</th><th class="num">Importe</th><th class="num">% a cobrar</th><th>Unidad</th>' + (PUEDE ? '<th class="solo-no"></th>' : "") + '</tr>', secc = null, n = 0;
+  const lista = CONCEPTOS.filter(c => mios.has(c.codigo) || (PUEDE && !SOLO && (c.familia === fam || c.familia === "comun" || !fam)));
+  for (const c of lista) {
+    if (q && !normBusqDato(c.descripcion + " " + c.codigo).includes(q)) continue;
+    const p = mios.get(c.codigo);
+    if (c.seccion !== secc) { secc = c.seccion; html += `<tr class="seccion"><td colspan="${PUEDE ? 6 : 5}">${esc(secc)}</td></tr>`; }
+    n++;
+    if (!p) {   // concepto de su familia que esta tarifa no tiene
+      html += `<tr class="inactivo"><td class="cod">${esc(c.codigo)}</td><td>${esc(c.descripcion)} <span class="peq">(no está en esta tarifa)</span></td><td></td><td></td><td>${esc(c.unidad || "")}</td><td class="solo-no"><button class="mini secondary" onclick="anyadirATarifa('${c.codigo}')">➕ Añadir a esta tarifa</button></td></tr>`;
+      continue;
+    }
+    const imp = p.importe === null ? "" : p.importe, pct = p.porcentaje;
+    const celImp = PUEDE && !SOLO ? `<input class="precio" type="number" step="0.01" value="${imp}" placeholder="${c.unidad === "% PVP" ? "PVP" : "a escribir"}" onchange="guardarPrecio('${c.codigo}', 'importe', this)">`
+                                  : (p.importe === null ? '<span class="peq">' + (c.unidad === "% PVP" ? "PVP del mueble" : "a escribir") + '</span>' : eur(p.importe));
+    const celPct = PUEDE && !SOLO ? `<input class="precio" type="number" step="0.01" value="${pct}" onchange="guardarPrecio('${c.codigo}', 'porcentaje', this)">` : num(pct) + " %";
+    html += `<tr class="${c.activo ? "" : "inactivo"}"><td class="cod">${esc(c.codigo)}</td><td>${esc(c.descripcion)}${c.activo ? "" : ' <span class="peq">(retirado)</span>'}</td><td class="num">${celImp}</td><td class="num">${celPct}</td><td>${esc(c.unidad || "")}</td>`
+      + (PUEDE ? `<td class="solo-no" style="white-space:nowrap"><button class="mini secondary" onclick="renombrarArticulo('${c.codigo}')" title="Cambiar el nombre (en todas las tarifas)">✎</button> <button class="mini secondary" onclick="quitarDeTarifa('${c.codigo}')" title="Quitar de esta tarifa">✕</button></td>` : "") + "</tr>";
+  }
+  $("tabla_precios").innerHTML = n ? html + "</table>" : '<p class="aviso">Ningún artículo con ese texto.</p>';
+}
+async function verPdf(id) {
+  const t = TARIFAS.find(x => x.id === id);
+  const { data, error } = await client.storage.from("tarifas").createSignedUrl(t.archivo, 3600);
+  if (error) { alert("No se pudo abrir el PDF: " + error.message); return; }
+  window.open(data.signedUrl, "_blank");
+}
+async function guardarPrecio(codigo, campo, input) {
+  const tid = $("sel_tarifa").value, v = input.value.trim();
+  let val = v === "" ? null : parseFloat(v.replace(",", "."));
+  if (campo === "porcentaje" && (val === null || isNaN(val))) { alert("El % no puede quedar vacío (100 = se cobra el importe entero)."); pintarPrecios(); return; }
+  if (val !== null && isNaN(val)) { alert("Escribe un número."); pintarPrecios(); return; }
+  const { error } = await client.from("tarifa_precios").update({ [campo]: val }).eq("tarifa_id", tid).eq("codigo", codigo);
+  if (error) { alert("No se pudo guardar: " + error.message); pintarPrecios(); return; }
+  const p = PRECIOS.find(x => x.tarifa_id === tid && x.codigo === codigo); if (p) p[campo] = val;
+  input.style.background = "#dcfce7"; setTimeout(() => { input.style.background = ""; }, 900);
+}
+async function anyadirATarifa(codigo) {
+  const tid = $("sel_tarifa").value, c = CONCEPTOS.find(x => x.codigo === codigo);
+  const pct = c.unidad === "% PVP" ? prompt("% sobre el PVP para «" + c.descripcion + "»:", "10") : "100";
+  if (pct === null) return;
+  const imp = c.unidad === "% PVP" ? "" : prompt("Importe de «" + c.descripcion + "» en esta tarifa (vacío = se escribe en cada línea):", "");
+  if (imp === null) return;
+  const { error } = await client.from("tarifa_precios").insert({ tarifa_id: tid, codigo, importe: imp.trim() === "" ? null : parseFloat(imp.replace(",", ".")), porcentaje: parseFloat(String(pct).replace(",", ".")) || 100 });
+  if (error) { alert("No se pudo añadir: " + error.message); return; }
+  await cargarTodo(); pintarPrecios();
+}
+async function quitarDeTarifa(codigo) {
+  const tid = $("sel_tarifa").value, c = CONCEPTOS.find(x => x.codigo === codigo);
+  if (!confirm("¿Quitar «" + c.descripcion + "» de " + nombreTarifa(tid) + "?\n\nLas tiendas con esta tarifa ya no podrán elegirlo. Las líneas ya hechas no cambian.")) return;
+  const { error } = await client.from("tarifa_precios").delete().eq("tarifa_id", tid).eq("codigo", codigo);
+  if (error) { alert("No se pudo quitar: " + error.message); return; }
+  await cargarTodo(); pintarPrecios();
+}
+async function renombrarArticulo(codigo) {
+  const c = CONCEPTOS.find(x => x.codigo === codigo);
+  const n = prompt("Nombre del artículo (cambia en TODAS las tarifas; las líneas ya hechas conservan su texto):", c.descripcion);
+  if (!n || n.trim() === c.descripcion) return;
+  const { error } = await client.from("tarifa_conceptos").update({ descripcion: n.trim() }).eq("codigo", codigo);
+  if (error) { alert("No se pudo cambiar: " + error.message); return; }
+  await cargarTodo(); pintarPrecios();
+}
+async function crearArticulo() {
+  const tid = $("sel_tarifa").value, t = TARIFAS.find(x => x.id === tid);
+  const desc = $("na_desc").value.trim(), secc = $("na_secc").value.trim() || "9. Otros", uni = $("na_uni").value;
+  if (!desc) { alert("Escribe la descripción."); return; }
+  const pref = t.familia === "descanso" ? "D" : t.familia === "mueble" ? "M" : "X";
+  const usados = CONCEPTOS.filter(c => c.codigo.startsWith(pref)).map(c => parseInt(c.codigo.slice(1), 10) || 0);
+  const codigo = pref + String(Math.max(0, ...usados) + 1).padStart(2, "0");
+  const orden = Math.max(0, ...CONCEPTOS.filter(c => c.seccion === secc).map(c => c.orden), ...(CONCEPTOS.some(c => c.seccion === secc) ? [] : [9000])) + 1;
+  const r1 = await client.from("tarifa_conceptos").insert({ codigo, familia: t.familia || "comun", seccion: secc, descripcion: desc, unidad: uni, orden });
+  if (r1.error) { alert("No se pudo crear el artículo: " + r1.error.message); return; }
+  const imp = $("na_imp").value.trim();
+  const r2 = await client.from("tarifa_precios").insert({ tarifa_id: tid, codigo, importe: imp === "" ? null : parseFloat(imp), porcentaje: parseFloat($("na_pct").value) || 100 });
+  if (r2.error) { alert("Artículo creado, pero no se pudo poner el precio: " + r2.error.message); }
+  ["na_desc", "na_imp"].forEach(i => $(i).value = ""); $("na_pct").value = "100"; $("caja_nuevo").style.display = "none";
+  await cargarTodo(); pintarPrecios();
+}
+async function copiarTarifa() {
+  const tid = $("sel_tarifa").value, t = TARIFAS.find(x => x.id === tid);
+  const nombre = prompt("Nombre de la tarifa nueva (se copian todos los precios de «" + t.nombre + "» y luego se cambian los que hagan falta):", t.nombre + " (copia)");
+  if (!nombre) return;
+  const { data: nueva, error } = await client.from("tarifas").insert({ nombre: nombre.trim(), archivo: null, familia: t.familia }).select("id").single();
+  if (error) { alert("No se pudo crear la tarifa: " + error.message); return; }
+  const filas = PRECIOS.filter(p => p.tarifa_id === tid).map(p => ({ tarifa_id: nueva.id, codigo: p.codigo, importe: p.importe, porcentaje: p.porcentaje }));
+  const r = await client.from("tarifa_precios").insert(filas);
+  if (r.error) { alert("Tarifa creada, pero no se pudieron copiar los precios: " + r.error.message); }
+  await cargarTodo(); $("sel_tarifa").value = nueva.id; pintarPrecios();
+}
+async function renombrarTarifa() {
+  const tid = $("sel_tarifa").value, t = TARIFAS.find(x => x.id === tid);
+  const n = prompt("Nombre de la tarifa:", t.nombre); if (!n || n.trim() === t.nombre) return;
+  const { error } = await client.from("tarifas").update({ nombre: n.trim() }).eq("id", tid);
+  if (error) { alert("No se pudo cambiar: " + error.message); return; }
+  await cargarTodo(); pintarPrecios();
+}
+
+/* ---------------- TIENDAS ---------------- */
+function pintarTiendas() {
+  const q = normBusq($("buscar_tienda").value.trim()), todas = $("ver_antiguas").checked;
+  const asig = new Map(ASIG.map(a => [a.tienda_id, a.tarifa_id]));
+  const lista = TIENDAS.filter(t => (todas || !T_ACT || T_ACT.has(t.id) || asig.has(t.id)) && (!q || normBusqDato(nomTienda(t)).includes(q)));
+  const opts = sel => '<option value="">— por defecto (' + esc(nombreTarifa(CFG?.tarifa_defecto) || "ninguna") + ') —</option>' + TARIFAS.map(x => `<option value="${x.id}"${x.id === sel ? " selected" : ""}>${esc(x.nombre)}</option>`).join("");
+  $("tabla_tiendas").innerHTML = '<table><tr><th>Tienda</th><th>Tarifa</th></tr>' + lista.map(t =>
+    `<tr><td>${esc(nomTienda(t))}</td><td>${PUEDE ? `<select onchange="ponerTarifaTienda('${t.id}', this.value, this)">${opts(asig.get(t.id))}</select>` : esc(nombreTarifa(asig.get(t.id)) || "por defecto")}</td></tr>`).join("") + "</table>"
+    + `<p class="peq">${lista.length} tiendas${todas ? "" : " (las que han tenido órdenes en los últimos 3 meses o ya tienen tarifa)"}.</p>`;
+}
+async function ponerTarifaTienda(tienda, tarifa, sel) {
+  const r = tarifa ? await client.from("tarifas_asignadas").upsert({ tienda_id: tienda, tarifa_id: tarifa }, { onConflict: "tienda_id" })
+                   : await client.from("tarifas_asignadas").delete().eq("tienda_id", tienda);
+  if (r.error) { alert("No se pudo guardar: " + r.error.message); return; }
+  ASIG = ASIG.filter(a => a.tienda_id !== tienda); if (tarifa) ASIG.push({ tienda_id: tienda, tarifa_id: tarifa });
+  sel.style.background = "#dcfce7"; setTimeout(() => { sel.style.background = ""; }, 900);
+}
+
+/* ---------------- ESTADÍSTICA ---------------- */
+async function cargarEstad() {
+  $("e_articulos").innerHTML = '<p class="aviso">Cargando…</p>'; $("e_tiendas").innerHTML = "";
+  const { data, error } = await client.rpc("estadistica_tarifa", { p_desde: $("e_desde").value || "2000-01-01", p_hasta: $("e_hasta").value || "2100-01-01" });
+  if (error) { $("e_articulos").innerHTML = '<p class="aviso">No se pudo cargar: ' + esc(error.message) + "</p>"; return; }
+  ESTAD = data || []; pintarEstad();
+}
+function pintarEstad() {
+  const tid = $("e_tienda").value, filas = ESTAD.filter(r => !tid || r.tienda_id === tid);
+  if (!ESTAD.length) { $("e_articulos").innerHTML = '<p class="aviso">Todavía no hay líneas con artículos de tarifa en esas fechas.</p>'; $("e_tiendas").innerHTML = ""; return; }
+  const porArt = new Map();
+  filas.forEach(r => { const a = porArt.get(r.codigo) || { codigo: r.codigo, descripcion: r.descripcion, lineas: 0, cantidad: 0, importe: 0 }; a.lineas += +r.lineas; a.cantidad += +r.cantidad; a.importe += +r.importe_cobrar; porArt.set(r.codigo, a); });
+  const arts = [...porArt.values()].sort((a, b) => b.importe - a.importe || b.lineas - a.lineas);
+  const totA = arts.reduce((s, a) => ({ l: s.l + a.lineas, c: s.c + a.cantidad, i: s.i + a.importe }), { l: 0, c: 0, i: 0 });
+  $("e_titulo1").textContent = "Artículos" + (tid ? " de " + nomTienda(TIENDAS.find(t => t.id === tid) || { nombre: "" }) : " (todas las tiendas)");
+  $("e_articulos").innerHTML = '<table><tr><th>Artículo</th><th class="num">Líneas</th><th class="num">Cantidad</th><th class="num">Facturado</th><th class="num">%</th></tr>'
+    + arts.map(a => `<tr><td><span class="cod">${esc(a.codigo)}</span> ${esc(a.descripcion)}</td><td class="num">${a.lineas}</td><td class="num">${num(a.cantidad)}</td><td class="num">${eur(a.importe)}</td><td class="num">${totA.i ? num(a.importe * 100 / totA.i) + " %" : ""}</td></tr>`).join("")
+    + `<tr class="seccion"><td>Total</td><td class="num">${totA.l}</td><td class="num">${num(totA.c)}</td><td class="num">${eur(totA.i)}</td><td></td></tr></table>`;
+  // por tienda (del artículo elegido no: de todo lo filtrado)
+  const porT = new Map();
+  filas.forEach(r => { const k = r.tienda_id || "-"; const a = porT.get(k) || { id: r.tienda_id, nombre: r.tienda || "(sin tienda)", lineas: 0, importe: 0, arts: new Set() }; a.lineas += +r.lineas; a.importe += +r.importe_cobrar; a.arts.add(r.codigo); porT.set(k, a); });
+  const ts = [...porT.values()].sort((a, b) => b.importe - a.importe);
+  $("e_titulo2").textContent = tid ? "Total de la tienda" : "Tiendas";
+  $("e_tiendas").innerHTML = '<table><tr><th>Tienda</th><th class="num">Líneas</th><th class="num">Artículos distintos</th><th class="num">Facturado</th></tr>'
+    + ts.map(t => `<tr${t.id ? ` style="cursor:pointer" onclick="$('e_tienda').value='${t.id}';pintarEstad()" title="Ver los artículos de esta tienda"` : ""}><td>${esc(t.nombre)}</td><td class="num">${t.lineas}</td><td class="num">${t.arts.size}</td><td class="num">${eur(t.importe)}</td></tr>`).join("") + "</table>"
+    + (tid ? "" : '<p class="peq">Pulsa una tienda para ver sus artículos.</p>');
+}
+
+/* ---------------- AJUSTES ---------------- */
+async function guardarAjustes() {
+  const desde = $("cfg_desde").value || null, def = $("cfg_defecto").value || null;
+  if (desde && !confirm("Desde el " + new Date(desde + "T00:00").toLocaleDateString("es-ES") + ", las líneas de importes de las órdenes con montaje a partir de ese día se harán con estas tarifas. ¿Guardar?")) return;
+  const { error } = await client.from("tarifas_config").update({ desde, tarifa_defecto: def }).eq("id", 1);
+  if (error) { alert("No se pudo guardar: " + error.message); return; }
+  await cargarTodo(); pintarPrecios(); alert("Guardado.");
+}
+
+init();
+</script>
+</body>
+</html>
