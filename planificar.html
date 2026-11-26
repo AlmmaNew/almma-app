@@ -1569,7 +1569,7 @@ function avisos(){
     return '<div class="aviso-f ' + c.estado + (c.respuesta_nueva ? " nueva" : "") + '"><div class="cuando">' + casilla + fdia(c.fecha) + '<br>' + esc(c.hora) + ' h<div class="muted">' + esc(corto(c.equipo_id)) + '</div></div>' +
       '<div><a href="pedidos.html?anyo=' + o.anyo + '&orden=' + o.orden + '" target="_blank"><b>' + o.n + '</b></a> ' + etqUrg(o.n) + ' · ' + esc(o.cli) + ' <span class="muted">📞 ' + esc(o.tel || o.tel2 || "sin teléfono") + '</span><div class="muted">' + esc(o.loc) + ' · ' + esc(nomTienda(o.tiendaId)) + '</div>' +
       (c.estado === "avisada" && c.avisado_at ? '<div class="muted" style="color:#92400e">Avisado por WhatsApp el ' + fHoraCorta(c.avisado_at) + '</div>' : "") + txtRespuesta(c) + '</div>' +
-      '<div class="bts">' + (c.estado === "confirmada" ? '<span class="est confirmada">Confirmada</span>' : c.estado === "propuesta" ? '<button class="ambar" onclick="abrirAviso(\'' + c.id + '\')">📲 Avisar</button>' :
+      '<div class="bts">' + (c.estado === "confirmada" ? '<span class="est confirmada">Confirmada</span><button class="verde" title="WhatsApp al cliente confirmándole la cita" onclick="abrirConfirmacion(\'' + c.id + '\')">📲 Enviar confirmación</button>' : c.estado === "propuesta" ? '<button class="ambar" onclick="abrirAviso(\'' + c.id + '\')">📲 Avisar</button>' :
         '<button class="verde" onclick="confirmar(\'' + c.id + '\')">✅ Confirmar</button><button class="rojo" onclick="rechazar(\'' + c.id + '\')">✖ No le va bien</button><button class="secondary" onclick="abrirAviso(\'' + c.id + '\')">Reenviar</button>') + visto +
         '<button class="secondary" title="Quitar la cita: la orden vuelve a «Sin agendar»" onclick="quitar(' + c.anyo + ',' + c.orden + ',\'' + c.id + '\',\'' + c.estado + '\')">↩ Devolver a Sin agendar</button></div></div>'; };
   const p = lista.filter(c => c.estado === "propuesta"), a = lista.filter(c => c.estado === "avisada");
@@ -1664,8 +1664,10 @@ async function confirmar(id){
   if (!confirm("¿El cliente de " + c.anyo + "/" + c.orden + " ha confirmado el " + fdia(c.fecha) + " " + fr + "?\n\nLa orden pasará a «Agendada» con esa fecha, esa franja de llegada y los montadores de " + nomEq(c.equipo_id) + ".")) return;
   const { error } = await client.rpc("confirmar_cita", { p_id: id });
   if (error) { alert("No se ha podido confirmar: " + error.message); return; }
+  const o = buscarOrden(c.anyo, c.orden);   // antes de recargar: agendada puede no salir en ninguna lista cargada
   await cargarTodo();
   toast("✅ " + c.anyo + "/" + c.orden + " confirmada → «Agendada» · " + fdia(c.fecha) + " " + c.hora + " h · " + nomEq(c.equipo_id) + ". Ya sale en Rutas y en Mi día.");
+  abrirConfirmacion(null, { ...c, estado: "confirmada" }, o);   // y se le confirma al cliente con otro WhatsApp
 }
 async function rechazar(id){
   const c = citasAbiertas.find(x => x.id === id); if (!c) return;
@@ -1756,6 +1758,48 @@ async function abrirAviso(id){
     '<div class="muted">' + (enCola
       ? "«Abrir WhatsApp y pasar a la siguiente» abre WhatsApp con el mensaje de este cliente, la marca como avisada y aquí sale ya la siguiente. En WhatsApp solo hay que pulsar Enviar y volver a esta pestaña. WhatsApp no deja mandar varios mensajes de golpe: hay que enviarlos de uno en uno."
       : "«Abrir WhatsApp» abre WhatsApp (o WhatsApp Web) con el número y el mensaje escritos: solo hay que pulsar Enviar. Después, «Marcar como avisado»: queda anotado en la pestaña «Llamadas» de la orden con el texto enviado.") + '</div>');
+}
+/* ---------- WhatsApp de CONFIRMACIÓN (Arturo, 26-11-2026) ----------
+   Cuando el cliente acepta (desde el enlace, o contesta «SÍ» y la oficina pulsa ✅ Confirmar), se le confirma la cita con otro WhatsApp,
+   con lo que nos haya indicado del acceso (ascensor pequeño, calle peatonal…). Queda anotado en «Llamadas» y quita el aviso 🔔. */
+let confAbierta = null;   // la cita de la ventana «Enviar confirmación»
+function mensajeConfirmacion(o, c){
+  const fecha = flargo(c.fecha), Fecha = fecha[0].toUpperCase() + fecha.slice(1);
+  const nombre = capFrase((o.cli || "").trim().split(/\s+/)[0] || "");
+  return "*ALMMA* almacén y montaje\n*" + nomTienda(o.tiendaId) + "*\n\n" +
+    "Hola *" + nombre + "*, le confirmamos su cita de montaje ✅\n\n" +
+    "📦 *" + resumenPedido(o.lineas) + "*\n📅 *" + Fecha + "*\n" + lineaFranja(franjaDe(c)) + "\n📍 " + [o.dir, o.loc].filter(Boolean).join(", ") + "\n\n" +
+    (c.nota_cliente ? "📝 Hemos tomado nota: " + c.nota_cliente + "\n\n" : "") +
+    "Recuerde que tiene que haber una persona mayor de edad en casa y dejar despejada la zona donde se va a montar.\n\n" +
+    "Si necesita cambiar algo, llámenos al 📞 613 037 899.\n\n" +
+    "Muchas gracias,\n*ALMMA* · Entregas y montajes";
+}
+function abrirConfirmacion(id, cita, orden){
+  const c = cita || citasResp.find(x => x.id === id) || citasAbiertas.find(x => x.id === id); if (!c) return;
+  const o = orden || buscarOrden(c.anyo, c.orden); if (!o) { alert("No encuentro la orden " + c.anyo + "/" + c.orden + "."); return; }
+  confAbierta = c;
+  const msg = mensajeConfirmacion(o, c), tels = [o.tel, o.tel2].filter(t => telWhats(t));
+  abrirVentana('<h3>📲 Confirmar la cita por WhatsApp · ' + esc(o.cli) + '</h3><div class="muted">Orden ' + o.n + ' · ' + esc(nomTienda(o.tiendaId)) + ' · ' + esc(fdia(c.fecha)) + ' · ' + esc(nomEq(c.equipo_id)) + '</div>' +
+    txtRespuesta(c) +
+    '<div class="fila2"><label class="muted">Enviar al:</label>' + (tels.length ? '<select id="cf_tel">' + tels.map(t => '<option value="' + telWhats(t) + '">' + esc(t) + '</option>').join("") + '</select>' :
+      '<b style="color:#b91c1c">La orden no tiene un teléfono válido.</b> <span class="muted">Confírmalo por otro medio y pulsa «Anotar como enviada».</span>') +
+      '<span class="muted">Puedes retocar el texto antes de enviarlo.</span></div>' +
+    '<div class="aviso-2col"><textarea id="cf_msg" oninput="document.getElementById(\'burbuja\').innerHTML=aWhats(this.value)">' + esc(msg) + '</textarea>' +
+    '<div class="whats"><div class="whats-cab">🟢 ' + esc(o.cli) + '</div><div class="whats-fondo"><div class="burbuja" id="burbuja">' + aWhats(msg) + '</div></div></div></div>' +
+    '<div class="fila2">' + (tels.length ? '<button class="verde" onclick="enviarConfirmacion(true)">🟢 Abrir WhatsApp</button>' : "") +
+      '<button class="ambar" onclick="enviarConfirmacion(false)">Anotar como enviada</button><button class="secondary" onclick="cerrarVentana()">Ahora no</button></div>' +
+    '<div class="muted">«Abrir WhatsApp» abre WhatsApp con el mensaje escrito (solo hay que pulsar Enviar), lo anota en la pestaña «Llamadas» de la orden y quita el aviso 🔔.</div>');
+}
+async function enviarConfirmacion(abrir){
+  const c = confAbierta; if (!c) return;
+  const texto = document.getElementById("cf_msg").value;
+  if (abrir) window.open("https://wa.me/" + document.getElementById("cf_tel").value + "?text=" + encodeURIComponent(texto), "_blank");   // antes de esperar a nada (si no, el navegador lo bloquea)
+  const { error } = await client.from("llamadas_orden").insert({ anyo: c.anyo, orden: c.orden, canal: "whatsapp", creado_por: user.id,
+    notas: "📲 Cita CONFIRMADA al cliente por WhatsApp:\n" + texto });
+  if (error) { alert("WhatsApp abierto, pero no se ha podido anotar en Llamadas: " + error.message); return; }
+  if (c.respuesta_nueva) await client.rpc("marcar_respuesta_vista", { p_id: c.id });
+  confAbierta = null; cerrarVentana(); await recargarCitas();
+  toast("📲 Confirmación enviada a " + c.anyo + "/" + c.orden + " y anotada en Llamadas.");
 }
 function abrirWhatsApp(){ guardarFranja(); window.open("https://wa.me/" + document.getElementById("av_tel").value + "?text=" + encodeURIComponent(document.getElementById("av_msg").value), "_blank"); }
 /* ---------- avisar en grupo: las citas marcadas se abren una detrás de otra ---------- */

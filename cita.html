@@ -142,8 +142,19 @@ function siNo(){
 }
 
 const OPC_DIA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"], OPC_HORA = ["Por la mañana", "Por la tarde", "Me da igual la hora"];
+// Tras el «Sí» (Arturo, 26-11-2026): preguntar si hay algo del acceso que debamos saber, agradecer y cerrar; la oficina confirma luego por WhatsApp
+const OPC_ACCESO = ["Ascensor pequeño", "Sin ascensor", "Escalera estrecha", "Calle estrecha", "Calle peatonal", "Difícil aparcar", "Llamar antes de llegar"];
 
 function pintar(){
+  if (modo === "gracias") {
+    app.innerHTML = cabecera() + '<div class="estado ok"><b class="g">🙏 ¡Muchas gracias' + (cita.nombre ? ", " + esc(cita.nombre) : "") + '!</b>' +
+      'Su cita queda confirmada para el <b>' + fLarga(cita.fecha).toLowerCase() + '</b>, ' + franja(cita).toLowerCase() + ' (hora aproximada).' +
+      (cita.nota ? '<div style="margin-top:6px">Hemos tomado nota: «' + esc(cita.nota) + '»</div>' : "") +
+      '<div style="margin-top:10px">En breve le enviaremos un <b>WhatsApp</b> confirmándole la cita.</div></div>' +
+      '<div class="tarjeta" style="text-align:center"><b>Ya puede cerrar esta pantalla.</b>' +
+      '<button class="bt enviar" onclick="cerrarPantalla()">Cerrar</button><div id="no_cierra" class="muted oculto">Si no se cierra sola, pulse la ✕ de arriba o el botón de volver del móvil.</div></div>' + pie();
+    return;
+  }
   if (!cita.valida) {
     app.innerHTML = cabecera() + '<div class="estado aviso"><b class="g">Esta cita ha cambiado</b>' +
       (cita.motivo === "realizada" ? "El montaje ya se ha realizado. ¡Gracias por confiar en nosotros!" : "Le enviaremos un nuevo mensaje con la fecha. Si tiene dudas, llámenos.") + '</div>' + pie();
@@ -166,8 +177,19 @@ function pintar(){
     h += '<div class="tarjeta"><label class="tit" for="txt">Escríbanos lo que necesitemos saber</label>' +
       '<textarea id="txt" maxlength="500" placeholder="Por ejemplo: es un 4º sin ascensor; llamen al llegar"></textarea>' +
       '<button class="bt enviar" onclick="responder(\'nota\')">Enviar</button><button class="bt volver" onclick="ir(\'inicio\')">← Volver</button></div>';
+  } else if (modo === "acceso") {
+    h = cabecera() + '<div class="estado ok"><b class="g">✅ Cita confirmada</b>' + fLarga(cita.fecha) + ', ' + franja(cita).toLowerCase() + ' (hora aproximada).</div>' +
+      '<div class="tarjeta"><b>¿Tiene algo que indicarnos?</b><div class="muted">Para llegar y subir los muebles sin problemas. Marque lo que corresponda (puede marcar varios).</div>' +
+      '<div class="chips" style="margin-top:12px">' + OPC_ACCESO.map(chip).join("") + '</div>' +
+      '<label class="tit" for="txt">¿Algo más? (opcional)</label><textarea id="txt" maxlength="400" placeholder="Por ejemplo: es un 4º piso; la calle es de un solo sentido; hay que pedir llave del garaje"></textarea>' +
+      '<button class="bt enviar" onclick="responder(\'acceso\')">Enviar</button>' +
+      '<button class="bt nota" style="text-align:center" onclick="ir(\'gracias\')">No, nada que indicar</button></div>';
   }
   app.innerHTML = h + pie();
+}
+function cerrarPantalla(){
+  window.close();   // solo funciona si el navegador lo permite (p. ej. abierta desde WhatsApp en algunas versiones)
+  setTimeout(() => { const n = document.getElementById("no_cierra"); if (n) n.classList.remove("oculto"); }, 400);
 }
 function chip(t){ return '<button class="chip ' + (elegidos.has(t) ? "on" : "") + '" onclick="marcar(this, \'' + t + '\')">' + t + '</button>'; }
 function marcar(b, t){ elegidos.has(t) ? elegidos.delete(t) : elegidos.add(t); b.classList.toggle("on"); }
@@ -176,21 +198,28 @@ function ir(m){ modo = m; elegidos.clear(); pintar(); window.scrollTo(0, 0); }
 let enviando = false;
 async function responder(r){
   if (enviando) return;
-  const txt = (document.getElementById("txt")?.value || "").trim();
+  let txt = (document.getElementById("txt")?.value || "").trim();
   if (r === "nota" && !txt) { alert("Escriba el aviso antes de enviarlo."); return; }
+  if (r === "acceso") {   // lo marcado + lo escrito, como un aviso más («nota»)
+    txt = [...OPC_ACCESO.filter(t => elegidos.has(t)), txt].filter(Boolean).join(" · ");
+    if (!txt) { ir("gracias"); return; }   // no ha marcado ni escrito nada = nada que indicar
+  }
+  const rpc = r === "acceso" ? "nota" : r;
   const preferencia = r === "no" ? [...elegidos].join(", ") : null;
+  // después del «Sí» se pregunta por el acceso; después del aviso del acceso, gracias y cerrar
+  const siguiente = r === "si" ? "acceso" : r === "acceso" ? "gracias" : "inicio";
   enviando = true;
   try {
     if (demo) await new Promise(x => setTimeout(x, 400));
     else {
-      const { data, error } = await client.rpc("responder_cita", { p_token: token, p_respuesta: r, p_preferencia: preferencia, p_comentario: txt || null });
+      const { data, error } = await client.rpc("responder_cita", { p_token: token, p_respuesta: rpc, p_preferencia: preferencia, p_comentario: txt || null });
       if (error) throw error;
       if (!data) throw new Error("sin datos");
-      cita = data; modo = "inicio"; pintar(); window.scrollTo(0, 0); return;   // la base de datos devuelve la cita ya actualizada
+      cita = data; ir(data.valida ? siguiente : "inicio"); return;   // la base de datos devuelve la cita ya actualizada
     }
-    if (r === "nota") Object.assign(cita, { nota: txt, nota_at: new Date().toISOString() });   // un aviso no cambia el sí / no
+    if (rpc === "nota") Object.assign(cita, { nota: txt, nota_at: new Date().toISOString() });   // un aviso no cambia el sí / no
     else Object.assign(cita, { respuesta: r, preferencia, comentario: txt || null, respondido_at: new Date().toISOString() });
-    modo = "inicio"; pintar(); window.scrollTo(0, 0);
+    ir(siguiente);
   } catch (e) {
     alert("No se ha podido enviar. Compruebe que tiene internet y pruebe otra vez, o llámenos al " + TEL + ".");
   } finally { enviando = false; }
