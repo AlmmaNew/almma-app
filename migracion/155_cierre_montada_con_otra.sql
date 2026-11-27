@@ -8,3 +8,9 @@ alter table public.ordenes add constraint ordenes_cierre_motivo_check check (cie
 -- o nombre del cliente distinto en las dos órdenes.
 -- Nota en observaciones: «[27/11/2026] 🚫 CERRADA POR ANULACIÓN (revisión de órdenes antiguas): el cliente (mismo teléfono) tiene la orden X/Y montada el dd/mm/aaaa. Estado anterior: …»
 -- Para deshacer: como en 153, con lote = 'revision-2026-11-27-telefono'.
+
+-- CIERRE HECHO el 27-11-2026 (lote 'revision-2026-11-27-nombre', a nombre de Arturo): 483 órdenes
+-- en las que el mismo cliente (mismo nombre, 2 palabras o más) tiene otra orden de la misma tienda montada después.
+-- Se dejaron SIN cerrar: nombre de una sola palabra, nombre que en esa tienda usan clientes con teléfonos distintos,
+-- teléfonos distintos en las dos órdenes, o la otra orden montada más de un año después.
+-- Para deshacer: como en 153, con lote = 'revision-2026-11-27-nombre'.
