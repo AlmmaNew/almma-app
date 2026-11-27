@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALMMA - Análisis de negocio</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="capacidad.js"></script>
+<style>
+/* ALMMA · Análisis de negocio (27-11-2026). Solo lectura, solo con staff.acceso_finanzas (como Contabilidad y el Panel de dirección).
+   1) Previsión de demanda: montajes por mes de los últimos 3 años, estacionalidad y previsión de los próximos 6 meses frente a la capacidad.
+   2) Rentabilidad por tienda: facturado (cabfacturas, base sin IVA, sin proformas) entre montajes de los últimos 12 meses, frente a un
+      coste por montaje (sale de nóminas + gastos de Contabilidad, sin IVA; se puede cambiar a mano).
+   3) Almacenaje: lo que se podría cobrar por la mercancía que pasa mucho tiempo en la nave (días desde la recepción hasta el montaje). */
+:root{--primary:#2563eb;--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;--serie:#2563eb;--serie-prev:#93c5fd;--serie-ant:#cbd5e1;--bien:#15803d;--mal:#b91c1c;--aviso:#b45309;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+#toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 20px;background:#fff;border-bottom:1px solid var(--border);}
+#toolbar h1{font-size:17px;margin:0 10px 0 0;} #toolbar .spacer{flex:1;}
+button,select,input{font:inherit;font-size:14px;}
+button{cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#fff;padding:7px 12px;}
+input[type=number]{width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;}
+body #toolbar .tabs{display:flex;gap:4px;flex-wrap:wrap;} body #toolbar .tabs button.on,body #toolbar .tabs button.on:hover,body #toolbar .tabs button.on:focus{background:var(--primary) !important;color:#fff !important;border-color:var(--primary) !important;font-weight:700;}
+main{max-width:1250px;margin:0 auto;padding:18px 20px 60px;}
+.muted{color:var(--muted);font-size:13px;}
+#estado{font-size:13px;color:var(--muted);min-height:18px;margin-bottom:10px;}
+.tarjeta{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 14px -6px rgba(15,23,42,.10);}
+.tarjeta h2{font-size:16px;margin:0 0 4px;} .tarjeta > .muted{margin:0 0 12px;}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:16px;}
+.tile{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.tile .k{font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.3px;} .tile .v{font-size:24px;font-weight:800;margin:6px 0 2px;font-variant-numeric:tabular-nums;} .tile .d{font-size:13px;color:var(--muted);line-height:1.45;}
+.tw{overflow-x:auto;max-height:560px;overflow-y:auto;}
+table{border-collapse:collapse;width:100%;font-size:13px;}
+th,td{padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:left;white-space:nowrap;}
+th{position:sticky;top:0;background:#f8fafc;font-size:12px;color:#475569;z-index:1;}
+th.ord{cursor:pointer;} th.ord:hover{color:var(--primary);}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;}
+tr.total td{font-weight:800;border-top:2px solid var(--border);background:#f8fafc;}
+tr.prev td{color:#1e40af;background:#f8fbff;}
+.chip{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700;}
+.chip.r{background:#fee2e2;color:#991b1b;} .chip.a{background:#fef3c7;color:#92400e;} .chip.v{background:#dcfce7;color:#166534;}
+.sube{color:var(--bien);font-weight:700;} .baja{color:var(--mal);font-weight:700;} .ojo{color:var(--aviso);font-weight:700;}
+.minib{display:inline-block;height:8px;border-radius:4px;background:var(--serie);vertical-align:middle;margin-right:6px;}
+.param{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;}
+.param label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#475569;}
+.nota{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.55;}
+.leyenda{display:flex;gap:16px;font-size:13px;color:#475569;margin:4px 0 6px;flex-wrap:wrap;}
+.leyenda span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c);}
+.leyenda span.linea::before{height:0;border-top:2px dashed var(--c);background:none;vertical-align:3px;}
+#graf{position:relative;} #graf svg{display:block;width:100%;height:auto;}
+#graf .eje{font-size:11px;fill:#64748b;} #graf .rej{stroke:#eef2f7;}
+#tip{position:absolute;pointer-events:none;background:#0f172a;color:#fff;font-size:12px;padding:7px 10px;border-radius:8px;line-height:1.5;display:none;white-space:nowrap;z-index:5;}
+details summary{cursor:pointer;font-size:13px;color:var(--primary);margin-top:8px;}
+#bloqueo{display:none;}
+@media (max-width:600px){main{padding:14px 16px 50px;} #toolbar{padding:8px 16px;}}
+</style>
+<link rel="stylesheet" href="estilo_oficina.css">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
+<script src="volver.js" defer></script>
+</head>
+<body>
+<div id="toolbar">
+  <h1>📈 Análisis de negocio</h1>
+  <div class="tabs"><button id="t_dem" onclick="verTab('dem')">Previsión de demanda</button><button id="t_rent" onclick="verTab('rent')">Rentabilidad por tienda</button><button id="t_alm" onclick="verTab('alm')">Almacenaje</button></div>
+  <span class="spacer"></span>
+</div>
+<main>
+  <div id="bloqueo" class="tarjeta"><b>No tienes acceso.</b><br>Solo pueden verlo quienes tienen acceso a Contabilidad. <a href="inicio.html">Volver al inicio</a></div>
+  <div id="estado"></div>
+  <div id="v_dem"></div><div id="v_rent" style="display:none"></div><div id="v_alm" style="display:none"></div>
+</main>
+<script>
+const client = supabase.createClient(
+  "https://uamgbtbsxbrgymhqalak.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k"
+);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const iso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const d10 = s => s ? String(s).slice(0, 10) : "";
+const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const MESES_L = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const fEur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const eur = x => fEur.format(Math.round(x || 0));
+const num = x => new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 }).format(Math.round(x || 0));
+const f1 = x => (x || 0).toFixed(1).replace(".", ",");
+const HOY = new Date(); HOY.setHours(0, 0, 0, 0);
+const dias = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+const ymKey = (y, m) => y + "-" + String(m + 1).padStart(2, "0");   // m de 0 a 11
+const CATS_NO_COSTE = ["IVA", "IVA aplazado"];   // pagos de IVA: no son coste del servicio
+
+async function todo(fabrica) {
+  let out = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await fabrica().range(desde, desde + 999);
+    if (error) throw error;
+    out = out.concat(data || []);
+    if (!data || data.length < 1000) return out;
+  }
+}
+const lsGet = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : v; } catch (e) { return def; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+const D = {};
+let tab = lsGet("neg_tab", "dem");
+function verTab(t) {
+  tab = t; lsSet("neg_tab", t);
+  ["dem", "rent", "alm"].forEach(x => { $("v_" + x).style.display = x === t ? "" : "none"; $("t_" + x).classList.toggle("on", x === t); });
+}
+
+async function cargar() {
+  $("estado").textContent = "Cargando 3 años de montajes, facturas y gastos…";
+  const t0 = performance.now();
+  const ini36 = new Date(HOY.getFullYear() - 3, HOY.getMonth(), 1), ini12 = new Date(HOY.getFullYear() - 1, HOY.getMonth(), 1);
+  const hace1a = iso(new Date(HOY.getFullYear() - 1, HOY.getMonth(), HOY.getDate()));
+  // montajes de 3 años: por años a la vez (más rápido)
+  const tramos = [];
+  for (let y = ini36.getFullYear(); y <= HOY.getFullYear(); y++) {
+    const a = y === ini36.getFullYear() ? iso(ini36) : y + "-01-01", b = (y + 1) + "-01-01";
+    tramos.push(todo(() => client.from("ordenes").select("anyo, orden, tienda_id, fecha_recepcion, fecha_montaje, bultos").gte("fecha_montaje", a).lt("fecha_montaje", b).order("anyo").order("orden")));
+  }
+  try {
+    const [mont, tiendas, cab, nom, gas, nave, cap] = await Promise.all([
+      Promise.all(tramos).then(x => x.flat()),
+      todo(() => client.from("tiendas").select("id, nombre, nombre_comercial").order("id")),
+      todo(() => client.from("cabfacturas").select("tienda_id, impbruto, ffactura").neq("serie", 5).gte("ffactura", iso(ini12)).order("anyo").order("serie").order("factura")),
+      todo(() => client.from("cont_nominas").select("anyo, mes, base, extras, recogidas, sabados").order("id")).catch(() => []),
+      todo(() => client.from("cont_gastos").select("anyo, mes, categoria, importe, iva_pct").order("id")).catch(() => []),
+      todo(() => client.from("ordenes").select("anyo, orden, tienda_id, estado, fecha_recepcion, fecha_creacion, bultos").in("estado", ["recepcionado_total", "recepcionado_parcial", "agendado", "incidencia"])
+        .is("fecha_montaje", null).or("fecha_recepcion.gte." + hace1a + ",fecha_creacion.gte." + hace1a).order("anyo").order("orden")),
+      (window.calcularCapacidad ? calcularCapacidad(client) : Promise.resolve(null)).catch(() => null),
+    ]);
+    Object.assign(D, { mont, cab, nom, gas, nave, cap, ini12: iso(ini12), tN: new Map(tiendas.map(t => [t.id, t.nombre_comercial || t.nombre])) });
+    pintarDemanda(); pintarRent(); pintarAlm();
+    $("estado").textContent = num(mont.length) + " montajes leídos · " + ((performance.now() - t0) / 1000).toFixed(1).replace(".", ",") + " s";
+  } catch (e) { console.error(e); $("estado").innerHTML = '<span class="baja">No se han podido leer los datos: ' + esc(e.message || e) + "</span>"; }
+}
+const nomT = id => D.tN.get(id) || "(sin tienda)";
+
+/* =================== 1. PREVISIÓN DE DEMANDA =================== */
+function pintarDemanda() {
+  const porMes = new Map();
+  D.mont.forEach(o => { const k = d10(o.fecha_montaje).slice(0, 7); porMes.set(k, (porMes.get(k) || 0) + 1); });
+  // meses cerrados (el actual no cuenta: está a medias)
+  const meses = [];
+  for (let i = 36; i >= 1; i--) { const d = new Date(HOY.getFullYear(), HOY.getMonth() - i, 1); meses.push({ y: d.getFullYear(), m: d.getMonth(), k: ymKey(d.getFullYear(), d.getMonth()), n: porMes.get(ymKey(d.getFullYear(), d.getMonth())) || 0 }); }
+  // estacionalidad: cada mes frente a la media de su bloque de 12 meses
+  const idx = Array(12).fill(0).map(() => []);
+  for (let b = 0; b < 3; b++) {
+    const bl = meses.slice(b * 12, b * 12 + 12), media = bl.reduce((s, x) => s + x.n, 0) / 12;
+    if (media > 0) bl.forEach(x => idx[x.m].push(x.n / media));
+  }
+  const indice = idx.map(a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 1);
+  const ult12 = meses.slice(24).reduce((s, x) => s + x.n, 0), prev12 = meses.slice(12, 24).reduce((s, x) => s + x.n, 0);
+  const nivel = ult12 / 12;
+  const tend = prev12 ? ult12 / prev12 : 1;                                  // cambio interanual
+  const tendMes = Math.pow(Math.min(Math.max(tend, 0.7), 1.3), 1 / 12);     // repartido por meses (y acotado: nada de extrapolar locuras)
+  // capacidad por mes = días laborables × montajes/día actuales
+  const montDia = D.cap ? D.cap.montDia : null;
+  const laborables = (y, m) => { let n = 0; for (let d = new Date(y, m, 1); d.getMonth() === m; d.setDate(d.getDate() + 1)) if (d.getDay() >= 1 && d.getDay() <= 5) n++; return n; };
+  const prev = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(HOY.getFullYear(), HOY.getMonth() + i, 1), y = d.getFullYear(), m = d.getMonth();
+    const n = nivel * indice[m] * Math.pow(tendMes, 6 + i);                 // el nivel es la media de los últimos 12 meses (centrada ~6 meses atrás)
+    const ly = porMes.get(ymKey(y - 1, m)) || 0;
+    const lab = laborables(y, m);
+    prev.push({ y, m, k: ymKey(y, m), n: Math.round(n), ly, lab, cap: montDia ? Math.round(montDia * lab) : null, enCurso: i === 0, hecho: i === 0 ? (porMes.get(ymKey(y, m)) || 0) : null });
+  }
+  D.dem = { meses, prev };
+  const pico = prev.slice().sort((a, b) => b.n - a.n)[0];
+  const apretados = prev.filter(p => p.cap && p.n > p.cap * 0.95);
+  let h = '<div class="tiles">' +
+    '<div class="tile"><div class="k">Últimos 12 meses</div><div class="v">' + num(ult12) + ' montajes</div><div class="d"><span class="' + (tend >= 1 ? "sube" : "baja") + '">' + (tend >= 1 ? "▲ +" : "▼ ") + f1((tend - 1) * 100) + " %</span> frente a los 12 anteriores (" + num(prev12) + ")</div></div>" +
+    '<div class="tile"><div class="k">Media mensual</div><div class="v">' + num(nivel) + '</div><div class="d">Montajes al mes en los últimos 12 meses</div></div>' +
+    '<div class="tile"><div class="k">Próximos 6 meses</div><div class="v">≈ ' + num(prev.reduce((s, p) => s + p.n, 0)) + '</div><div class="d">Mes más fuerte: <b>' + MESES_L[pico.m] + "</b> (≈ " + num(pico.n) + ")</div></div>" +
+    '<div class="tile"><div class="k">Capacidad</div><div class="v">' + (montDia ? f1(montDia) + "/día" : "—") + '</div><div class="d">' + (apretados.length ? '<span class="ojo">Justo de gente en ' + apretados.map(p => MESES_L[p.m]).join(", ") + "</span>" : "Con el equipo actual cabe lo previsto") + "</div></div></div>";
+  h += '<section class="tarjeta"><h2>Montajes por mes y previsión</h2><p class="muted">Montajes hechos cada mes en los últimos 3 años y la previsión de los próximos 6, con la capacidad del equipo actual (días laborables × montajes al día del ritmo de las últimas 8 semanas).</p>' +
+    '<div class="leyenda"><span style="--c:var(--serie)">Montajes hechos</span><span style="--c:var(--serie-prev)">Previsión</span><span class="linea" style="--c:#dc2626">Capacidad del equipo actual</span></div><div id="graf"><div id="tip"></div></div>' +
+    '<details><summary>Ver como tabla</summary><div class="tw"><table><tr><th>Mes</th><th class="n">Montajes</th><th class="n">Mismo mes año anterior</th></tr>' +
+    meses.slice().reverse().map(x => "<tr><td>" + MESES_L[x.m] + " " + x.y + '</td><td class="n">' + num(x.n) + '</td><td class="n">' + num(porMes.get(ymKey(x.y - 1, x.m)) || 0) + "</td></tr>").join("") + "</table></div></details></section>";
+  h += '<div class="tarjeta"><h2>Previsión de los próximos 6 meses</h2><p class="muted">Cuántos montajes esperar y si el equipo actual llega.</p><div class="tw"><table><tr><th>Mes</th><th class="n">Previsión</th><th class="n">Año anterior</th><th class="n">Días lab.</th><th class="n">Capacidad</th><th>Ocupación prevista</th></tr>' +
+    prev.map(p => { const oc = p.cap ? p.n / p.cap : null; return '<tr class="prev"><td><b>' + MESES_L[p.m] + " " + p.y + "</b>" + (p.enCurso ? ' <span class="muted">(en curso: ' + num(p.hecho) + " hechos)</span>" : "") + '</td><td class="n"><b>≈ ' + num(p.n) + '</b></td><td class="n">' + num(p.ly) + '</td><td class="n">' + p.lab + '</td><td class="n">' + (p.cap ? num(p.cap) : "—") + "</td><td>" +
+      (oc === null ? "—" : '<span class="minib" style="width:' + Math.round(Math.min(oc, 1.2) * 70) + "px;background:" + (oc > 1 ? "#dc2626" : oc > 0.9 ? "#d97706" : "var(--serie)") + '"></span>' + Math.round(oc * 100) + " %" + (oc > 1 ? ' <span class="chip r">falta gente</span>' : oc < 0.7 ? ' <span class="chip a">sobra capacidad</span>' : "")) + "</td></tr>"; }).join("") + "</table></div>" +
+    '<div class="nota"><b>Cómo se calcula:</b> media de los últimos 12 meses (' + num(nivel) + ") × peso de cada mes del año según los 3 últimos años (p. ej. agosto " + Math.round(indice[7] * 100) + " %, " + MESES_L[pico.m] + " " + Math.round(indice[pico.m] * 100) + " %) × la tendencia del último año (" + (tend >= 1 ? "+" : "") + f1((tend - 1) * 100) + " % anual). " +
+    "Los festivos no están descontados de los días laborables. Es una estimación: sirve para planificar plantilla y vacaciones, no como cifra exacta." +
+    "</div></div>";
+  $("v_dem").innerHTML = h;
+  pintarGraf();
+}
+function pintarGraf() {
+  const { meses, prev } = D.dem, cont = $("graf");
+  const todos = meses.map(x => ({ ...x, tipo: "h" })).concat(prev.map(p => ({ ...p, tipo: "p" })));
+  const W = 900, H = 260, ml = 44, mr = 8, mt = 10, mb = 28;
+  const max = Math.max(1, ...todos.map(x => Math.max(x.n, x.cap || 0)));
+  const top = Math.ceil(max / 100) * 100, y = v => mt + (H - mt - mb) * (1 - v / top);
+  const gw = (W - ml - mr) / todos.length, bw = Math.max(4, gw - 3);
+  const barra = (x, v, color) => { const y0 = H - mb, y1 = y(v), hgt = y0 - y1; if (hgt <= 0.5) return ""; const r = Math.min(3, hgt, bw / 2);
+    return '<path fill="' + color + '" d="M' + x + "," + y0 + "V" + (y1 + r) + "Q" + x + "," + y1 + " " + (x + r) + "," + y1 + "H" + (x + bw - r) + "Q" + (x + bw) + "," + y1 + " " + (x + bw) + "," + (y1 + r) + "V" + y0 + 'Z"/>'; };
+  let s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Montajes por mes en los últimos 3 años y previsión de los próximos 6 meses">';
+  for (let v = 0; v <= top; v += 100) s += '<line class="rej" x1="' + ml + '" x2="' + (W - mr) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="eje" x="' + (ml - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + v + "</text>";
+  todos.forEach((x, i) => {
+    const gx = ml + i * gw;
+    s += barra(gx + 1.5, x.n, x.tipo === "p" ? "var(--serie-prev)" : "var(--serie)");
+    if (x.tipo === "p" && x.cap) s += '<line x1="' + gx + '" x2="' + (gx + gw) + '" y1="' + y(x.cap) + '" y2="' + y(x.cap) + '" stroke="#dc2626" stroke-width="2" stroke-dasharray="4 3"/>';
+    if (x.m === 0 || i === meses.length) s += '<text class="eje" x="' + (gx + gw / 2) + '" y="' + (H - 9) + '" text-anchor="middle">' + (x.m === 0 ? x.y : MESES[x.m]) + "</text>";
+    s += '<rect x="' + gx + '" y="' + mt + '" width="' + gw + '" height="' + (H - mt - mb) + '" fill="transparent" data-i="' + i + '"/>';
+  });
+  s += '<line x1="' + (ml + meses.length * gw) + '" x2="' + (ml + meses.length * gw) + '" y1="' + mt + '" y2="' + (H - mb) + '" stroke="#94a3b8" stroke-dasharray="2 3"/>';
+  s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + (H - mb) + '" y2="' + (H - mb) + '" stroke="#cbd5e1"/></svg>';
+  cont.insertAdjacentHTML("beforeend", s);
+  const tip = $("tip");
+  cont.querySelectorAll("rect[data-i]").forEach(r => {
+    r.addEventListener("mousemove", ev => {
+      const x = todos[+r.dataset.i], b = cont.getBoundingClientRect();
+      tip.innerHTML = "<b>" + MESES_L[x.m] + " " + x.y + "</b><br>" + (x.tipo === "p" ? "Previsión: ≈ " + num(x.n) + (x.cap ? "<br>Capacidad: " + num(x.cap) : "") : "Montajes: " + num(x.n));
+      tip.style.display = "block"; const w = tip.offsetWidth;
+      tip.style.left = Math.min(ev.clientX - b.left + 14, b.width - w - 4) + "px"; tip.style.top = Math.max(0, ev.clientY - b.top - 20) + "px";
+      r.setAttribute("fill", "rgba(37,99,235,.06)");
+    });
+    r.addEventListener("mouseleave", () => { tip.style.display = "none"; r.setAttribute("fill", "transparent"); });
+  });
+}
+
+/* =================== 2. RENTABILIDAD POR TIENDA =================== */
+let ordRent = { col: "margen", dir: -1 };
+function costeSugerido() {
+  // meses con nóminas Y gastos apuntados: (nóminas + gastos sin IVA) / montajes de esos meses
+  const k = (y, m) => y + "-" + m;
+  const nomM = new Map(), gasM = new Map();
+  D.nom.forEach(n => nomM.set(k(n.anyo, n.mes), (nomM.get(k(n.anyo, n.mes)) || 0) + (+n.base || 0) + (+n.extras || 0) + (+n.recogidas || 0) + (+n.sabados || 0)));
+  D.gas.filter(g => !CATS_NO_COSTE.includes(g.categoria)).forEach(g => gasM.set(k(g.anyo, g.mes), (gasM.get(k(g.anyo, g.mes)) || 0) + (+g.importe || 0)));
+  const mesesOk = [...nomM.keys()].filter(x => gasM.has(x) && gasM.get(x) >= 0.2 * nomM.get(x));   // meses con los gastos apuntados de verdad (si no, el coste sale bajo)
+  const actual = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
+  const montM = new Map(); D.mont.forEach(o => { const d = d10(o.fecha_montaje); const kk = (+d.slice(0, 4)) + "-" + (+d.slice(5, 7)); montM.set(kk, (montM.get(kk) || 0) + 1); });
+  const usados = mesesOk.filter(x => { const [y, m] = x.split("-").map(Number); return new Date(y, m - 1, 1) < actual && montM.get(x); });   // solo meses cerrados
+  const coste = usados.reduce((s, x) => s + nomM.get(x) + gasM.get(x), 0), monts = usados.reduce((s, x) => s + montM.get(x), 0);
+  return { valor: monts ? coste / monts : null, meses: usados.map(x => { const [y, m] = x.split("-").map(Number); return MESES[m - 1] + " " + String(y).slice(2); }), coste, monts };
+}
+function pintarRent() {
+  const sug = costeSugerido();
+  const guardado = parseFloat(lsGet("neg_coste", ""));
+  const coste = isFinite(guardado) && guardado > 0 ? guardado : (sug.valor ? Math.round(sug.valor) : 70);
+  const porT = new Map(); const f = id => { if (!porT.has(id)) porT.set(id, { id, fact: 0, mont: 0 }); return porT.get(id); };
+  D.cab.forEach(c => { f(c.tienda_id).fact += +c.impbruto || 0; });
+  D.mont.filter(o => d10(o.fecha_montaje) >= D.ini12).forEach(o => { f(o.tienda_id).mont++; });
+  const filas = [...porT.values()].filter(r => r.mont >= 1 || r.fact > 0).map(r => {
+    const costeT = r.mont * coste; return { ...r, nombre: nomT(r.id), porMont: r.mont ? r.fact / r.mont : null, coste: costeT, margen: r.fact - costeT, pct: r.fact ? (r.fact - costeT) / r.fact : null };
+  });
+  D.rent = { filas, coste, sug };
+  const tot = filas.reduce((a, r) => ({ fact: a.fact + r.fact, mont: a.mont + r.mont }), { fact: 0, mont: 0 });
+  const perd = filas.filter(r => r.mont >= 10 && r.margen < 0);
+  let h = '<div class="param"><label>Coste por montaje (€)<input type="number" id="p_coste" min="1" step="1" value="' + coste + '" onchange="lsSet(\'neg_coste\', this.value); pintarRent(); verTab(\'rent\')"></label>' +
+    '<div class="muted" style="flex:1;min-width:240px">' + (sug.valor ? "Sugerido según Contabilidad: <b>" + eur(sug.valor) + "</b> = (nóminas + gastos sin IVA de " + sug.meses.join(", ") + ": " + eur(sug.coste) + ") ÷ " + num(sug.monts) + " montajes. " : "No hay meses con nóminas y gastos apuntados para sugerir un coste. ") +
+    "Ponlo a tu cifra si sabes que faltan gastos (p. ej. los de José, gasoil, furgonetas…).</div>" +
+    (isFinite(guardado) && guardado > 0 && sug.valor ? '<button onclick="lsSet(\'neg_coste\', \'\'); pintarRent(); verTab(\'rent\')">Volver al sugerido</button>' : "") + "</div>";
+  h += '<div class="tiles">' +
+    '<div class="tile"><div class="k">Facturado 12 meses</div><div class="v">' + eur(tot.fact) + '</div><div class="d">Base sin IVA, sin proformas</div></div>' +
+    '<div class="tile"><div class="k">Ingreso por montaje</div><div class="v">' + eur(tot.mont ? tot.fact / tot.mont : 0) + '</div><div class="d">' + num(tot.mont) + " montajes en 12 meses</div></div>" +
+    '<div class="tile"><div class="k">Margen estimado</div><div class="v ' + (tot.fact - tot.mont * coste >= 0 ? "" : "baja") + '">' + eur(tot.fact - tot.mont * coste) + '</div><div class="d">' + (tot.fact ? Math.round((tot.fact - tot.mont * coste) / tot.fact * 100) + " % de lo facturado, con " + eur(coste) + " por montaje" : "") + "</div></div>" +
+    '<div class="tile"><div class="k">Tiendas en pérdidas</div><div class="v ' + (perd.length ? "baja" : "") + '">' + perd.length + '</div><div class="d">Con 10 montajes o más y por debajo del coste</div></div></div>';
+  h += '<section class="tarjeta"><h2>Rentabilidad por tienda (últimos 12 meses)</h2><p class="muted">Lo facturado a cada tienda dividido entre sus montajes, frente al coste por montaje. Pulsa una columna para ordenar.</p><div class="tw" id="tabla_rent"></div>' +
+    '<div class="nota">El coste es el mismo para todos los montajes: un montaje lejano o largo cuesta más que la media, así que una tienda con pedidos grandes o lejos puede estar peor de lo que sale aquí. Las tiendas con pocos montajes dan cifras poco fiables. Facturas: serie 1, 2, 3 y 9 (sin proformas).</div></section>';
+  $("v_rent").innerHTML = h;
+  pintarTablaRent();
+}
+function pintarTablaRent() {
+  const c = ordRent.col, dir = ordRent.dir, { filas, coste } = D.rent;
+  const fl = filas.slice().sort((a, b) => typeof a[c] === "string" ? dir * a[c].localeCompare(b[c], "es") : dir * ((a[c] ?? -1e12) - (b[c] ?? -1e12)));
+  const col = (k, t, n = true) => '<th class="ord' + (n ? " n" : "") + '" onclick="ordRent={col:\'' + k + '\',dir:ordRent.col===\'' + k + '\'?-ordRent.dir:-1};pintarTablaRent()">' + t + (c === k ? (dir < 0 ? " ▼" : " ▲") : "") + "</th>";
+  $("tabla_rent").innerHTML = "<table><tr>" + col("nombre", "Tienda", false) + col("fact", "Facturado") + col("mont", "Montajes") + col("porMont", "€ por montaje") + col("coste", "Coste estimado") + col("margen", "Margen") + col("pct", "% margen") + "</tr>" +
+    fl.map(r => "<tr><td>" + esc(r.nombre) + (r.mont === 0 ? ' <span class="muted">(sin montajes: otros servicios)</span>' : r.mont < 10 ? ' <span class="muted">(pocos)</span>' : "") + '</td><td class="n">' + eur(r.fact) + '</td><td class="n">' + num(r.mont) + '</td><td class="n">' +
+      (r.porMont === null ? "—" : '<span class="' + (r.porMont < coste ? "baja" : "") + '">' + eur(r.porMont) + "</span>") + '</td><td class="n">' + eur(r.coste) + '</td><td class="n"><b class="' + (r.margen < 0 ? "baja" : "") + '">' + eur(r.margen) + '</b></td><td class="n">' +
+      (r.pct === null || r.mont === 0 ? "—" : r.pct < 0 ? '<span class="chip r">' + Math.round(r.pct * 100) + " %</span>" : r.pct < 0.15 ? '<span class="chip a">' + Math.round(r.pct * 100) + " %</span>" : Math.round(r.pct * 100) + " %") + "</td></tr>").join("") + "</table>";
+}
+
+/* =================== 3. ALMACENAJE =================== */
+function pintarAlm() {
+  const gratis = Math.max(0, parseInt(lsGet("neg_gratis", "15"), 10) || 0), precio = Math.max(0, parseFloat(lsGet("neg_precio", "5")) || 0);
+  const hoyS = iso(HOY);
+  // histórico: montajes de los últimos 12 meses con fecha de recepción
+  const hist = D.mont.filter(o => d10(o.fecha_montaje) >= D.ini12 && o.fecha_recepcion).map(o => ({ ...o, d: dias(d10(o.fecha_recepcion), d10(o.fecha_montaje)) })).filter(o => o.d >= 0 && o.d < 400);
+  const semanas = d => d > gratis ? Math.ceil((d - gratis) / 7) : 0;
+  const porT = new Map(); const f = id => { if (!porT.has(id)) porT.set(id, { id, n: 0, largas: 0, sem: 0, sumD: 0, bultos: 0 }); return porT.get(id); };
+  hist.forEach(o => { const r = f(o.tienda_id); r.n++; r.sumD += o.d; const s = semanas(o.d); if (s) { r.largas++; r.sem += s; r.bultos += +o.bultos || 0; } });
+  const filas = [...porT.values()].map(r => ({ ...r, nombre: nomT(r.id), media: r.n ? r.sumD / r.n : 0, imp: r.sem * precio })).filter(r => r.largas).sort((a, b) => b.imp - a.imp);
+  const tot = filas.reduce((a, r) => ({ largas: a.largas + r.largas, sem: a.sem + r.sem, imp: a.imp + r.imp }), { largas: 0, sem: 0, imp: 0 });
+  const mediaD = hist.length ? hist.reduce((s, o) => s + o.d, 0) / hist.length : 0;
+  const ordenados = hist.map(o => o.d).sort((a, b) => a - b), mediana = ordenados.length ? ordenados[Math.floor(ordenados.length / 2)] : 0;
+  // ahora en la nave
+  const ref = o => d10(o.fecha_recepcion) || d10(o.fecha_creacion);
+  const nave = D.nave.map(o => ({ ...o, d: dias(ref(o), hoyS) }));
+  const navePorT = new Map(); nave.forEach(o => { const r = navePorT.get(o.tienda_id) || { n: 0, max: 0, sum: 0, viejas: 0, sem: 0, bultos: 0 }; r.n++; r.max = Math.max(r.max, o.d); r.sum += o.d; r.bultos += +o.bultos || 0; if (o.d > 90) r.viejas++; else r.sem += semanas(o.d); navePorT.set(o.tienda_id, r); });
+  const naveF = [...navePorT.entries()].map(([id, r]) => ({ nombre: nomT(id), ...r })).sort((a, b) => b.n - a.n);
+  const naveViejas = nave.filter(o => o.d > 90).length;
+  let h = '<div class="param"><label>Días gratis en la nave<input type="number" id="p_gratis" min="0" max="120" value="' + gratis + '" onchange="lsSet(\'neg_gratis\', this.value); pintarAlm(); verTab(\'alm\')"></label>' +
+    '<label>€ por orden y semana después<input type="number" id="p_precio" min="0" step="0.5" value="' + precio + '" onchange="lsSet(\'neg_precio\', this.value); pintarAlm(); verTab(\'alm\')"></label>' +
+    '<div class="muted" style="flex:1;min-width:240px">Simulación: «si desde hace un año hubiéramos cobrado ' + eur(precio) + " por semana empezada a cada orden que pasó más de " + gratis + " días en la nave entre la recepción y el montaje». Cambia las cifras para ver otras condiciones.</div></div>";
+  h += '<div class="tiles">' +
+    '<div class="tile"><div class="k">Se habría cobrado</div><div class="v">' + eur(tot.imp) + '</div><div class="d">en 12 meses · ' + num(tot.sem) + " semanas de " + num(tot.largas) + " órdenes</div></div>" +
+    '<div class="tile"><div class="k">Órdenes que pasan de ' + gratis + ' días</div><div class="v">' + (hist.length ? Math.round(tot.largas / hist.length * 100) + " %" : "—") + '</div><div class="d">' + num(tot.largas) + " de " + num(hist.length) + " montajes con fecha de recepción</div></div>" +
+    '<div class="tile"><div class="k">Estancia en la nave</div><div class="v">' + mediana + ' días</div><div class="d">Mediana de la recepción al montaje (media ' + f1(mediaD) + " días)</div></div>" +
+    '<div class="tile"><div class="k">Ahora en la nave</div><div class="v">' + num(nave.length - naveViejas) + '</div><div class="d">Órdenes recibidas sin montar (de menos de 90 días)' + (naveViejas ? '<br><span class="ojo">+ ' + num(naveViejas) + " de más de 90 días, seguramente sin cerrar</span>" : "") + "</div></div></div>";
+  h += '<section class="tarjeta"><h2>Por tienda: lo que se habría cobrado</h2><p class="muted">Últimos 12 meses. Ordenado por importe.</p><div class="tw"><table><tr><th>Tienda</th><th class="n">Montajes</th><th class="n">Media de días en la nave</th><th class="n">Pasan de ' + gratis + ' días</th><th class="n">Semanas cobrables</th><th class="n">Bultos (si constan)</th><th class="n">Importe</th></tr>' +
+    (filas.map(r => "<tr><td>" + esc(r.nombre) + '</td><td class="n">' + num(r.n) + '</td><td class="n">' + f1(r.media) + '</td><td class="n">' + num(r.largas) + " · " + Math.round(r.largas / r.n * 100) + ' %</td><td class="n">' + num(r.sem) + '</td><td class="n">' + (r.bultos ? num(r.bultos) : "—") + '</td><td class="n"><b>' + eur(r.imp) + "</b></td></tr>").join("") || '<tr><td colspan="7" class="muted">Ninguna orden pasa de esos días</td></tr>') +
+    (filas.length ? '<tr class="total"><td>Total</td><td class="n">' + num(hist.length) + '</td><td class="n">' + f1(mediaD) + '</td><td class="n">' + num(tot.largas) + '</td><td class="n">' + num(tot.sem) + '</td><td></td><td class="n">' + eur(tot.imp) + "</td></tr>" : "") + "</table></div>" +
+    '<div class="nota">Los días cuentan desde que consta la recepción hasta el montaje. Parte de la espera puede ser nuestra (falta de hueco), no del cliente ni de la tienda: antes de cobrar, conviene contar los días solo desde que el cliente o la tienda no aceptan fecha. Los bultos solo constan en la mitad de las órdenes, por eso se cobra por orden.</div></section>';
+  h += '<section class="tarjeta"><h2>Ahora mismo en la nave</h2><p class="muted">Órdenes con mercancía recibida y sin montar, por tienda.</p><div class="tw" style="max-height:420px"><table><tr><th>Tienda</th><th class="n">Órdenes</th><th class="n">Media de días</th><th class="n">La más antigua</th><th class="n">De más de 90 días</th><th class="n">Bultos (si constan)</th><th class="n">Si se cobrara hoy</th></tr>' +
+    naveF.map(r => "<tr><td>" + esc(r.nombre) + '</td><td class="n">' + num(r.n) + '</td><td class="n">' + num(r.sum / r.n) + '</td><td class="n">' + (r.max > 90 ? '<span class="chip r">' + r.max + " días</span>" : r.max > gratis ? '<span class="chip a">' + r.max + " días</span>" : r.max + " días") + '</td><td class="n">' + (r.viejas || "") + '</td><td class="n">' + (r.bultos ? num(r.bultos) : "—") + '</td><td class="n">' + (r.sem ? eur(r.sem * precio) : "") + "</td></tr>").join("") +
+    "</table></div><div class=\"nota\">«Si se cobrara hoy» solo cuenta las de menos de 90 días. Las más antiguas casi seguro son órdenes montadas o anuladas sin cerrar.</div></section>";
+  $("v_alm").innerHTML = h;
+}
+
+(async function init() {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) { location.href = "login.html"; return; }
+  let st = null;
+  try { st = (await client.from("staff").select("acceso_finanzas, solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle()).data; } catch (e) {}
+  if (!st || !st.acceso_finanzas || st.solo_montajes || st.solo_deca) { $("bloqueo").style.display = "block"; $("toolbar").querySelector(".tabs").style.display = "none"; return; }
+  verTab(["dem", "rent", "alm"].includes(tab) ? tab : "dem");
+  cargar();
+})();
+</script>
+</body>
+</html>
