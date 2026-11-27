@@ -306,7 +306,7 @@ function pintarAlm() {
     '<div class="nota">Los días cuentan desde que consta la recepción hasta el montaje. Parte de la espera puede ser nuestra (falta de hueco), no del cliente ni de la tienda: antes de cobrar, conviene contar los días solo desde que el cliente o la tienda no aceptan fecha. Los bultos solo constan en la mitad de las órdenes, por eso se cobra por orden.</div></section>';
   h += '<section class="tarjeta"><h2>Ahora mismo en la nave</h2><p class="muted">Órdenes con mercancía recibida y sin montar, por tienda.</p><div class="tw" style="max-height:420px"><table><tr><th>Tienda</th><th class="n">Órdenes</th><th class="n">Media de días</th><th class="n">La más antigua</th><th class="n">De más de 90 días</th><th class="n">Bultos (si constan)</th><th class="n">Si se cobrara hoy</th></tr>' +
     naveF.map(r => "<tr><td>" + esc(r.nombre) + '</td><td class="n">' + num(r.n) + '</td><td class="n">' + num(r.sum / r.n) + '</td><td class="n">' + (r.max > 90 ? '<span class="chip r">' + r.max + " días</span>" : r.max > gratis ? '<span class="chip a">' + r.max + " días</span>" : r.max + " días") + '</td><td class="n">' + (r.viejas || "") + '</td><td class="n">' + (r.bultos ? num(r.bultos) : "—") + '</td><td class="n">' + (r.sem ? eur(r.sem * precio) : "") + "</td></tr>").join("") +
-    "</table></div><div class=\"nota\">«Si se cobrara hoy» solo cuenta las de menos de 90 días. Las más antiguas casi seguro son órdenes montadas o anuladas sin cerrar.</div></section>";
+    "</table></div><div class=\"nota\">«Si se cobrara hoy» solo cuenta las de menos de 90 días. Las más antiguas casi seguro son órdenes montadas o anuladas sin cerrar: <a href=\"revisar_ordenes.html\">revisarlas →</a></div></section>";
   $("v_alm").innerHTML = h;
 }
 
