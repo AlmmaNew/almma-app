@@ -24,3 +24,9 @@ alter table public.ordenes add constraint ordenes_cierre_motivo_check check (cie
 -- abiertas con la mercancía recibida (o creadas) hace entre 1 y 2 años y SIN ninguna pista. cierre_motivo = 'antigua'.
 -- Para deshacer: como en 153, con lote = 'revision-2026-11-27-1anyo'.
 -- Total cerradas por anulación tras los 6 lotes: 2.053. Quedan 173 abiertas de más de 90 días (128 con pista dudosa + 45 sin pista del último año).
+
+-- CIERRE HECHO el 27-11-2026 (lote 'revision-2026-11-27-dudosas', a nombre de Arturo): 128 órdenes
+-- con coincidencia DUDOSA de montaje con otra orden (teléfono de la tienda, nombre repetido, teléfonos distintos…), cerradas sin comprobar
+-- por decisión de Arturo. cierre_motivo = 'montada_otra'; la nota dice «coincidencia dudosa, cerrada sin comprobar». 6 son del último año.
+-- Para deshacer: como en 153, con lote = 'revision-2026-11-27-dudosas'.
+-- Total cerradas por anulación tras los 7 lotes: 2.181. Quedan 45 abiertas de más de 90 días (sin pista, del último año).
