@@ -186,6 +186,7 @@ input.bloq-tarifa{background:#e5e7eb;color:#374151;cursor:not-allowed;}
 .tabulator .tabulator-row.est-agendado .tabulator-cell:first-child{border-left-color:#2563eb;}
 .tabulator .tabulator-row.est-completado,.tabulator .tabulator-row.tabulator-row-even.est-completado{background:#bbf7d0 !important;} .tabulator .tabulator-row.est-completado:hover{background:#86efac !important;}
 .tabulator .tabulator-row.est-completado .tabulator-cell:first-child{border-left-color:#15803d;}
+.tabulator .tabulator-row.est-anulada,.tabulator .tabulator-row.tabulator-row-even.est-anulada{background:#e5e7eb !important;color:#475569;} .tabulator .tabulator-row.est-anulada .tabulator-cell:first-child{border-left-color:#6b7280;}
 .tabulator .tabulator-row.est-conincid,.tabulator .tabulator-row.tabulator-row-even.est-conincid{background:#bbf7d0 !important;} .tabulator .tabulator-row.est-conincid:hover{background:#86efac !important;}
 .tabulator .tabulator-row.est-conincid .tabulator-cell:first-child{border-left-color:#dc2626;}
 .tabulator .tabulator-row.est-incidencia,.tabulator .tabulator-row.tabulator-row-even.est-incidencia{background:#fee2e2 !important;} .tabulator .tabulator-row.est-incidencia:hover{background:#fecaca !important;}
@@ -824,8 +825,13 @@ function pintarResumenOrden(o) {
   const nomEstado = selEst.selectedOptions[0] ? selEst.selectedOptions[0].textContent : estado;
   const conIncid = estado === "terminado_incidencia" || (estado === "completado" && o.con_incidencia);
   document.getElementById("d_head").style.setProperty("--est", COLOR_ESTADO[estado] || "#94a3b8");
-  document.getElementById("d_estado_pill").innerHTML = `<span class="estado-pill estado-${esc(conIncid ? "conincid" : estado)}">${conIncid ? "⚠ " : ""}${esc(nomEstado)}</span>`;
+  document.getElementById("d_estado_pill").innerHTML = o.cierre_motivo   // SQL 153: cerrada sin montar
+    ? '<span class="estado-pill" style="background:#e5e7eb;color:#374151;border:1px solid #9ca3af">🚫 Cerrada por anulación</span>'
+    : `<span class="estado-pill estado-${esc(conIncid ? "conincid" : estado)}">${conIncid ? "⚠ " : ""}${esc(nomEstado)}</span>`;
+  if (o.cierre_motivo) document.getElementById("d_head").style.setProperty("--est", "#6b7280");
   const badges = [];
+  if (o.cierre_motivo) badges.push('<span class="ph-badge" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db" title="Cerrada sin montar el ' + (o.cierre_at ? new Date(o.cierre_at).toLocaleDateString("es-ES") : "") + '. Si se reabre (cambiando el estado), la marca se quita sola.">' +
+    ({ anulada: "Anulada", sustituida: "Sustituida por otra orden", antigua: "Antigua sin noticias", otro: "Cerrada" }[o.cierre_motivo] || "Cerrada") + " · ver observaciones</span>");
   if (o.con_incidencia && estado !== "incidencia" && !conIncid) badges.push('<span class="ph-badge" style="background:#fee2e2;color:#b91c1c">⚠ Con incidencia</span>');
   if (o.facturada === "S") badges.push('<span class="ph-badge" style="background:#dcfce7;color:#166534">✔ Facturada</span>');
   else if (o.pendiente_facturar) badges.push('<span class="ph-badge" style="background:#fef3c7;color:#92400e">Pendiente de facturar</span>');
@@ -1600,7 +1606,7 @@ async function cargarPedidos() {
   const desdeEfectivo = (incluirAnteriores || hayFechasPrev) ? anyoDesde : Math.max(isNaN(anyoDesde) ? anyoMinimo : anyoDesde, anyoMinimo);
 
   let query = client.from("ordenes")
-    .select("anyo, orden, nombre_cli, num_pedido, estado, con_incidencia, fecha_creacion, fecha_prev_montaje, importe_total, creado_por, modificado_por, modificado_at, tiendas ( nombre )")
+    .select("anyo, orden, nombre_cli, num_pedido, estado, con_incidencia, cierre_motivo, fecha_creacion, fecha_prev_montaje, importe_total, creado_por, modificado_por, modificado_at, tiendas ( nombre )")
     .order("anyo", { ascending: false })
     .order("orden", { ascending: false })
     .limit(500);
@@ -1640,6 +1646,7 @@ async function cargarPedidos() {
         return v ? v.slice(8, 10) + "/" + v.slice(5, 7) + "/" + v.slice(0, 4) : "";
       } },
     { title: "Estado", field: "estado", minWidth: 200, formatter: (cell) => {
+        if (cell.getData().cierre_motivo) return "🚫 Cerrada por anulación";   // SQL 153: cerrada sin montar (anulada, sustituida o muy antigua)
         if (cell.getValue() === "completado" && cell.getData().con_incidencia) return "Completado con incidencias";
         const v = (cell.getValue() || "en_proceso").replace(/_/g, " ");
         return v.charAt(0).toUpperCase() + v.slice(1);   // solo texto, sin "globo"
@@ -1649,7 +1656,7 @@ async function cargarPedidos() {
 
   if (!tabla) {
     tabla = new Tabulator("#tabla_pedidos", {
-      data, columns: columnas, layout: "fitColumns", height: "calc(100vh - 240px)", rowFormatter: (row) => { const d = row.getData(), el = row.getElement(); el.className = el.className.replace(/\best-\S+/g, "").trim(); el.classList.add("est-" + ((d.estado === "terminado_incidencia" || (d.estado === "completado" && d.con_incidencia)) ? "conincid" : (d.estado || "en_proceso"))); }, 
+      data, columns: columnas, layout: "fitColumns", height: "calc(100vh - 240px)", rowFormatter: (row) => { const d = row.getData(), el = row.getElement(); el.className = el.className.replace(/\best-\S+/g, "").trim(); el.classList.add("est-" + (d.cierre_motivo ? "anulada" : (d.estado === "terminado_incidencia" || (d.estado === "completado" && d.con_incidencia)) ? "conincid" : (d.estado || "en_proceso"))); }, 
     });
     // no usamos la opcion rowClick de Tabulator: bloquea el callback si detecta
     // cualquier seleccion de texto activa en la pagina (falso positivo frecuente

@@ -65,6 +65,7 @@ body.emb{background:transparent;} body.emb > *:not(#modal_nuevo):not(.emergente)
 .tabulator .tabulator-row.est-agendado,.tabulator .tabulator-row.tabulator-row-even.est-agendado{background:#dbeafe !important;} .tabulator .tabulator-row.est-agendado:hover{background:#bfdbfe !important;}
 .tabulator .tabulator-row.est-agendado .tabulator-cell:first-child{border-left-color:#2563eb;}
 .tabulator .tabulator-row.est-completado,.tabulator .tabulator-row.tabulator-row-even.est-completado{background:#bbf7d0 !important;} .tabulator .tabulator-row.est-completado:hover{background:#86efac !important;}
+.tabulator .tabulator-row.est-anulada,.tabulator .tabulator-row.tabulator-row-even.est-anulada{background:#e5e7eb !important;color:#475569;} .tabulator .tabulator-row.est-anulada .tabulator-cell:first-child{border-left-color:#6b7280;}
 .tabulator .tabulator-row.est-completado .tabulator-cell:first-child{border-left-color:#15803d;}
 .tabulator .tabulator-row.est-conincid,.tabulator .tabulator-row.tabulator-row-even.est-conincid{background:#bbf7d0 !important;} .tabulator .tabulator-row.est-conincid:hover{background:#86efac !important;}
 .tabulator .tabulator-row.est-conincid .tabulator-cell:first-child{border-left-color:#dc2626;}
@@ -224,7 +225,7 @@ const globo = (a, o) => conMensaje.has(a + "/" + o) ? ' <span title="Mensaje sin
 async function cargarPedidos() {
   await cargarConMensaje();
   const { data, error } = await client.from("ordenes")
-    .select("anyo, orden, nombre_cli, num_pedido, estado, con_incidencia, fecha_creacion")
+    .select("anyo, orden, nombre_cli, num_pedido, estado, con_incidencia, cierre_motivo, fecha_creacion")
     .eq("tienda_id", tiendaSel || dependiente.tienda_id)
     .gte("anyo", 2026)   // las tiendas solo ven 2026 en adelante (SQL 105)
     .order("anyo", { ascending: false })
@@ -238,6 +239,7 @@ async function cargarPedidos() {
     { title: "Cliente", field: "nombre_cli", minWidth: 220 },
     { title: "Referencia de pedido", field: "num_pedido", minWidth: 170 },
     { title: "Estado", field: "estado", minWidth: 200, formatter: (cell) => {
+        if (cell.getData().cierre_motivo) return "🚫 Cerrada por anulación";   // SQL 153: cerrada sin montar (anulada, sustituida o muy antigua)
         if (cell.getValue() === "completado" && cell.getData().con_incidencia) return "Completado con incidencias";
         const v = (cell.getValue() || "en_proceso").replace(/_/g, " ");
         return v.charAt(0).toUpperCase() + v.slice(1);   // solo texto, sin "globo"
@@ -245,7 +247,7 @@ async function cargarPedidos() {
   ];
 
   if (!tabla) {
-    tabla = new Tabulator("#tabla_pedidos", { data, columns: columnas, layout: "fitColumns", height: "calc(100vh - 110px)", rowFormatter: (row) => { const d = row.getData(), el = row.getElement(); el.className = el.className.replace(/\best-\S+/g, "").trim(); el.classList.add("est-" + ((d.estado === "terminado_incidencia" || (d.estado === "completado" && d.con_incidencia)) ? "conincid" : (d.estado || "en_proceso"))); }, });
+    tabla = new Tabulator("#tabla_pedidos", { data, columns: columnas, layout: "fitColumns", height: "calc(100vh - 110px)", rowFormatter: (row) => { const d = row.getData(), el = row.getElement(); el.className = el.className.replace(/\best-\S+/g, "").trim(); el.classList.add("est-" + (d.cierre_motivo ? "anulada" : (d.estado === "terminado_incidencia" || (d.estado === "completado" && d.con_incidencia)) ? "conincid" : (d.estado || "en_proceso"))); }, });
   } else {
     tabla.setData(data);
   }
