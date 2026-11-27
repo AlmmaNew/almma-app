@@ -12,6 +12,9 @@
     incidenciaDias: 7,      // incidencias abiertas desde hace más de X días
     caidaFacturacion: 0.15, // facturado este mes un X % por debajo del mismo periodo del año pasado…
     caidaDesdeDia: 10,      // …solo a partir del día X del mes (antes es muy pronto para comparar)
+    bolsaDias: 15,          // órdenes listas para montar y sin cita que suman más de X días de trabajo (rojo si el doble)
+    perdidaCapacidad: 0.2,  // en las próximas 3 semanas, una semana pierde más del X % de capacidad por ausencias
+    bolsaViejaMax: 20,      // más de X órdenes sin cita con la mercancía recibida hace más de 90 días
   };
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
   const eur = x => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(Math.round(x || 0));
@@ -91,6 +94,20 @@
       const a = fMes.reduce((s, f) => s + (+f.impbruto || 0), 0), b = fLY.reduce((s, f) => s + (+f.impbruto || 0), 0);
       if (b > 0 && (a - b) / b <= -U.caidaFacturacion)
         A.push({ nivel: "a", ico: "📉", titulo: "Este mes se ha facturado un " + Math.round((b - a) / b * 100) + " % menos que el año pasado a estas alturas", detalle: eur(a) + " frente a " + eur(b) + " (hasta el día " + HOY.getDate() + "). Puede ser solo facturación con retraso: mira «Montado sin facturar».", href: "direccion.html", clave: "caida" });
+    }
+    // 6. Carga y capacidad (capacidad.js): bolsa grande, semanas con poca gente y órdenes viejas sin cerrar
+    if (window.calcularCapacidad) {
+      const c = await seguro(calcularCapacidad(client));
+      if (c) {
+        const b = c.bolsa, f1 = x => x.toFixed(1).replace(".", ",");
+        if (b.diasTrabajo !== null && b.diasTrabajo > U.bolsaDias)
+          A.push({ nivel: b.diasTrabajo > 2 * U.bolsaDias ? "r" : "a", ico: "🚚", titulo: b.activa + " órdenes listas para montar y sin cita: unos " + Math.round(b.diasTrabajo) + " días de trabajo al ritmo actual", detalle: "Ritmo de las últimas semanas: " + f1(c.montDia) + " montajes al día. Si la bolsa sigue creciendo, hace falta más gente o más horas.", href: "direccion.html", clave: "bolsa" });
+        const corta = c.semanas.slice(0, 3).find(s => s.perdida > U.perdidaCapacidad);
+        if (corta)
+          A.push({ nivel: "a", ico: "🏖", titulo: "Semana del " + corta.ini.slice(8, 10) + "/" + corta.ini.slice(5, 7) + ": un " + Math.round(corta.perdida * 100) + " % menos de capacidad por ausencias", detalle: "Fuera: " + esc([...corta.ausentes.keys()].join(", ")) + ". Capacidad estimada " + corta.capacidad + " montajes, agendados " + corta.agendado + ".", href: "direccion.html", clave: "ausencias" });
+        if (b.vieja > U.bolsaViejaMax)
+          A.push({ nivel: "a", ico: "🗂", titulo: b.vieja + " órdenes con la mercancía recibida hace más de " + b.diasVieja + " días y sin cita ni montaje", detalle: "Seguramente ya se montaron o se anularon y no se cerraron. Revisarlas en Órdenes deja los números limpios.", href: "pedidos.html", clave: "viejas" });
+      }
     }
     return A.sort((x, y) => (x.nivel === "r" ? 0 : 1) - (y.nivel === "r" ? 0 : 1));
   }

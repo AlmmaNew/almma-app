@@ -72,6 +72,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--primary);margin-top:8p
 <link rel="stylesheet" href="estilo_oficina.css">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
 <script src="volver.js" defer></script>
+<script src="capacidad.js"></script>
 <script src="alertas_direccion.js"></script>
 </head>
 <body>
@@ -174,6 +175,7 @@ async function cargar() {
   const g0 = new Date(p.y, p.m - 24, 1);
   const factDesde = [iso(g0), p.lyDesde].sort()[0];
   try {
+    const capP = (window.calcularCapacidad ? calcularCapacidad(client) : Promise.resolve(null)).catch(e => { console.warn("capacidad:", e); return null; });
     const [tiendas, cab, mont, montLY, activos, pendFact, contF, contC, monts, inc] = await Promise.all([
       todo(() => client.from("tiendas").select("id, codigo, nombre, nombre_comercial").order("id")),
       todo(() => client.from("cabfacturas").select("anyo, serie, factura, tienda_id, ffactura, impbruto, tipo_factura").gte("ffactura", factDesde).order("anyo").order("serie").order("factura")),
@@ -183,13 +185,14 @@ async function cargar() {
       client.rpc("facturas_pendientes").then(r => { if (r.error) throw r.error; return r.data || []; }),
       todo(() => client.from("cont_facturas").select("id, serie, numero, cliente, fecha, total, retencion").order("id")),
       todo(() => client.from("cont_cobros").select("factura_id, importe").order("id")),
-      todo(() => client.from("montadores").select("id, nombre, activo").order("id")),
+      todo(() => client.from("montadores").select("id, nombre, activo, especial").order("id")),
       todo(() => client.from("incidencias").select("id, anyo, orden, tipo, estado, created_at, resuelto_at").order("created_at")),
     ]);
     const [montEq, incOrd] = await Promise.all([
       porOrdenes("ordenes_montadores", "anyo, orden, montador_id", mont),
       porOrdenes("ordenes", "anyo, orden, tienda_id", inc.filter(i => i.anyo && i.orden)),
     ]);
+    D.cap = await capP;
     Object.assign(D, { p, tiendas, cab, mont, montLY, activos, pendFact, contF, contC, monts, inc, montEq, incOrd });
     pintar();
     $("estado").textContent = "Datos de " + p.titulo + p.nota + " · cargado en " + ((performance.now() - t0) / 1000).toFixed(1).replace(".", ",") + " s";
@@ -305,23 +308,30 @@ function pintar() {
     (deud.map(r => "<tr><td>" + esc(r.cli) + '</td><td class="n"><b>' + eur(r.imp) + '</b></td><td class="n">' + r.n + '</td><td class="n">' + (r.max > 90 ? '<span class="chip r">' + r.max + " días</span>" : r.max > 60 ? '<span class="chip a">' + r.max + " días</span>" : r.max + " días") + "</td></tr>").join("") || '<tr><td colspan="4" class="muted">Nada pendiente</td></tr>') +
     "</table></div></section></div>";
 
+  /* --- carga y capacidad (siempre desde hoy, no depende del mes elegido) --- */
+  h += capacidadHTML(D.cap);
+
   /* --- montadores + incidencias --- */
   const mNom = new Map(D.monts.map(m => [m.id, m.nombre]));
+  const especial = new Set(D.monts.filter(m => m.especial).map(m => m.id));   // «Sin montador», «Recoge …»: no son personas
+  const porEsp = new Map();
   const ordMap = new Map(D.mont.map(o => [o.anyo + "/" + o.orden, o]));
   const porM = new Map();
   D.montEq.forEach(e => {
     const o = ordMap.get(e.anyo + "/" + e.orden); if (!o) return;
+    if (especial.has(e.montador_id)) { const n = mNom.get(e.montador_id) || "?"; porEsp.set(n, (porEsp.get(n) || 0) + 1); return; }
     const r = porM.get(e.montador_id) || { nombre: mNom.get(e.montador_id) || "(desconocido)", n: 0, inc: 0, dias: new Set() };
     r.n++; if (o.con_incidencia || o.estado === "terminado_incidencia" || o.estado === "incidencia") r.inc++; r.dias.add(d10(o.fecha_montaje));
     porM.set(e.montador_id, r);
   });
   const sinMontador = D.mont.filter(o => !D.montEq.some(e => e.anyo === o.anyo && e.orden === o.orden)).length;
+  const notaEsp = porEsp.size ? "Sin montador de la empresa: " + [...porEsp.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => esc(k) + " " + v).join(" · ") + ". " : "";
   const filasM = [...porM.values()].sort((a, b) => b.n - a.n);
   const maxM = Math.max(1, ...filasM.map(r => r.n));
   h += '<div class="dos bloque"><section class="tarjeta"><h2>Montadores</h2><p class="muted">Montajes de ' + esc(p.titulo) + ". Si van dos en un montaje, cuenta para los dos.</p>" +
     '<div class="tw"><table><tr><th>Montador</th><th class="n">Montajes</th><th class="n">Días</th><th class="n">Por día</th><th class="n">Con incidencia</th></tr>' +
     (filasM.map(r => "<tr><td>" + esc(r.nombre) + '</td><td class="n"><span class="minib" style="width:' + Math.round(r.n / maxM * 60) + 'px"></span>' + r.n + '</td><td class="n">' + r.dias.size + '</td><td class="n">' + (r.n / r.dias.size).toFixed(1).replace(".", ",") + '</td><td class="n">' + (r.inc ? '<span class="chip ' + (r.inc / r.n > 0.08 ? "r" : "a") + '">' + r.inc + " · " + Math.round(r.inc / r.n * 100) + " %</span>" : "0") + "</td></tr>").join("") || '<tr><td colspan="5" class="muted">Sin montajes en el periodo</td></tr>') +
-    "</table></div>" + (sinMontador ? '<div class="nota">' + sinMontador + " montajes del periodo no tienen montador asignado.</div>" : "") + "</section>";
+    "</table></div>" + (notaEsp || sinMontador > 0 ? '<div class="nota">' + notaEsp + (sinMontador > 0 ? sinMontador + " montajes del periodo no tienen montador asignado." : "") + "</div>" : "") + "</section>";
 
   const incP = D.inc.filter(i => entre(d10(i.created_at), p.desde, p.hasta));
   const normTipo = t => { const s = (t || "Sin tipo").trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
@@ -341,6 +351,35 @@ function pintar() {
   pintarGrafico();
 }
 
+function capacidadHTML(c) {
+  if (!c) return '<section class="tarjeta"><h2>Carga y capacidad</h2><p class="muted">No se ha podido calcular (mira la consola).</p></section>';
+  const f1 = x => (x || 0).toFixed(1).replace(".", ",");
+  const dm = s => s.slice(8, 10) + "/" + s.slice(5, 7);
+  let h = '<section class="tarjeta"><h2>Carga y capacidad de montaje</h2><p class="muted">Desde hoy, sea cual sea el mes elegido arriba. El ritmo sale de las últimas ' + c.semanasHist + " semanas (" + c.diasLab + " días laborables), contando solo montadores de la empresa (sin «Recoge…» ni «Sin montador»).</p>";
+  const b = c.bolsa;
+  h += '<div class="cubos">' +
+    '<div class="cubo"><div class="k">Ritmo actual</div><b>' + f1(c.montDia) + ' montajes/día</b><span class="muted">' + num(c.ordenesReales) + " en " + c.diasLab + " días</span></div>" +
+    '<div class="cubo"><div class="k">Montadores por día</div><b>' + f1(c.montadoresDia) + '</b><span class="muted">' + f1(c.porMontadorDia) + " montajes cada uno</span></div>" +
+    '<div class="cubo ' + (b.diasTrabajo > 15 ? "r" : "") + '"><div class="k">Lista para montar, sin cita</div><b>' + num(b.activa) + " órdenes</b>" + '<span class="muted">≈ ' + (b.diasTrabajo === null ? "—" : f1(b.diasTrabajo)) + " días de trabajo</span></div>" +
+    '<div class="cubo ' + (b.vieja > 20 ? "r" : "") + '"><div class="k">Sin cita de hace +' + b.diasVieja + ' días</div><b>' + num(b.vieja) + '</b><span class="muted">¿montadas sin cerrar? Revisar</span></div></div>';
+  h += '<div class="tw"><table><tr><th>Semana</th><th class="n">Días lab.</th><th class="n">Montadores/día previstos</th><th class="n">Capacidad</th><th class="n">Agendado</th><th class="n">Libre</th><th>Ocupación</th><th>Notas</th></tr>';
+  c.semanas.forEach((s, i) => {
+    const oc = s.capacidad ? s.agendado / s.capacidad : (s.agendado ? 1 : 0);
+    const notas = [];
+    if (s.festivos.length) notas.push("🎉 " + esc(s.festivos.join(", ")));
+    if (s.ausentes.size) notas.push("🏖 " + [...s.ausentes.entries()].map(([n, d]) => esc(n) + " (" + d + " d)").join(", "));
+    if (s.perdida > 0.15) notas.push('<span class="ojo">−' + Math.round(s.perdida * 100) + " % de capacidad por ausencias</span>");
+    h += "<tr><td><b>" + (i === 0 ? "Esta semana" : dm(s.ini) + " – " + dm(s.fin)) + "</b>" + (i === 0 && s.pasados ? '<span class="muted"> · ' + (s.dias === 1 ? "queda 1 día" : "quedan " + s.dias + " días") + "</span>" : "") +
+      '</td><td class="n">' + s.dias + '</td><td class="n">' + (s.dias ? f1(s.montEsperados / s.dias) : "—") + '</td><td class="n">' + num(s.capacidad) + '</td><td class="n">' + num(s.agendado) +
+      '</td><td class="n">' + (s.libre < 0 ? '<span class="alerta">' + num(s.libre) + "</span>" : num(s.libre)) + "</td><td>" +
+      '<span class="minib" style="width:' + Math.round(Math.min(1, oc) * 80) + "px;background:" + (oc > 1 ? "#dc2626" : oc > 0.85 ? "#d97706" : "var(--serie-actual)") + '"></span>' + Math.round(oc * 100) + " %</td><td style=\"white-space:normal\">" + (notas.join("<br>") || '<span class="muted">—</span>') + "</td></tr>";
+  });
+  h += "</table></div>";
+  h += '<div class="nota"><b>Cómo se calcula:</b> capacidad = días laborables × montadores previstos × ' + f1(c.porMontadorDia) + " montajes por montador y día. Los montadores previstos salen de cuánto suele montar cada uno: " +
+    c.presencia.map(m => esc(m.nombre) + " " + Math.round(m.p * 100) + " %").join(", ") + ". Se descuentan festivos, puentes y ausencias (pantalla Ausencias y vacaciones). «Agendado» = órdenes con fecha de montaje prevista y aún sin montar." +
+    (b.vieja > 20 ? " <b>Las " + num(b.vieja) + " órdenes sin cita de hace más de " + b.diasVieja + " días</b> no cuentan en la bolsa: seguramente se montaron o anularon y no se cerraron." : "") + "</div></section>";
+  return h;
+}
 function tile(k, v, d, href) {
   const inner = '<div class="k">' + k + '</div><div class="v">' + v + '</div><div class="d">' + d + "</div>";
   return '<div class="tile">' + (href ? '<a href="' + href + '">' + inner + "</a>" : inner) + "</div>";
