@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALMMA - Panel de dirección</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ALMMA · Panel de dirección (27-11-2026). Solo lectura: no cambia nada de la base de datos.
+   Lo ven solo quienes tienen staff.acceso_finanzas (como Contabilidad).
+   De dónde sale cada número:
+   - Facturado: cabfacturas (facturas emitidas), base imponible (impbruto), sin IVA. Las proformas (serie 5) fuera salvo que se marquen.
+   - Montajes: ordenes con fecha_montaje en el periodo. Montadores: ordenes_montadores.
+   - Montado sin facturar: la función facturas_pendientes() (la misma de Facturación › Pendientes).
+   - Pendiente de cobro: cont_facturas − retención − cont_cobros (igual que Contabilidad › Pendientes).
+   - Embudo: órdenes abiertas (no completadas). Incidencias: tabla incidencias. */
+:root{--primary:#2563eb;--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
+  --serie-actual:#2563eb;--serie-anterior:#cbd5e1;--bien:#15803d;--mal:#b91c1c;--aviso:#b45309;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+#toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 20px;background:#fff;border-bottom:1px solid var(--border);}
+#toolbar h1{font-size:17px;margin:0 10px 0 0;}
+#toolbar .spacer{flex:1;}
+#toolbar label{font-size:13px;color:#475569;display:flex;align-items:center;gap:6px;}
+button,select,input{font:inherit;font-size:14px;}
+button{cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#fff;padding:7px 12px;}
+button.primario{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700;}
+select,input[type=month]{padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+main{max-width:1250px;margin:0 auto;padding:18px 20px 60px;}
+.muted{color:var(--muted);font-size:13px;}
+#estado{font-size:13px;color:var(--muted);margin-bottom:12px;min-height:18px;}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:16px;}
+.tile{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 14px -6px rgba(15,23,42,.10);}
+.tile .k{font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.3px;}
+.tile .v{font-size:26px;font-weight:800;margin:6px 0 4px;font-variant-numeric:tabular-nums;}
+.tile .d{font-size:13px;color:var(--muted);line-height:1.45;}
+.tile a{color:inherit;text-decoration:none;} .tile a:hover .v{color:var(--primary);}
+.sube{color:var(--bien);font-weight:700;} .baja{color:var(--mal);font-weight:700;}
+.alerta{color:var(--mal);font-weight:700;} .ojo{color:var(--aviso);font-weight:700;}
+.tarjeta{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 14px -6px rgba(15,23,42,.10);}
+.tarjeta h2{font-size:16px;margin:0 0 4px;} .tarjeta > .muted{margin:0 0 12px;}
+.dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;} .dos > *{min-width:0;} @media (max-width:900px){.dos{grid-template-columns:minmax(0,1fr);}}
+.dos .tarjeta{margin-bottom:0;} .bloque{margin-bottom:16px;}
+.tw{overflow-x:auto;max-height:480px;overflow-y:auto;}
+table{border-collapse:collapse;width:100%;font-size:13px;}
+th,td{padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:left;white-space:nowrap;}
+th{position:sticky;top:0;background:#f8fafc;font-size:12px;color:#475569;cursor:default;}
+th.ord{cursor:pointer;} th.ord:hover{color:var(--primary);}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;}
+tr.total td{font-weight:800;border-top:2px solid var(--border);background:#f8fafc;}
+.minib{display:inline-block;height:8px;border-radius:4px;background:var(--serie-actual);vertical-align:middle;margin-right:6px;}
+.chip{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700;}
+.chip.r{background:#fee2e2;color:#991b1b;} .chip.a{background:#fef3c7;color:#92400e;} .chip.v{background:#dcfce7;color:#166534;}
+/* gráfico */
+.leyenda{display:flex;gap:16px;font-size:13px;color:#475569;margin:4px 0 6px;flex-wrap:wrap;}
+.leyenda span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c);}
+#graf{position:relative;} #graf svg{display:block;width:100%;height:auto;}
+#graf .eje{font-size:11px;fill:#64748b;} #graf .rej{stroke:#eef2f7;stroke-width:1;}
+#tip{position:absolute;pointer-events:none;background:#0f172a;color:#fff;font-size:12px;padding:7px 10px;border-radius:8px;line-height:1.5;display:none;white-space:nowrap;z-index:5;box-shadow:0 6px 18px -6px rgba(0,0,0,.4);}
+details summary{cursor:pointer;font-size:13px;color:var(--primary);margin-top:8px;}
+.embudo{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.paso{border:1px solid var(--border);border-left:5px solid var(--c);border-radius:10px;padding:10px 12px;}
+.paso b{display:block;font-size:22px;font-variant-numeric:tabular-nums;} .paso span{font-size:12px;color:#475569;}
+.cubos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+.cubo{border:1px solid var(--border);border-radius:10px;padding:8px 10px;} .cubo .k{font-size:12px;color:#475569;} .cubo b{display:block;font-size:17px;font-variant-numeric:tabular-nums;}
+.cubo.r{border-color:#fca5a5;background:#fff7f7;}
+.nota{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+#bloqueo{display:none;}
+@media (max-width:600px){main{padding:14px 16px 50px;} #toolbar{padding:8px 16px;} .cubos{grid-template-columns:repeat(2,1fr);}}
+@media print{#toolbar button,#toolbar select,#toolbar input{display:none;} body{background:#fff;} .tw{max-height:none;}}
+</style>
+<link rel="stylesheet" href="estilo_oficina.css">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
+<script src="volver.js" defer></script>
+</head>
+<body>
+<div id="toolbar">
+  <h1>📊 Panel de dirección</h1>
+  <label>Mes <input type="month" id="f_mes"></label>
+  <label>Ver <select id="f_modo"><option value="mes">Solo ese mes</option><option value="anyo">Año hasta ese mes</option></select></label>
+  <label><input type="checkbox" id="f_prof"> Incluir proformas (serie 5)</label>
+  <span class="spacer"></span>
+  <button class="primario" onclick="cargar()">↻ Actualizar</button>
+</div>
+<main>
+  <div id="bloqueo" class="tarjeta"><b>No tienes acceso al Panel de dirección.</b><br>Solo pueden verlo quienes tienen acceso a Contabilidad. <a href="inicio.html">Volver al inicio</a></div>
+  <div id="estado"></div>
+  <div id="panel"></div>
+</main>
+<script>
+const client = supabase.createClient(
+  "https://uamgbtbsxbrgymhqalak.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k"
+);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const MESES_L = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const fEur0 = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const fNum = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
+const eur = x => fEur0.format(Math.round(x || 0));
+const num = x => fNum.format(x || 0);
+const d10 = s => s ? String(s).slice(0, 10) : "";
+const iso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const HOY = new Date(); HOY.setHours(0, 0, 0, 0);
+const HOYS = iso(HOY);
+const dias = (a, b = HOYS) => Math.round((new Date(b) - new Date(a)) / 86400000);
+const fechaES = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4) : "";
+const ACTIVOS = ["en_proceso", "recepcionado_parcial", "recepcionado_total", "agendado", "incidencia"];
+
+/* lee todas las filas de una consulta, de 1000 en 1000 */
+async function todo(fabrica, paso = 1000) {
+  let out = [];
+  for (let desde = 0; ; desde += paso) {
+    const { data, error } = await fabrica().range(desde, desde + paso - 1);
+    if (error) throw error;
+    out = out.concat(data || []);
+    if (!data || data.length < paso) return out;
+  }
+}
+/* consulta por trozos de órdenes (anyo, orden) con .in() */
+async function porOrdenes(tabla, campos, claves, colAnyo = "anyo", colOrden = "orden") {
+  const out = [], quiero = new Set(claves.map(k => k.anyo + "/" + k.orden));
+  const anyos = [...new Set(claves.map(k => k.anyo))];
+  const nums = [...new Set(claves.map(k => k.orden))];
+  for (let i = 0; i < nums.length; i += 250) {
+    const trozo = nums.slice(i, i + 250);
+    const filas = await todo(() => client.from(tabla).select(campos).in(colAnyo, anyos).in(colOrden, trozo));
+    filas.forEach(f => { if (quiero.has(f[colAnyo] + "/" + f[colOrden])) out.push(f); });
+  }
+  return out;
+}
+
+/* ---------- periodo elegido ---------- */
+function periodo() {
+  const [y, m] = $("f_mes").value.split("-").map(Number);
+  const modo = $("f_modo").value;
+  const desde = new Date(modo === "anyo" ? y : y, modo === "anyo" ? 0 : m - 1, 1);
+  let hasta = new Date(y, m, 1);                      // exclusivo
+  const enCurso = hasta > HOY;                          // mes sin terminar: se compara hasta el mismo día
+  if (enCurso) { hasta = new Date(HOY); hasta.setDate(hasta.getDate() + 1); }
+  const menos1 = d => { const x = new Date(d); x.setFullYear(x.getFullYear() - 1); return x; };
+  const p = { y, m, modo, enCurso, desde: iso(desde), hasta: iso(hasta), lyDesde: iso(menos1(desde)), lyHasta: iso(menos1(hasta)) };
+  if (modo === "mes") {   // mes anterior, cortado en el mismo día si el mes está en curso
+    const pd = new Date(y, m - 2, 1); let ph = new Date(y, m - 1, 1);
+    if (enCurso) { const c = new Date(y, m - 2, HOY.getDate() + 1); if (c < ph) ph = c; }
+    p.prevDesde = iso(pd); p.prevHasta = iso(ph);
+  }
+  const nombreMes = MESES_L[m - 1] + " " + y;
+  p.titulo = modo === "anyo" ? "enero–" + nombreMes : nombreMes;
+  p.nota = enCurso ? " (hasta hoy, día " + HOY.getDate() + "; se compara con los mismos días)" : "";
+  return p;
+}
+const entre = (s, a, b) => s >= a && s < b;
+function delta(act, ant, txt) {
+  if (!ant) return '<span class="muted">' + txt + ': sin datos</span>';
+  const pct = (act - ant) / Math.abs(ant) * 100;
+  const cls = pct >= 0 ? "sube" : "baja", fl = pct >= 0 ? "▲" : "▼";
+  return '<span class="' + cls + '">' + fl + " " + (pct >= 0 ? "+" : "") + pct.toFixed(1).replace(".", ",") + " %</span> " + txt;
+}
+
+/* ---------- datos ---------- */
+const D = {};
+let ordenTiendas = { col: "act", dir: -1 };
+
+async function cargar() {
+  const p = periodo();
+  try { localStorage.setItem("dir_modo", $("f_modo").value); localStorage.setItem("dir_prof", $("f_prof").checked ? "1" : ""); } catch (e) {}
+  $("estado").textContent = "Cargando datos…";
+  const t0 = performance.now();
+  // gráfico: 12 meses que acaban en el mes elegido, y los 12 anteriores
+  const g0 = new Date(p.y, p.m - 24, 1);
+  const factDesde = [iso(g0), p.lyDesde].sort()[0];
+  try {
+    const [tiendas, cab, mont, montLY, activos, pendFact, contF, contC, monts, inc] = await Promise.all([
+      todo(() => client.from("tiendas").select("id, codigo, nombre, nombre_comercial").order("id")),
+      todo(() => client.from("cabfacturas").select("anyo, serie, factura, tienda_id, ffactura, impbruto, tipo_factura").gte("ffactura", factDesde).order("anyo").order("serie").order("factura")),
+      todo(() => client.from("ordenes").select("anyo, orden, tienda_id, estado, fecha_recepcion, fecha_montaje, con_incidencia").gte("fecha_montaje", p.desde).lt("fecha_montaje", p.hasta).order("anyo").order("orden")),
+      todo(() => client.from("ordenes").select("anyo, orden, tienda_id").gte("fecha_montaje", p.lyDesde).lt("fecha_montaje", p.lyHasta).order("anyo").order("orden")),
+      todo(() => client.from("ordenes").select("anyo, orden, tienda_id, estado, fecha_creacion, fecha_recepcion, fecha_prev_montaje, fecha_montaje").in("estado", ACTIVOS).order("anyo").order("orden")),
+      client.rpc("facturas_pendientes").then(r => { if (r.error) throw r.error; return r.data || []; }),
+      todo(() => client.from("cont_facturas").select("id, serie, numero, cliente, fecha, total, retencion").order("id")),
+      todo(() => client.from("cont_cobros").select("factura_id, importe").order("id")),
+      todo(() => client.from("montadores").select("id, nombre, activo").order("id")),
+      todo(() => client.from("incidencias").select("id, anyo, orden, tipo, estado, created_at, resuelto_at").order("created_at")),
+    ]);
+    const [montEq, incOrd] = await Promise.all([
+      porOrdenes("ordenes_montadores", "anyo, orden, montador_id", mont),
+      porOrdenes("ordenes", "anyo, orden, tienda_id", inc.filter(i => i.anyo && i.orden)),
+    ]);
+    Object.assign(D, { p, tiendas, cab, mont, montLY, activos, pendFact, contF, contC, monts, inc, montEq, incOrd });
+    pintar();
+    $("estado").textContent = "Datos de " + p.titulo + p.nota + " · cargado en " + ((performance.now() - t0) / 1000).toFixed(1).replace(".", ",") + " s";
+  } catch (e) {
+    console.error(e);
+    $("estado").innerHTML = '<span class="alerta">No se han podido leer los datos: ' + esc(e.message || e) + "</span>";
+  }
+}
+
+/* ---------- pintar ---------- */
+function nombreTienda(id) {
+  const t = D.tMap.get(id);
+  return t ? (t.nombre_comercial || t.nombre || "(sin nombre)") : "(tienda desconocida)";
+}
+function pintar() {
+  const p = D.p, prof = $("f_prof").checked;
+  D.tMap = new Map(D.tiendas.map(t => [t.id, t]));
+  const facts = D.cab.filter(f => prof || f.serie !== 5).map(f => ({ ...f, fecha: d10(f.ffactura), base: +f.impbruto || 0 }));
+  const suma = (a, b) => facts.filter(f => entre(f.fecha, a, b)).reduce((s, f) => s + f.base, 0);
+  const fAct = suma(p.desde, p.hasta), fLY = suma(p.lyDesde, p.lyHasta), fPrev = p.prevDesde ? suma(p.prevDesde, p.prevHasta) : null;
+
+  // montajes
+  const nMont = D.mont.length, nMontLY = D.montLY.length;
+  const conInc = D.mont.filter(o => o.con_incidencia || o.estado === "terminado_incidencia" || o.estado === "incidencia").length;
+  const plazos = D.mont.filter(o => o.fecha_recepcion).map(o => dias(d10(o.fecha_recepcion), d10(o.fecha_montaje))).filter(x => x >= 0 && x < 400).sort((a, b) => a - b);
+  const mediana = plazos.length ? plazos[Math.floor(plazos.length / 2)] : null;
+
+  // montado sin facturar
+  const pf = D.pendFact.map(l => ({ ...l, imp: +l.importe_cobrar || 0, fm: d10(l.fecha_montaje) }));
+  const pfTot = pf.reduce((s, l) => s + l.imp, 0);
+  const pfViejo = pf.filter(l => l.fm && dias(l.fm) > 30);
+  const pfOrdenes = new Set(pf.map(l => l.anyo + "/" + l.orden)).size;
+
+  // pendiente de cobro (como Contabilidad)
+  const cob = {}; D.contC.forEach(c => { cob[c.factura_id] = (cob[c.factura_id] || 0) + (+c.importe || 0); });
+  const pend = D.contF.map(f => ({ ...f, pend: Math.round(((+f.total || 0) - (+f.retencion || 0) - (cob[f.id] || 0)) * 100) / 100, d: dias(f.fecha) })).filter(f => f.pend > 0.005);
+  const pendTot = pend.reduce((s, f) => s + f.pend, 0);
+  const pend90 = pend.filter(f => f.d > 90).reduce((s, f) => s + f.pend, 0);
+
+  // embudo (órdenes abiertas)
+  const hace1a = iso(new Date(HOY.getFullYear() - 1, HOY.getMonth(), HOY.getDate()));
+  const fechaRef = o => d10(o.fecha_recepcion) || d10(o.fecha_creacion);
+  const recientes = D.activos.filter(o => d10(o.fecha_creacion) >= hace1a || d10(o.fecha_recepcion) >= hace1a);
+  const viejas = D.activos.length - recientes.length;
+  const sinCita = recientes.filter(o => o.estado === "recepcionado_total" && !o.fecha_prev_montaje && !o.fecha_montaje);
+  const sinCita15 = sinCita.filter(o => dias(fechaRef(o)) > 15).length;
+
+  // incidencias
+  const incAbiertas = D.inc.filter(i => i.estado !== "resuelta" && i.estado !== "cerrada" && !i.resuelto_at);
+
+  let h = "";
+  /* --- tiles --- */
+  h += '<div class="tiles">';
+  h += tile("Facturado " + (p.modo === "anyo" ? "en el año" : "en el mes"), eur(fAct),
+    delta(fAct, fLY, "vs. " + (p.y - 1) + " (" + eur(fLY) + ")") + (fPrev !== null ? "<br>" + delta(fAct, fPrev, "vs. mes anterior") : "") + "<br>Base imponible, sin IVA", "facturas.html");
+  h += tile("Montajes realizados", num(nMont), delta(nMont, nMontLY, "vs. " + (p.y - 1) + " (" + num(nMontLY) + ")") + "<br>" +
+    (nMont ? '<span class="' + (conInc / nMont > 0.05 ? "ojo" : "") + '">' + (conInc / nMont * 100).toFixed(1).replace(".", ",") + " % con incidencia</span>" : ""), "rutas.html");
+  h += tile("Recepción → montaje", mediana === null ? "—" : mediana + " días", "Mediana de los montajes del periodo, desde que llega la mercancía" + (plazos.length ? "<br>El 90 % en menos de " + plazos[Math.floor(plazos.length * 0.9)] + " días" : ""));
+  h += tile("Montado sin facturar", eur(pfTot), num(pfOrdenes) + " órdenes · " + num(pf.length) + " líneas" + (pfViejo.length ? '<br><span class="alerta">' + eur(pfViejo.reduce((s, l) => s + l.imp, 0)) + " montado hace más de 30 días</span>" : ""), "facturas.html?tab=pendiente");
+  h += tile("Pendiente de cobro", eur(pendTot), num(pend.length) + " facturas" + (pend90 > 0.5 ? '<br><span class="alerta">' + eur(pend90) + " con más de 90 días</span>" : '<br><span class="sube">Nada con más de 90 días</span>'), "contabilidad.html");
+  h += tile("Recepcionado sin cita", num(sinCita.length), (sinCita15 ? '<span class="' + (sinCita15 > 20 ? "alerta" : "ojo") + '">' + num(sinCita15) + " llevan más de 15 días esperando</span>" : "Ninguna lleva más de 15 días") + "<br>Mercancía completa en almacén", "planificar.html");
+  h += tile("Incidencias abiertas", num(incAbiertas.length), incAbiertas.length ? "La más antigua: hace " + num(dias(d10(incAbiertas[0].created_at))) + " días" : "", "incidencias.html");
+  h += "</div>";
+
+  /* --- gráfico mensual --- */
+  h += '<section class="tarjeta"><h2>Facturación mensual</h2><p class="muted">Base imponible de los 12 meses que acaban en ' + esc(MESES_L[p.m - 1] + " " + p.y) + ", comparada con los mismos meses del año anterior." + (prof ? " Con proformas." : " Sin proformas.") + "</p>";
+  h += '<div class="leyenda"><span style="--c:var(--serie-actual)">Últimos 12 meses</span><span style="--c:var(--serie-anterior)">Un año antes</span></div><div id="graf"><div id="tip"></div></div>';
+  const meses = [];
+  for (let i = 11; i >= 0; i--) {
+    const a = new Date(p.y, p.m - 1 - i, 1), b = new Date(p.y, p.m - i, 1);
+    const la = new Date(a), lb = new Date(b); la.setFullYear(la.getFullYear() - 1); lb.setFullYear(lb.getFullYear() - 1);
+    meses.push({ et: MESES[a.getMonth()] + " " + String(a.getFullYear()).slice(2), etLY: MESES[la.getMonth()] + " " + String(la.getFullYear()).slice(2),
+      act: suma(iso(a), iso(b)), ly: suma(iso(la), iso(lb)), enCurso: b > HOY && a <= HOY });
+  }
+  D.meses = meses;
+  h += '<details><summary>Ver como tabla</summary><div class="tw"><table><tr><th>Mes</th><th class="n">Facturado</th><th class="n">Un año antes</th><th class="n">Variación</th></tr>' +
+    meses.map(x => "<tr><td>" + x.et + (x.enCurso ? " (en curso)" : "") + '</td><td class="n">' + eur(x.act) + '</td><td class="n">' + eur(x.ly) + '</td><td class="n">' + (x.ly ? delta(x.act, x.ly, "") : "—") + "</td></tr>").join("") +
+    '<tr class="total"><td>Total 12 meses</td><td class="n">' + eur(meses.reduce((s, x) => s + x.act, 0)) + '</td><td class="n">' + eur(meses.reduce((s, x) => s + x.ly, 0)) + '</td><td class="n">' + delta(meses.reduce((s, x) => s + x.act, 0), meses.reduce((s, x) => s + x.ly, 0), "") + "</td></tr></table></div></details></section>";
+
+  /* --- por tienda --- */
+  const porT = new Map();
+  const fila = id => { if (!porT.has(id)) porT.set(id, { id, act: 0, ly: 0, mont: 0, montLY: 0, inc: 0, pfact: 0 }); return porT.get(id); };
+  facts.forEach(f => { if (entre(f.fecha, p.desde, p.hasta)) fila(f.tienda_id).act += f.base; else if (entre(f.fecha, p.lyDesde, p.lyHasta)) fila(f.tienda_id).ly += f.base; });
+  D.mont.forEach(o => { const r = fila(o.tienda_id); r.mont++; if (o.con_incidencia || o.estado === "terminado_incidencia" || o.estado === "incidencia") r.inc++; });
+  D.montLY.forEach(o => { fila(o.tienda_id).montLY++; });
+  pf.forEach(l => { fila(l.tienda_id).pfact += l.imp; });
+  D.filasTienda = [...porT.values()].filter(r => r.act || r.ly || r.mont || r.montLY || r.pfact).map(r => ({ ...r, nombre: nombreTienda(r.id), var: r.ly ? (r.act - r.ly) / Math.abs(r.ly) : null, pctInc: r.mont ? r.inc / r.mont : null }));
+  D.totAct = fAct;
+  h += '<section class="tarjeta"><h2>Por tienda</h2><p class="muted">' + esc(p.titulo) + " frente al mismo periodo de " + (p.y - 1) + ". Pulsa en una columna para ordenar.</p><div class=\"tw\" id=\"t_tiendas\"></div>" +
+    '<div class="nota">La facturación a veces va un mes por detrás del montaje. Compara tendencias, no cada mes suelto. «Sin facturar» es lo montado que aún no está en ninguna factura ni borrador.</div></section>';
+
+  /* --- embudo + cobros --- */
+  const cuenta = e => recientes.filter(o => o.estado === e).length;
+  const agendadas = recientes.filter(o => o.estado === "agendado").length;
+  const cubosSC = [[0, 7, "0–7 días"], [8, 15, "8–15"], [16, 30, "16–30"], [31, 1e9, "más de 30"]].map(([a, z, t]) => ({ t, n: sinCita.filter(o => { const d = dias(fechaRef(o)); return d >= a && d <= z; }).length, r: a > 15 }));
+  h += '<div class="dos bloque"><section class="tarjeta"><h2>Órdenes abiertas</h2><p class="muted">Dónde está ahora el trabajo (órdenes de los últimos 12 meses).</p><div class="embudo">' +
+    paso("#94a3b8", cuenta("en_proceso"), "En proceso (falta mercancía)") +
+    paso("#eab308", cuenta("recepcionado_parcial"), "Recepción parcial") +
+    paso("#f97316", sinCita.length, "Recepcionadas sin cita") +
+    paso("#2563eb", agendadas + recientes.filter(o => o.estado === "recepcionado_total" && o.fecha_prev_montaje && !o.fecha_montaje).length, "Con cita / agendadas") +
+    paso("#dc2626", cuenta("incidencia"), "En incidencia") +
+    '</div><h3 style="font-size:14px;margin:16px 0 8px">Recepcionadas sin cita, por días de espera</h3><div class="cubos">' +
+    cubosSC.map(c => '<div class="cubo ' + (c.r && c.n ? "r" : "") + '"><div class="k">' + c.t + "</div><b>" + num(c.n) + "</b></div>").join("") + "</div>" +
+    tablaEspera(sinCita, fechaRef) +
+    (viejas ? '<div class="nota">⚠ Hay ' + num(viejas) + " órdenes abiertas de hace más de un año (sin completar en el sistema). No cuentan aquí; seguramente son antiguas y habría que cerrarlas.</div>" : "") + "</section>";
+
+  const cubosC = [[0, 30, "0–30 días"], [31, 60, "31–60"], [61, 90, "61–90"], [91, 1e9, "más de 90"]].map(([a, z, t]) => { const s = pend.filter(f => f.d >= a && f.d <= z); return { t, imp: s.reduce((x, f) => x + f.pend, 0), n: s.length, r: a > 60 }; });
+  const porCli = new Map(); pend.forEach(f => { const r = porCli.get(f.cliente) || { cli: f.cliente, imp: 0, n: 0, max: 0 }; r.imp += f.pend; r.n++; r.max = Math.max(r.max, f.d); porCli.set(f.cliente, r); });
+  const deud = [...porCli.values()].sort((a, b) => b.imp - a.imp).slice(0, 12);
+  h += '<section class="tarjeta"><h2>Pendiente de cobro</h2><p class="muted">Por antigüedad de la factura. Los mismos datos que Contabilidad › Pendientes.</p><div class="cubos">' +
+    cubosC.map(c => '<div class="cubo ' + (c.r && c.imp > 0.5 ? "r" : "") + '"><div class="k">' + c.t + "</div><b>" + eur(c.imp) + '</b><span class="muted">' + c.n + " fact.</span></div>").join("") + "</div>" +
+    '<div class="tw" style="max-height:330px"><table><tr><th>Cliente</th><th class="n">Pendiente</th><th class="n">Facturas</th><th class="n">La más antigua</th></tr>' +
+    (deud.map(r => "<tr><td>" + esc(r.cli) + '</td><td class="n"><b>' + eur(r.imp) + '</b></td><td class="n">' + r.n + '</td><td class="n">' + (r.max > 90 ? '<span class="chip r">' + r.max + " días</span>" : r.max > 60 ? '<span class="chip a">' + r.max + " días</span>" : r.max + " días") + "</td></tr>").join("") || '<tr><td colspan="4" class="muted">Nada pendiente</td></tr>') +
+    "</table></div></section></div>";
+
+  /* --- montadores + incidencias --- */
+  const mNom = new Map(D.monts.map(m => [m.id, m.nombre]));
+  const ordMap = new Map(D.mont.map(o => [o.anyo + "/" + o.orden, o]));
+  const porM = new Map();
+  D.montEq.forEach(e => {
+    const o = ordMap.get(e.anyo + "/" + e.orden); if (!o) return;
+    const r = porM.get(e.montador_id) || { nombre: mNom.get(e.montador_id) || "(desconocido)", n: 0, inc: 0, dias: new Set() };
+    r.n++; if (o.con_incidencia || o.estado === "terminado_incidencia" || o.estado === "incidencia") r.inc++; r.dias.add(d10(o.fecha_montaje));
+    porM.set(e.montador_id, r);
+  });
+  const sinMontador = D.mont.filter(o => !D.montEq.some(e => e.anyo === o.anyo && e.orden === o.orden)).length;
+  const filasM = [...porM.values()].sort((a, b) => b.n - a.n);
+  const maxM = Math.max(1, ...filasM.map(r => r.n));
+  h += '<div class="dos bloque"><section class="tarjeta"><h2>Montadores</h2><p class="muted">Montajes de ' + esc(p.titulo) + ". Si van dos en un montaje, cuenta para los dos.</p>" +
+    '<div class="tw"><table><tr><th>Montador</th><th class="n">Montajes</th><th class="n">Días</th><th class="n">Por día</th><th class="n">Con incidencia</th></tr>' +
+    (filasM.map(r => "<tr><td>" + esc(r.nombre) + '</td><td class="n"><span class="minib" style="width:' + Math.round(r.n / maxM * 60) + 'px"></span>' + r.n + '</td><td class="n">' + r.dias.size + '</td><td class="n">' + (r.n / r.dias.size).toFixed(1).replace(".", ",") + '</td><td class="n">' + (r.inc ? '<span class="chip ' + (r.inc / r.n > 0.08 ? "r" : "a") + '">' + r.inc + " · " + Math.round(r.inc / r.n * 100) + " %</span>" : "0") + "</td></tr>").join("") || '<tr><td colspan="5" class="muted">Sin montajes en el periodo</td></tr>') +
+    "</table></div>" + (sinMontador ? '<div class="nota">' + sinMontador + " montajes del periodo no tienen montador asignado.</div>" : "") + "</section>";
+
+  const incP = D.inc.filter(i => entre(d10(i.created_at), p.desde, p.hasta));
+  const normTipo = t => { const s = (t || "Sin tipo").trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
+  const porTipo = new Map(); incP.forEach(i => porTipo.set(normTipo(i.tipo), (porTipo.get(normTipo(i.tipo)) || 0) + 1));
+  const incTienda = new Map(D.incOrd.map(o => [o.anyo + "/" + o.orden, o.tienda_id]));
+  const porTI = new Map(); incP.forEach(i => { const n = nombreTienda(incTienda.get(i.anyo + "/" + i.orden)); porTI.set(n, (porTI.get(n) || 0) + 1); });
+  const lista = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => "<tr><td>" + esc(k) + '</td><td class="n">' + v + "</td></tr>").join("") || '<tr><td colspan="2" class="muted">Ninguna</td></tr>';
+  const antiguas = incAbiertas.slice(0, 8);
+  h += '<section class="tarjeta"><h2>Incidencias</h2><p class="muted">' + num(incP.length) + " abiertas en " + esc(p.titulo) + ".</p>" +
+    '<div class="dos" style="gap:12px"><div class="tw"><table><tr><th>Tipo</th><th class="n">Nº</th></tr>' + lista(porTipo) + '</table></div><div class="tw"><table><tr><th>Tienda</th><th class="n">Nº</th></tr>' + lista(porTI) + "</table></div></div>" +
+    '<h3 style="font-size:14px;margin:16px 0 8px">Sin resolver, las más antiguas</h3><div class="tw" style="max-height:260px"><table><tr><th>Orden</th><th>Tipo</th><th class="n">Abierta hace</th></tr>' +
+    (antiguas.map(i => '<tr><td><a href="pedidos.html?anyo=' + i.anyo + "&orden=" + i.orden + '" target="_blank">' + i.anyo + "/" + i.orden + "</a></td><td>" + esc(normTipo(i.tipo)).slice(0, 40) + '</td><td class="n">' + num(dias(d10(i.created_at))) + " días</td></tr>").join("") || '<tr><td colspan="3" class="muted">Ninguna</td></tr>') +
+    "</table></div>" + (incAbiertas.length > 20 && incAbiertas.every(i => i.estado === "abierta") ? '<div class="nota">Todas las incidencias figuran como «abiertas». Si ya se resolvieron, conviene cerrarlas en Incidencias para que este número sirva.</div>' : "") + "</section></div>";
+
+  $("panel").innerHTML = h;
+  pintarTiendas();
+  pintarGrafico();
+}
+
+function tile(k, v, d, href) {
+  const inner = '<div class="k">' + k + '</div><div class="v">' + v + '</div><div class="d">' + d + "</div>";
+  return '<div class="tile">' + (href ? '<a href="' + href + '">' + inner + "</a>" : inner) + "</div>";
+}
+function paso(c, n, t) { return '<div class="paso" style="--c:' + c + '"><b>' + num(n) + "</b><span>" + t + "</span></div>"; }
+function tablaEspera(sinCita, fechaRef) {
+  const porT = new Map();
+  sinCita.forEach(o => { const r = porT.get(o.tienda_id) || { n: 0, max: 0 }; r.n++; r.max = Math.max(r.max, dias(fechaRef(o))); porT.set(o.tienda_id, r); });
+  const f = [...porT.entries()].sort((a, b) => b[1].max - a[1].max).slice(0, 8);
+  if (!f.length) return "";
+  return '<div class="tw" style="max-height:260px"><table><tr><th>Tienda</th><th class="n">Sin cita</th><th class="n">La que más espera</th></tr>' +
+    f.map(([id, r]) => "<tr><td>" + esc(nombreTienda(id)) + '</td><td class="n">' + r.n + '</td><td class="n">' + (r.max > 30 ? '<span class="chip r">' + r.max + " días</span>" : r.max > 15 ? '<span class="chip a">' + r.max + " días</span>" : r.max + " días") + "</td></tr>").join("") + "</table></div>";
+}
+
+/* tabla por tienda, ordenable */
+function pintarTiendas() {
+  const c = ordenTiendas.col, dir = ordenTiendas.dir;
+  const filas = D.filasTienda.slice().sort((a, b) => {
+    const x = a[c], y = b[c];
+    if (typeof x === "string") return dir * x.localeCompare(y, "es");
+    return dir * ((x ?? -1e12) - (y ?? -1e12));
+  });
+  const tot = k => D.filasTienda.reduce((s, r) => s + (r[k] || 0), 0);
+  const maxA = Math.max(1, ...filas.map(r => r.act));
+  const col = (k, t, n = true) => '<th class="ord' + (n ? " n" : "") + '" onclick="ordenar(\'' + k + '\')">' + t + (c === k ? (dir < 0 ? " ▼" : " ▲") : "") + "</th>";
+  const varTxt = v => v === null ? '<span class="muted">nueva</span>' : '<span class="' + (v >= 0 ? "sube" : "baja") + '">' + (v >= 0 ? "+" : "") + (v * 100).toFixed(0) + " %</span>";
+  let h = "<table><tr>" + col("nombre", "Tienda", false) + col("act", "Facturado") + col("ly", "Año anterior") + col("var", "Variación") + col("mont", "Montajes") + col("montLY", "Mont. año ant.") + col("pctInc", "% incidencia") + col("pfact", "Sin facturar") + "</tr>";
+  h += filas.map(r => "<tr><td>" + esc(r.nombre) + '</td><td class="n"><span class="minib" style="width:' + Math.round(r.act / maxA * 70) + 'px"></span>' + eur(r.act) +
+    '<span class="muted"> · ' + (D.totAct ? (r.act / D.totAct * 100).toFixed(0) : 0) + ' %</span></td><td class="n">' + eur(r.ly) + '</td><td class="n">' + (r.act || r.ly ? varTxt(r.var) : "") + '</td><td class="n">' + r.mont +
+    '</td><td class="n">' + r.montLY + '</td><td class="n">' + (r.pctInc === null ? "" : r.pctInc > 0.08 && r.mont >= 5 ? '<span class="chip r">' + Math.round(r.pctInc * 100) + " %</span>" : Math.round(r.pctInc * 100) + " %") +
+    '</td><td class="n">' + (r.pfact > 0.5 ? eur(r.pfact) : "") + "</td></tr>").join("");
+  const tA = tot("act"), tL = tot("ly");
+  h += '<tr class="total"><td>Total</td><td class="n">' + eur(tA) + '</td><td class="n">' + eur(tL) + '</td><td class="n">' + (tL ? varTxt((tA - tL) / tL) : "") + '</td><td class="n">' + tot("mont") + '</td><td class="n">' + tot("montLY") + '</td><td class="n">' + (tot("mont") ? Math.round(tot("inc") / tot("mont") * 100) + " %" : "") + '</td><td class="n">' + eur(tot("pfact")) + "</td></tr></table>";
+  $("t_tiendas").innerHTML = h;
+}
+function ordenar(k) { ordenTiendas = { col: k, dir: ordenTiendas.col === k ? -ordenTiendas.dir : (k === "nombre" ? 1 : -1) }; pintarTiendas(); }
+
+/* gráfico de barras agrupadas (SVG): por mes, este periodo y un año antes */
+function pintarGrafico() {
+  const cont = $("graf"), M = D.meses;
+  const W = 900, H = 260, ml = 56, mr = 8, mt = 10, mb = 28;
+  const max = Math.max(1, ...M.flatMap(x => [x.act, x.ly]));
+  const paso = Math.pow(10, Math.floor(Math.log10(max))), escala = [1, 2, 2.5, 5, 10].map(f => f * paso).find(s => max / s <= 5) || paso * 10;
+  const top = Math.ceil(max / escala) * escala;
+  const y = v => mt + (H - mt - mb) * (1 - v / top);
+  const gw = (W - ml - mr) / M.length, bw = Math.min(26, (gw - 10) / 2);
+  const barra = (x, v, color) => {   // barra con las esquinas de arriba redondeadas (4px), apoyada en la base
+    const y0 = H - mb, y1 = y(v), hgt = y0 - y1; if (hgt <= 0.5) return "";
+    const r = Math.min(4, hgt, bw / 2);
+    return '<path fill="' + color + '" d="M' + x + "," + y0 + "V" + (y1 + r) + "Q" + x + "," + y1 + " " + (x + r) + "," + y1 + "H" + (x + bw - r) + "Q" + (x + bw) + "," + y1 + " " + (x + bw) + "," + (y1 + r) + "V" + y0 + 'Z"/>';
+  };
+  let s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Facturación mensual: últimos 12 meses frente al año anterior">';
+  for (let v = 0; v <= top + 0.1; v += escala) {
+    s += '<line class="rej" x1="' + ml + '" x2="' + (W - mr) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="eje" x="' + (ml - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + (v >= 1000 ? fNum.format(v / 1000) + " k" : v) + "</text>";
+  }
+  M.forEach((m, i) => {
+    const gx = ml + i * gw, cx = gx + gw / 2;
+    s += barra(cx - bw - 1, m.ly, "var(--serie-anterior)") + barra(cx + 1, m.act, "var(--serie-actual)");
+    s += '<text class="eje" x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle">' + m.et + (m.enCurso ? "*" : "") + "</text>";
+    s += '<rect x="' + gx + '" y="' + mt + '" width="' + gw + '" height="' + (H - mt - mb) + '" fill="transparent" data-i="' + i + '"/>';
+  });
+  s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + (H - mb) + '" y2="' + (H - mb) + '" stroke="#cbd5e1"/></svg>';
+  cont.insertAdjacentHTML("beforeend", s);
+  const tip = $("tip");
+  cont.querySelectorAll("rect[data-i]").forEach(r => {
+    r.addEventListener("mousemove", ev => {
+      const m = M[+r.dataset.i], b = cont.getBoundingClientRect();
+      tip.innerHTML = "<b>" + m.et + (m.enCurso ? " (en curso)" : "") + "</b><br>Facturado: <b>" + eur(m.act) + "</b><br>" + m.etLY + ": " + eur(m.ly) + (m.ly ? "<br>" + ((m.act - m.ly) / m.ly * 100 >= 0 ? "+" : "") + ((m.act - m.ly) / m.ly * 100).toFixed(1).replace(".", ",") + " %" : "");
+      tip.style.display = "block";
+      const x = ev.clientX - b.left + 14, w = tip.offsetWidth;
+      tip.style.left = Math.min(x, b.width - w - 4) + "px"; tip.style.top = Math.max(0, ev.clientY - b.top - 20) + "px";
+      r.setAttribute("fill", "rgba(37,99,235,.06)");
+    });
+    r.addEventListener("mouseleave", () => { tip.style.display = "none"; r.setAttribute("fill", "transparent"); });
+  });
+}
+
+async function logout() { await client.auth.signOut(); location.href = "login.html"; }
+
+(async function init() {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) { location.href = "login.html"; return; }
+  let st = null;
+  try { st = (await client.from("staff").select("acceso_finanzas, solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle()).data; } catch (e) {}
+  if (!st || !st.acceso_finanzas || st.solo_montajes || st.solo_deca) { $("bloqueo").style.display = "block"; document.querySelectorAll("#toolbar label, #toolbar button").forEach(e => e.style.display = "none"); return; }
+  $("f_mes").value = HOYS.slice(0, 7);
+  try { const m = localStorage.getItem("dir_modo"); if (m) $("f_modo").value = m; $("f_prof").checked = localStorage.getItem("dir_prof") === "1"; } catch (e) {}
+  $("f_mes").addEventListener("change", cargar);
+  $("f_modo").addEventListener("change", cargar);
+  $("f_prof").addEventListener("change", () => { if (D.p) pintar(); });
+  cargar();
+})();
+</script>
+</body>
+</html>
