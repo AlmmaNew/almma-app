@@ -188,6 +188,8 @@ async function cargar() {
       todo(() => client.from("montadores").select("id, nombre, activo, especial").order("id")),
       todo(() => client.from("incidencias").select("id, anyo, orden, tipo, estado, created_at, resuelto_at").order("created_at")),
     ]);
+    // valoraciones de clientes (SQL 151): si aún no existe la tabla, no pasa nada
+    D.vals = await todo(() => client.from("valoraciones").select("puntuacion, respondido_at, enviado_at").gte("respondido_at", p.desde).lt("respondido_at", p.hasta).order("respondido_at")).catch(() => null);
     const [montEq, incOrd] = await Promise.all([
       porOrdenes("ordenes_montadores", "anyo, orden, montador_id", mont),
       porOrdenes("ordenes", "anyo, orden, tienda_id", inc.filter(i => i.anyo && i.orden)),
@@ -254,6 +256,10 @@ function pintar() {
   h += tile("Montado sin facturar", eur(pfTot), num(pfOrdenes) + " órdenes · " + num(pf.length) + " líneas" + (pfViejo.length ? '<br><span class="alerta">' + eur(pfViejo.reduce((s, l) => s + l.imp, 0)) + " montado hace más de 30 días</span>" : ""), "facturas.html?tab=pendiente");
   h += tile("Pendiente de cobro", eur(pendTot), num(pend.length) + " facturas" + (pend90 > 0.5 ? '<br><span class="alerta">' + eur(pend90) + " con más de 90 días</span>" : '<br><span class="sube">Nada con más de 90 días</span>'), "contabilidad.html");
   h += tile("Recepcionado sin cita", num(sinCita.length), (sinCita15 ? '<span class="' + (sinCita15 > 20 ? "alerta" : "ojo") + '">' + num(sinCita15) + " llevan más de 15 días esperando</span>" : "Ninguna lleva más de 15 días") + "<br>Mercancía completa en almacén", "planificar.html");
+  if (D.vals) {
+    const vr = D.vals.filter(v => v.puntuacion), med = vr.length ? vr.reduce((s, v) => s + v.puntuacion, 0) / vr.length : 0, mal = vr.filter(v => v.puntuacion <= 2).length;
+    h += tile("Valoración de clientes", vr.length ? med.toFixed(1).replace(".", ",") + " ★" : "—", vr.length ? vr.length + " valoraciones" + (mal ? '<br><span class="alerta">' + mal + " de 1–2 estrellas</span>" : '<br><span class="sube">Ninguna de 1–2 estrellas</span>') : "Sin valoraciones en el periodo. Se piden en ⭐ Valoraciones.", "valoraciones.html?tab=res");
+  }
   h += tile("Incidencias abiertas", num(incAbiertas.length), incAbiertas.length ? "La más antigua: hace " + num(dias(d10(incAbiertas[0].created_at))) + " días" : "", "incidencias.html");
   h += "</div>";
 

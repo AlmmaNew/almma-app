@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALMMA - Valoraciones de clientes</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ALMMA · Valoraciones de los clientes finales (27-11-2026, migracion/151_valoraciones.sql).
+   Pestaña «Pedir»: montajes de los últimos días a los que aún no se ha pedido valoración. «📲 WhatsApp» abre el mensaje con el
+   enlace (valoracion.html?v=<código>) y lo apunta como enviado. Pestaña «Resultados»: media, por tienda, por montador, qué destacan
+   o qué falla y los comentarios. Las de 1–2 estrellas avisan además en la campana. La ve toda la oficina (is_staff). */
+:root{--primary:#2563eb;--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;--estrella:#f59e0b;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+#toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 20px;background:#fff;border-bottom:1px solid var(--border);}
+#toolbar h1{font-size:17px;margin:0 10px 0 0;} #toolbar .spacer{flex:1;}
+button,select,input{font:inherit;font-size:14px;}
+button{cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#fff;padding:7px 12px;}
+button.primario{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700;}
+button.wa{background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700;white-space:nowrap;}
+button:disabled{opacity:.5;cursor:default;}
+select{padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+body #toolbar .tabs{display:flex;gap:4px;} body #toolbar .tabs button{border-radius:8px;} body #toolbar .tabs button.on{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:700;}
+main{max-width:1250px;margin:0 auto;padding:18px 20px 60px;}
+.muted{color:var(--muted);font-size:13px;}
+.tarjeta{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 14px -6px rgba(15,23,42,.10);}
+.tarjeta h2{font-size:16px;margin:0 0 4px;} .tarjeta > .muted{margin:0 0 12px;}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:16px;}
+.tile{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.tile .k{font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.3px;} .tile .v{font-size:26px;font-weight:800;margin:6px 0 2px;font-variant-numeric:tabular-nums;} .tile .d{font-size:13px;color:var(--muted);}
+.dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;} .dos > *{min-width:0;} @media (max-width:900px){.dos{grid-template-columns:minmax(0,1fr);}}
+.dos .tarjeta{margin-bottom:0;} .bloque{margin-bottom:16px;}
+.tw{overflow-x:auto;max-height:520px;overflow-y:auto;}
+table{border-collapse:collapse;width:100%;font-size:13px;}
+th,td{padding:7px 8px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top;}
+th{position:sticky;top:0;background:#f8fafc;font-size:12px;color:#475569;z-index:1;}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+tr.hecha td{opacity:.5;}
+.est{color:var(--estrella);letter-spacing:1px;white-space:nowrap;}
+.chip{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700;}
+.chip.r{background:#fee2e2;color:#991b1b;} .chip.a{background:#fef3c7;color:#92400e;} .chip.v{background:#dcfce7;color:#166534;} .chip.g{background:#f1f5f9;color:#475569;}
+.com{border-top:1px solid #eef2f7;padding:10px 0;} .com:first-child{border-top:0;} .com.nueva{background:#fffbeb;margin:0 -16px;padding:10px 16px;}
+.com .cab{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;font-size:13px;} .com .cab b{font-size:14px;} .com .txt{margin-top:4px;font-size:14px;} .com .asp{font-size:12px;color:#475569;margin-top:3px;}
+.minib{display:inline-block;height:8px;border-radius:4px;background:var(--estrella);vertical-align:middle;margin-right:6px;}
+#estado{font-size:13px;color:var(--muted);min-height:18px;margin-bottom:10px;}
+.nota{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+@media (max-width:600px){main{padding:14px 16px 50px;} #toolbar{padding:8px 16px;}}
+</style>
+<link rel="stylesheet" href="estilo_oficina.css">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
+<script src="volver.js" defer></script>
+</head>
+<body>
+<div id="toolbar">
+  <h1>⭐ Valoraciones de clientes</h1>
+  <div class="tabs"><button id="tab_pedir" class="on" onclick="verTab('pedir')">📲 Pedir valoración</button><button id="tab_res" onclick="verTab('res')">📊 Resultados</button></div>
+  <span class="spacer"></span>
+  <label id="lbl_dias" class="muted">Montados en los últimos <select id="f_dias" onchange="cargarPedir()"><option>3</option><option selected>7</option><option>14</option><option>30</option></select> días</label>
+  <label id="lbl_per" class="muted" style="display:none">Periodo <select id="f_per" onchange="cargarRes()"><option value="30">Últimos 30 días</option><option value="90" selected>Últimos 90 días</option><option value="365">Último año</option></select></label>
+</div>
+<main>
+  <div id="estado"></div>
+  <div id="v_pedir"></div>
+  <div id="v_res" style="display:none"></div>
+</main>
+<script>
+const client = supabase.createClient(
+  "https://uamgbtbsxbrgymhqalak.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k"
+);
+const URL_VAL = "https://almma.es/valoracion.html?v=";   // siempre a almma.es: el cliente no puede abrir un enlace de este ordenador
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const iso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const d10 = s => s ? String(s).slice(0, 10) : "";
+const fechaES = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(2, 4) : "";
+const HOY = new Date(); HOY.setHours(0, 0, 0, 0);
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const estrellas = n => "★".repeat(n) + "☆".repeat(5 - n);
+const f1 = x => (x || 0).toFixed(1).replace(".", ",");
+const capFrase = s => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
+function telWhats(t){ let d = String(t || "").replace(/\D/g, ""); if (d.startsWith("0034")) d = d.slice(4); if (d.length === 11 && d.startsWith("34")) d = d.slice(2); return d.length === 9 && /^[67]/.test(d) ? "34" + d : null; }   // como en Planificar: solo móviles
+async function todo(fabrica) {
+  let out = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await fabrica().range(desde, desde + 999);
+    if (error) throw error;
+    out = out.concat(data || []);
+    if (!data || data.length < 1000) return out;
+  }
+}
+let tiendas = new Map(), montadores = new Map(), pendientes = [];
+
+function verTab(t) {
+  $("tab_pedir").classList.toggle("on", t === "pedir"); $("tab_res").classList.toggle("on", t === "res");
+  $("v_pedir").style.display = t === "pedir" ? "" : "none"; $("v_res").style.display = t === "res" ? "" : "none";
+  $("lbl_dias").style.display = t === "pedir" ? "" : "none"; $("lbl_per").style.display = t === "res" ? "" : "none";
+  try { localStorage.setItem("val_tab", t); } catch (e) {}
+  if (t === "res") cargarRes(); else cargarPedir();
+}
+
+/* ---------- PEDIR ---------- */
+function mensaje(o, token) {
+  const nombre = capFrase((o.nombre_cli || "").trim().split(/\s+/)[0] || "");
+  const f = new Date(d10(o.fecha_montaje) + "T12:00:00"), ayer = new Date(HOY); ayer.setDate(ayer.getDate() - 1);
+  const cuando = iso(f) === iso(HOY) ? "hoy" : iso(f) === iso(ayer) ? "ayer" : "el " + DIAS[f.getDay()] + " " + f.getDate() + " de " + MESES[f.getMonth()];
+  const tienda = tiendas.get(o.tienda_id) || "";
+  return "*ALMMA* almacén y montaje\n" + (tienda ? "*" + tienda + "*\n" : "") + "\n" +
+    "Hola" + (nombre ? " *" + nombre + "*" : "") + ", " + cuando + " le montamos su pedido.\n\n" +
+    "¿Nos dice qué tal ha ido? Son *10 segundos*:\n👉 " + URL_VAL + token + "\n\n" +
+    "Su opinión nos ayuda a hacerlo cada día mejor. ¡Muchas gracias!\n*ALMMA* · Entregas y montajes\n📞 613 037 899";
+}
+async function cargarPedir() {
+  $("estado").textContent = "Cargando montajes…";
+  const desde = new Date(HOY); desde.setDate(desde.getDate() - (+$("f_dias").value) + 1);
+  const man = new Date(HOY); man.setDate(man.getDate() + 1);
+  try {
+    const ords = await todo(() => client.from("ordenes").select("anyo, orden, nombre_cli, localidad_cli, telefono_cli, telefono2_cli, tienda_id, fecha_montaje, estado, con_incidencia, ordenes_montadores(montador_id)")
+      .gte("fecha_montaje", iso(desde)).lt("fecha_montaje", iso(man)).in("estado", ["completado", "terminado_incidencia"]).order("fecha_montaje", { ascending: false }).order("anyo").order("orden"));
+    const reales = ords.filter(o => (o.ordenes_montadores || []).some(m => montadores.has(m.montador_id) && !montadores.get(m.montador_id).especial));   // fuera las recogidas
+    const vals = new Map();
+    const nums = [...new Set(reales.map(o => o.orden))];
+    for (let i = 0; i < nums.length; i += 250) {
+      const { data, error } = await client.from("valoraciones").select("anyo, orden, enviado_at, enviado_veces, respondido_at, puntuacion").in("orden", nums.slice(i, i + 250));
+      if (error) throw error;
+      (data || []).forEach(v => vals.set(v.anyo + "/" + v.orden, v));
+    }
+    pendientes = reales.map(o => ({ ...o, val: vals.get(o.anyo + "/" + o.orden) || null, tel: telWhats(o.telefono_cli) || telWhats(o.telefono2_cli) }));
+    pintarPedir();
+    $("estado").textContent = "";
+  } catch (e) { console.error(e); $("estado").innerHTML = '<span style="color:#b91c1c">Error: ' + esc(e.message || e) + "</span>"; }
+}
+function pintarPedir() {
+  const sin = pendientes.filter(o => !o.val || !o.val.enviado_at);
+  const conTel = sin.filter(o => o.tel).length;
+  let h = '<div class="tarjeta"><h2>Montajes sin valoración pedida: ' + sin.length + "</h2>" +
+    '<p class="muted">Pulsa «📲 WhatsApp»: se abre el mensaje con el enlace y queda apuntado como enviado. Mejor el mismo día o el siguiente al montaje. ' +
+    (sin.length - conTel ? (sin.length - conTel) + " no tienen móvil (solo fijo o sin teléfono). " : "") + "Los ya enviados salen abajo, en gris.</p>" +
+    '<div class="tw"><table><tr><th>Montaje</th><th>Orden</th><th>Cliente</th><th>Tienda</th><th>Montadores</th><th></th><th></th></tr>';
+  const fila = o => {
+    const ms = (o.ordenes_montadores || []).map(m => montadores.get(m.montador_id)).filter(m => m && !m.especial).map(m => esc(m.nombre)).join(", ");
+    const v = o.val, k = o.anyo + "-" + o.orden;
+    const estado = v && v.respondido_at ? '<span class="est">' + estrellas(v.puntuacion) + "</span>" :
+      v && v.enviado_at ? '<span class="chip g">Enviada ' + fechaES(d10(v.enviado_at)) + (v.enviado_veces > 1 ? " (" + v.enviado_veces + " veces)" : "") + "</span>" :
+      (o.con_incidencia || o.estado === "terminado_incidencia" ? '<span class="chip a" title="Quizá mejor esperar a resolverla">⚠ con incidencia</span>' : "");
+    return '<tr class="' + (v && v.enviado_at ? "hecha" : "") + '" id="f_' + k + '"><td>' + fechaES(d10(o.fecha_montaje)) + '</td><td><a href="pedidos.html?anyo=' + o.anyo + "&orden=" + o.orden + '" target="_blank">' + o.anyo + "/" + o.orden + "</a></td><td>" + esc(o.nombre_cli) +
+      '<div class="muted">' + esc(o.localidad_cli || "") + "</div></td><td>" + esc(tiendas.get(o.tienda_id) || "") + "</td><td>" + ms + "</td><td>" + estado + '</td><td class="n">' +
+      (v && v.respondido_at ? "" : o.tel ? '<button class="wa" onclick="enviar(' + o.anyo + "," + o.orden + ', this)">📲 WhatsApp' + (v && v.enviado_at ? " otra vez" : "") + "</button>" : '<span class="muted">sin móvil</span>') +
+      ' <button title="Copiar el enlace" onclick="copiar(' + o.anyo + "," + o.orden + ', this)">🔗</button></td></tr>';
+  };
+  const enviados = pendientes.filter(o => o.val && o.val.enviado_at);
+  h += (sin.map(fila).join("") || '<tr><td colspan="7" class="muted">Ninguno pendiente en estos días. ✔</td></tr>') + enviados.map(fila).join("") + "</table></div></div>";
+  $("v_pedir").innerHTML = h;
+}
+async function enviar(anyo, orden, btn) {
+  const o = pendientes.find(x => x.anyo === anyo && x.orden === orden); if (!o) return;
+  const w = window.open("", "_blank");   // se abre ya (si no, el navegador bloquea la ventana por esperar a la base de datos)
+  btn.disabled = true;
+  const { data, error } = await client.rpc("token_valoracion", { p_anyo: anyo, p_orden: orden, p_enviada: true });
+  if (error || !data) { if (w) w.close(); btn.disabled = false; alert("No se ha podido crear el enlace: " + (error ? error.message : "")); return; }
+  const url = "https://wa.me/" + o.tel + "?text=" + encodeURIComponent(mensaje(o, data));
+  if (w) w.location.href = url; else location.href = url;
+  o.val = { ...(o.val || {}), enviado_at: new Date().toISOString(), enviado_veces: ((o.val && o.val.enviado_veces) || 0) + 1 };
+  pintarPedir();
+}
+async function copiar(anyo, orden, btn) {
+  const { data, error } = await client.rpc("token_valoracion", { p_anyo: anyo, p_orden: orden, p_enviada: false });
+  if (error || !data) { alert("No se ha podido crear el enlace."); return; }
+  const url = URL_VAL + data;
+  try { await navigator.clipboard.writeText(url); btn.textContent = "✔"; setTimeout(() => btn.textContent = "🔗", 1500); }
+  catch (e) { prompt("Copia el enlace:", url); }
+}
+
+/* ---------- RESULTADOS ---------- */
+async function cargarRes() {
+  $("estado").textContent = "Cargando valoraciones…";
+  const desde = new Date(HOY); desde.setDate(desde.getDate() - (+$("f_per").value));
+  try {
+    const vals = await todo(() => client.from("valoraciones").select("id, anyo, orden, tienda_id, montadores, fecha_montaje, enviado_at, puntuacion, aspectos, comentario, respondido_at, vista")
+      .gte("creado_at", desde.toISOString()).order("creado_at", { ascending: false }));
+    const resp = vals.filter(v => v.respondido_at && v.puntuacion);
+    const nombres = new Map();
+    const nums = [...new Set(resp.map(v => v.orden))];
+    for (let i = 0; i < nums.length; i += 250) {
+      const { data } = await client.from("ordenes").select("anyo, orden, nombre_cli, localidad_cli").in("orden", nums.slice(i, i + 250));
+      (data || []).forEach(o => nombres.set(o.anyo + "/" + o.orden, o));
+    }
+    pintarRes(vals, resp, nombres);
+    $("estado").textContent = "";
+  } catch (e) { console.error(e); $("estado").innerHTML = '<span style="color:#b91c1c">Error: ' + esc(e.message || e) + "</span>"; }
+}
+function pintarRes(vals, resp, nombres) {
+  const env = vals.filter(v => v.enviado_at).length;
+  const media = resp.length ? resp.reduce((s, v) => s + v.puntuacion, 0) / resp.length : 0;
+  const buenas = resp.filter(v => v.puntuacion >= 4).length, malas = resp.filter(v => v.puntuacion <= 2).length;
+  const nuevas = resp.filter(v => !v.vista).length;
+  let h = '<div class="tiles">' +
+    '<div class="tile"><div class="k">Media</div><div class="v">' + (resp.length ? f1(media) + ' <span class="est" style="font-size:20px">★</span>' : "—") + '</div><div class="d">' + resp.length + " valoraciones</div></div>" +
+    '<div class="tile"><div class="k">Responden</div><div class="v">' + (env ? Math.round(resp.length / env * 100) + " %" : "—") + '</div><div class="d">' + env + " enlaces enviados</div></div>" +
+    '<div class="tile"><div class="k">Contentos (4–5 ★)</div><div class="v">' + (resp.length ? Math.round(buenas / resp.length * 100) + " %" : "—") + '</div><div class="d">' + buenas + " clientes</div></div>" +
+    '<div class="tile"><div class="k">Descontentos (1–2 ★)</div><div class="v" style="color:' + (malas ? "#b91c1c" : "inherit") + '">' + malas + '</div><div class="d">' + (resp.length ? Math.round(malas / resp.length * 100) + " % del total" : "") + "</div></div></div>";
+  if (!resp.length) { $("v_res").innerHTML = h + '<div class="tarjeta"><p class="muted" style="margin:0">Aún no hay valoraciones en este periodo. Empieza en la pestaña «📲 Pedir valoración».</p></div>'; return; }
+  const agrupa = (clave) => { const m = new Map(); resp.forEach(v => [].concat(clave(v)).forEach(k => { if (k == null) return; const r = m.get(k) || { n: 0, s: 0, malas: 0 }; r.n++; r.s += v.puntuacion; if (v.puntuacion <= 2) r.malas++; m.set(k, r); })); return [...m.entries()].sort((a, b) => b[1].n - a[1].n); };
+  const tabla = (titulo, filas, nombre) => '<section class="tarjeta"><h2>' + titulo + '</h2><div class="tw" style="max-height:340px"><table><tr><th></th><th class="n">Valoraciones</th><th class="n">Media</th><th class="n">1–2 ★</th></tr>' +
+    filas.map(([k, r]) => "<tr><td>" + esc(nombre(k)) + '</td><td class="n">' + r.n + '</td><td class="n"><span class="minib" style="width:' + Math.round(r.s / r.n / 5 * 60) + 'px"></span>' + f1(r.s / r.n) + '</td><td class="n">' + (r.malas ? '<span class="chip r">' + r.malas + "</span>" : "0") + "</td></tr>").join("") + "</table></div>" +
+    '<div class="nota">Con menos de 5 valoraciones, la media aún dice poco.</div></section>';
+  h += '<div class="dos bloque">' + tabla("Por tienda", agrupa(v => v.tienda_id), k => tiendas.get(k) || "¿?") + tabla("Por montador", agrupa(v => v.montadores || []), k => (montadores.get(k) || {}).nombre || "¿?") + "</div>";
+  const aspectos = (cond) => { const m = new Map(); resp.filter(cond).forEach(v => (v.aspectos || []).forEach(a => m.set(a, (m.get(a) || 0) + 1))); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
+  const listaAsp = (l, cls) => l.map(([a, n]) => '<tr><td>' + esc(a) + '</td><td class="n"><span class="chip ' + cls + '">' + n + "</span></td></tr>").join("") || '<tr><td class="muted">Nada aún</td></tr>';
+  h += '<div class="dos bloque"><section class="tarjeta"><h2>👍 Lo que más destacan</h2><p class="muted">En las valoraciones de 4–5 estrellas.</p><table>' + listaAsp(aspectos(v => v.puntuacion >= 4), "v") + '</table></section>' +
+    '<section class="tarjeta"><h2>👎 Lo que más falla</h2><p class="muted">En las valoraciones de 1–3 estrellas.</p><table>' + listaAsp(aspectos(v => v.puntuacion <= 3), "r") + "</table></section></div>";
+  const coms = resp.filter(v => v.comentario || v.puntuacion <= 3).slice(0, 60);
+  h += '<section class="tarjeta"><h2 style="display:flex;gap:8px;align-items:center"><span style="flex:1">Comentarios y valoraciones bajas</span>' + (nuevas ? '<button onclick="marcarVistas()">✔ Marcar ' + nuevas + " nuevas como vistas</button>" : "") + '</h2><p class="muted">Las más recientes primero. En amarillo, las que aún nadie ha visto.</p>' +
+    coms.map(v => { const o = nombres.get(v.anyo + "/" + v.orden) || {}; return '<div class="com' + (v.vista ? "" : " nueva") + '"><div class="cab"><span class="est">' + estrellas(v.puntuacion) + "</span><b>" + esc(o.nombre_cli || "") + '</b><span class="muted">' + esc(tiendas.get(v.tienda_id) || "") + " · " + fechaES(d10(v.respondido_at)) +
+      ' · <a href="pedidos.html?anyo=' + v.anyo + "&orden=" + v.orden + '" target="_blank">' + v.anyo + "/" + v.orden + "</a>" + ((v.montadores || []).length ? " · " + v.montadores.map(m => esc((montadores.get(m) || {}).nombre || "")).join(", ") : "") + "</span></div>" +
+      (v.aspectos && v.aspectos.length ? '<div class="asp">' + v.aspectos.map(esc).join(" · ") + "</div>" : "") + (v.comentario ? '<div class="txt">«' + esc(v.comentario) + "»</div>" : "") + "</div>"; }).join("") + "</section>";
+  $("v_res").innerHTML = h;
+}
+async function marcarVistas() {
+  const { error } = await client.from("valoraciones").update({ vista: true }).eq("vista", false).not("respondido_at", "is", null);
+  if (error) { alert("No se ha podido: " + error.message); return; }
+  cargarRes();
+}
+
+(async function init() {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) { location.href = "login.html"; return; }
+  const { data: st } = await client.from("staff").select("solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle();
+  if (!st || st.solo_montajes || st.solo_deca) { location.href = "inicio.html"; return; }
+  const [t, m] = await Promise.all([
+    todo(() => client.from("tiendas").select("id, nombre, nombre_comercial").order("id")),
+    todo(() => client.from("montadores").select("id, nombre, especial").order("id")),
+  ]);
+  tiendas = new Map(t.map(x => [x.id, x.nombre_comercial || x.nombre]));
+  montadores = new Map(m.map(x => [x.id, x]));
+  let tab = new URLSearchParams(location.search).get("tab"); if (!tab) { try { tab = localStorage.getItem("val_tab") || "pedir"; } catch (e) { tab = "pedir"; } }
+  verTab(tab === "res" ? "res" : "pedir");
+})();
+</script>
+</body>
+</html>
