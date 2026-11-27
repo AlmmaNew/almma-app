@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALMMA - Revisar órdenes antiguas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ALMMA · Revisar órdenes antiguas sin cerrar (27-11-2026, migracion/152_revision_ordenes_viejas.sql).
+   Lista de órdenes sin montar ni cerrar con la mercancía recibida (o creadas) hace más de X días, con lo que se sabe de cada una
+   y qué hacer. Solo lectura: las órdenes se cierran o anulan en Órdenes (pedidos.html), y al recargar desaparecen de aquí.
+   «✔ Revisada» solo se recuerda en este navegador, para ir tachando. «⬇ Excel» descarga lo que se ve (CSV). La ve toda la oficina. */
+:root{--primary:#2563eb;--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+#toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 20px;background:#fff;border-bottom:1px solid var(--border);}
+#toolbar h1{font-size:17px;margin:0 10px 0 0;} #toolbar .spacer{flex:1;}
+button,select,input{font:inherit;font-size:14px;}
+button{cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#fff;padding:7px 12px;}
+button.primario{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700;}
+select,input[type=search]{padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+input[type=search]{min-width:220px;}
+main{max-width:1400px;margin:0 auto;padding:18px 20px 60px;}
+.muted{color:var(--muted);font-size:13px;}
+#estado{font-size:13px;color:var(--muted);min-height:18px;margin-bottom:10px;}
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:14px;}
+.cat{background:#fff;border:1px solid var(--border);border-left:5px solid var(--c);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;font:inherit;}
+.cat.on{outline:3px solid var(--c);outline-offset:-1px;}
+.cat b{display:block;font-size:22px;font-variant-numeric:tabular-nums;} .cat .t{font-weight:700;font-size:14px;} .cat .d{font-size:12px;color:#475569;margin-top:2px;line-height:1.4;}
+.filtros{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+.filtros label{font-size:13px;color:#475569;display:flex;align-items:center;gap:6px;}
+.tarjeta{background:#fff;border:1px solid var(--border);border-radius:12px;padding:0;box-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 14px -6px rgba(15,23,42,.10);overflow:hidden;}
+.tw{overflow:auto;max-height:70vh;}
+table{border-collapse:collapse;width:100%;font-size:13px;}
+th,td{padding:7px 8px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top;}
+th{position:sticky;top:0;background:#f8fafc;font-size:12px;color:#475569;z-index:1;white-space:nowrap;}
+td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+tr.rev td{opacity:.45;} tr.rev td:last-child{opacity:1;}
+a{color:#1d4ed8;font-weight:600;}
+.chip{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700;white-space:nowrap;}
+.que{font-size:12px;line-height:1.45;max-width:320px;}
+.que b{display:block;font-size:13px;}
+.peq{font-size:12px;color:#475569;max-width:260px;}
+.pie{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.55;}
+@media (max-width:600px){main{padding:14px 16px 50px;} #toolbar{padding:8px 16px;} input[type=search]{min-width:0;width:100%;}}
+</style>
+<link rel="stylesheet" href="estilo_oficina.css">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
+<script src="volver.js" defer></script>
+</head>
+<body>
+<div id="toolbar">
+  <h1>🧹 Revisar órdenes antiguas</h1>
+  <span class="spacer"></span>
+  <label class="muted">Sin montar desde hace más de <select id="f_dias" onchange="cargar()"><option>60</option><option selected>90</option><option>180</option><option>365</option></select> días</label>
+  <button onclick="excel()">⬇ Excel</button>
+  <button class="primario" onclick="cargar()">↻ Recargar</button>
+</div>
+<main>
+  <div id="estado">Cargando…</div>
+  <div class="cats" id="cats"></div>
+  <div class="filtros">
+    <input type="search" id="f_q" placeholder="Buscar cliente, pedido, orden…" oninput="pintar()">
+    <label>Antigüedad <select id="f_edad" onchange="pintar()"><option value="">Todas</option><option value="1">Menos de 1 año</option><option value="2">1 a 2 años</option><option value="5">2 a 5 años</option><option value="9">Más de 5 años</option></select></label>
+    <label>Tienda <select id="f_tienda" onchange="pintar()"><option value="">Todas</option></select></label>
+    <label><input type="checkbox" id="f_ocultar" onchange="pintar()"> Ocultar las ya revisadas</label>
+    <span class="muted" id="cuenta"></span>
+  </div>
+  <div class="tarjeta"><div class="tw" id="tabla"></div></div>
+  <div class="pie">
+    <b>Cómo usarla:</b> empieza por las categorías de arriba, de izquierda a derecha (de más segura a menos). Abre cada orden con su enlace, comprueba y ciérrala o anúlala en Órdenes como siempre;
+    al pulsar «↻ Recargar» desaparece de la lista. «✔» solo te sirve para ir tachando en este navegador.<br>
+    <b>Pistas:</b> «Montada con otra orden» = el mismo cliente (mismo teléfono o mismo nombre) tiene otra orden de la misma tienda que sí se montó después; casi siempre es la misma mercancía con otra orden.
+    «Ubicación» = donde consta en la nave, pero ojo: ese apunte no se borra al montar, así que no prueba que siga allí.
+  </div>
+</main>
+<script>
+const client = supabase.createClient(
+  "https://uamgbtbsxbrgymhqalak.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhbWdidGJzeGJyZ3ltaHFhbGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMTMyOTIsImV4cCI6MjA5OTg4OTI5Mn0.0OClM8yZmfkiXynOkGLQiLRX-XZjkkP63z5UfIgck8k"
+);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const fechaES = s => s ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4) : "";
+const HOY = new Date(); HOY.setHours(0, 0, 0, 0);
+const dias = s => Math.round((HOY - new Date(s)) / 86400000);
+const ESTADOS = { en_proceso: "En proceso", recepcionado_parcial: "Recepción parcial", recepcionado_total: "Recepcionada", agendado: "Agendada", incidencia: "Incidencia" };
+const enlace = (a, o) => '<a href="pedidos.html?anyo=' + a + "&orden=" + o + '" target="_blank">' + a + "/" + o + "</a>";
+// categorías, de más segura a menos
+const CATS = [
+  { k: "anulada", c: "#64748b", t: "Dice «anulada» o «devolución»", d: "El pedido o las observaciones lo dicen. → Anular." },
+  { k: "sustituida", c: "#7c3aed", t: "Sustituida por otra orden", d: "Otra orden la cita como anterior. → Cerrar." },
+  { k: "montada", c: "#16a34a", t: "Montada con otra orden", d: "El cliente tiene otra orden montada de la misma tienda. → Comprobar y cerrar." },
+  { k: "muy_vieja", c: "#b45309", t: "Sin pista, más de 2 años", d: "Nada indica qué pasó. → Anular salvo que la mercancía siga en la nave." },
+  { k: "revisar", c: "#dc2626", t: "Sin pista, menos de 2 años", d: "→ Mirar en la nave y preguntar a la tienda." },
+];
+let filas = [], tiendas = new Map(), cat = "";
+const revKey = "rev_ordenes";
+const leerRev = () => { try { return new Set(JSON.parse(localStorage.getItem(revKey) || "[]")); } catch (e) { return new Set(); } };
+const guardarRev = s => { try { localStorage.setItem(revKey, JSON.stringify([...s])); } catch (e) {} };
+let revisadas = leerRev();
+
+function categoria(r) {
+  if (r.anulada_txt) return "anulada";
+  if (r.sustituida_por) return "sustituida";
+  if (r.montada_con) return "montada";
+  return dias(r.ref) > 730 ? "muy_vieja" : "revisar";
+}
+function queHacer(r) {
+  const c = r.categoria;
+  if (c === "anulada") return "<b>Anular</b>" + (r.obs ? esc(r.obs) : "El nº de pedido o los textos lo indican.");
+  if (c === "sustituida") { const s = r.sustituida_por; return "<b>Cerrar: la sustituye " + enlace(s.anyo, s.orden) + "</b>" + (s.fecha_montaje ? "montada el " + fechaES(s.fecha_montaje) : "esa orden está «" + esc(ESTADOS[s.estado] || s.estado || "") + "»"); }
+  if (c === "montada") { const m = r.montada_con; return "<b>Comprobar " + enlace(m.anyo, m.orden) + " y cerrar</b>Mismo " + m.por + ", montada el " + fechaES(m.fecha_montaje); }
+  if (c === "muy_vieja") return "<b>Anular</b>Más de 2 años sin noticias" + (r.ubicacion ? "; antes mira la ubicación " + esc(r.ubicacion) : "");
+  return "<b>Revisar</b>" + (r.ubicacion ? "Mirar en la nave (" + esc(r.ubicacion) + ") y " : "") + "preguntar a la tienda";
+}
+
+async function cargar() {
+  $("estado").textContent = "Buscando órdenes antiguas y sus pistas… (unos segundos)";
+  const t0 = performance.now();
+  const { data, error } = await client.rpc("revision_ordenes_viejas", { p_dias: +$("f_dias").value });
+  if (error) { $("estado").innerHTML = '<span style="color:#b91c1c">Error: ' + esc(error.message) + "</span>"; return; }
+  filas = (data || []).map(r => ({ ...r, dias: dias(r.ref) })).map(r => ({ ...r, categoria: categoria(r) }));
+  const ids = [...new Set(filas.map(r => r.tienda_id))];
+  $("f_tienda").innerHTML = '<option value="">Todas</option>' + ids.map(id => [id, tiendas.get(id) || "(sin tienda)"]).sort((a, b) => a[1].localeCompare(b[1], "es")).map(([id, n]) => '<option value="' + esc(id) + '">' + esc(n) + "</option>").join("");
+  $("estado").textContent = filas.length + " órdenes abiertas de hace más de " + $("f_dias").value + " días · " + ((performance.now() - t0) / 1000).toFixed(1).replace(".", ",") + " s";
+  pintar();
+}
+function visibles(ignorarCat) {
+  const q = $("f_q").value.trim().toLowerCase(), edad = $("f_edad").value, t = $("f_tienda").value, ocultar = $("f_ocultar").checked;
+  return filas.filter(r => (ignorarCat || !cat || r.categoria === cat) && (!t || r.tienda_id === t) && (!ocultar || !revisadas.has(r.anyo + "/" + r.orden)) &&
+    (!edad || (edad === "1" ? r.dias <= 365 : edad === "2" ? r.dias > 365 && r.dias <= 730 : edad === "5" ? r.dias > 730 && r.dias <= 1825 : r.dias > 1825)) &&
+    (!q || [r.anyo + "/" + r.orden, r.nombre_cli, r.num_pedido, r.localidad_cli, r.telefono_cli, r.articulos, tiendas.get(r.tienda_id)].join(" ").toLowerCase().includes(q)));
+}
+function pintar() {
+  const base = visibles(true);
+  $("cats").innerHTML = CATS.map(c => { const n = base.filter(r => r.categoria === c.k).length;
+    return '<button class="cat' + (cat === c.k ? " on" : "") + '" style="--c:' + c.c + '" onclick="cat=cat===\'' + c.k + '\'?\'\':\'' + c.k + '\';pintar()"><b>' + n + '</b><div class="t">' + c.t + '</div><div class="d">' + c.d + "</div></button>"; }).join("");
+  const vs = visibles(false);
+  const nRev = vs.filter(r => revisadas.has(r.anyo + "/" + r.orden)).length;
+  $("cuenta").textContent = vs.length + " en la lista" + (nRev ? " · " + nRev + " marcadas como revisadas" : "") + (cat ? " · pulsa otra vez la categoría para ver todas" : "");
+  const MAX = 500;
+  $("tabla").innerHTML = "<table><tr><th>Orden</th><th>Qué hacer</th><th>Estado</th><th>Recibida</th><th>Tienda</th><th>Cliente</th><th>Pedido</th><th>Artículos</th><th>Ubicación</th><th></th></tr>" +
+    vs.slice(0, MAX).map(r => { const k = r.anyo + "/" + r.orden, cc = CATS.find(c => c.k === r.categoria);
+      return '<tr class="' + (revisadas.has(k) ? "rev" : "") + '"><td>' + enlace(r.anyo, r.orden) + '</td><td class="que" style="border-left:4px solid ' + cc.c + '">' + queHacer(r) + "</td><td>" + esc(ESTADOS[r.estado] || r.estado) +
+        '</td><td class="n">' + fechaES(r.ref) + '<div class="muted">' + (r.dias > 730 ? Math.floor(r.dias / 365) + " años" : r.dias + " días") + (r.recibida ? "" : " · creada") + "</div></td><td>" + esc(tiendas.get(r.tienda_id) || "") +
+        "</td><td>" + esc(r.nombre_cli || "") + '<div class="muted">' + esc([r.localidad_cli, r.telefono_cli].filter(Boolean).join(" · ")) + "</div></td><td>" + esc(r.num_pedido || "") +
+        '</td><td class="peq">' + esc(r.articulos || "") + "</td><td>" + esc(r.ubicacion || "") + '</td><td><button title="Marcar como revisada (solo en este navegador)" onclick="tachar(\'' + k + '\')">' + (revisadas.has(k) ? "↺" : "✔") + "</button></td></tr>"; }).join("") +
+    (vs.length > MAX ? '<tr><td colspan="10" class="muted">… y ' + (vs.length - MAX) + " más. Usa los filtros o descarga el Excel.</td></tr>" : "") +
+    (vs.length ? "" : '<tr><td colspan="10" class="muted">Nada con estos filtros.</td></tr>') + "</table>";
+}
+function tachar(k) { revisadas.has(k) ? revisadas.delete(k) : revisadas.add(k); guardarRev(revisadas); pintar(); }
+function excel() {
+  const vs = visibles(false);
+  const txt = html => { const d = document.createElement("div"); d.innerHTML = html.replace(/<b>/g, "").replace(/<\/b>/g, ": "); return d.textContent; };
+  const cols = ["Orden", "Categoría", "Qué hacer", "Estado", "Recibida", "Días", "Tienda", "Cliente", "Localidad", "Teléfono", "Pedido", "Artículos", "Ubicación", "Observaciones", "Revisada"];
+  const lineas = [cols].concat(vs.map(r => [r.anyo + "/" + r.orden, CATS.find(c => c.k === r.categoria).t, txt(queHacer(r)), ESTADOS[r.estado] || r.estado, fechaES(r.ref), r.dias, tiendas.get(r.tienda_id) || "",
+    r.nombre_cli || "", r.localidad_cli || "", r.telefono_cli || "", r.num_pedido || "", r.articulos || "", r.ubicacion || "", r.obs || "", revisadas.has(r.anyo + "/" + r.orden) ? "sí" : ""]));
+  const csv = "﻿" + lineas.map(l => l.map(v => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(";")).join("\r\n");   // ; y BOM: Excel en español lo abre bien
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "ordenes_antiguas_" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+(async function init() {
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) { location.href = "login.html"; return; }
+  const { data: st } = await client.from("staff").select("solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle();
+  if (!st || st.solo_montajes || st.solo_deca) { location.href = "inicio.html"; return; }
+  let t = [];
+  for (let d = 0; ; d += 1000) { const { data } = await client.from("tiendas").select("id, nombre, nombre_comercial").order("id").range(d, d + 999); t = t.concat(data || []); if (!data || data.length < 1000) break; }
+  tiendas = new Map(t.map(x => [x.id, x.nombre_comercial || x.nombre]));
+  cargar();
+})();
+</script>
+</body>
+</html>

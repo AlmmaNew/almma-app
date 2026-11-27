@@ -110,7 +110,7 @@
         if (corta)
           A.push({ nivel: "a", ico: "🏖", titulo: "Semana del " + corta.ini.slice(8, 10) + "/" + corta.ini.slice(5, 7) + ": un " + Math.round(corta.perdida * 100) + " % menos de capacidad por ausencias", detalle: "Fuera: " + esc([...corta.ausentes.keys()].join(", ")) + ". Capacidad estimada " + corta.capacidad + " montajes, agendados " + corta.agendado + ".", href: "direccion.html", clave: "ausencias" });
         if (b.vieja > U.bolsaViejaMax)
-          A.push({ nivel: "a", ico: "🗂", titulo: b.vieja + " órdenes con la mercancía recibida hace más de " + b.diasVieja + " días y sin cita ni montaje", detalle: "Seguramente ya se montaron o se anularon y no se cerraron. Revisarlas en Órdenes deja los números limpios.", href: "pedidos.html", clave: "viejas" });
+          A.push({ nivel: "a", ico: "🗂", titulo: b.vieja + " órdenes con la mercancía recibida hace más de " + b.diasVieja + " días y sin cita ni montaje", detalle: "Seguramente ya se montaron o se anularon y no se cerraron. Hay una lista con pistas de cada una para revisarlas.", href: "revisar_ordenes.html", clave: "viejas" });
       }
     }
     return A.sort((x, y) => (x.nivel === "r" ? 0 : 1) - (y.nivel === "r" ? 0 : 1));

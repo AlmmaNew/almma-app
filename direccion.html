@@ -384,7 +384,7 @@ function capacidadHTML(c) {
   h += "</table></div>";
   h += '<div class="nota"><b>Cómo se calcula:</b> capacidad = días laborables × montadores previstos × ' + f1(c.porMontadorDia) + " montajes por montador y día. Los montadores previstos salen de cuánto suele montar cada uno: " +
     c.presencia.map(m => esc(m.nombre) + " " + Math.round(m.p * 100) + " %").join(", ") + ". Se descuentan festivos, puentes y ausencias (pantalla Ausencias y vacaciones). «Agendado» = órdenes con fecha de montaje prevista y aún sin montar." +
-    (b.vieja > 20 ? " <b>Las " + num(b.vieja) + " órdenes sin cita de hace más de " + b.diasVieja + " días</b> no cuentan en la bolsa: seguramente se montaron o anularon y no se cerraron." : "") + "</div></section>";
+    (b.vieja > 20 ? " <b>Las " + num(b.vieja) + " órdenes sin cita de hace más de " + b.diasVieja + " días</b> no cuentan en la bolsa: seguramente se montaron o anularon y no se cerraron. <a href=\"revisar_ordenes.html\">Revisarlas →</a>" : "") + "</div></section>";
   return h;
 }
 function tile(k, v, d, href) {
