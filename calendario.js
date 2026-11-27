@@ -88,10 +88,13 @@ input[type=date]:not([data-calendario=no]):not(:disabled):not([readonly]:not([da
     if (input && input.dataset.calRo) { input.readOnly = false; delete input.dataset.calRo; }
     input = null;
   }
+  const tactil = () => matchMedia("(pointer: coarse)").matches;   // móvil / tableta
   function elegir(v) {
     const el = input; cerrar(); if (!el) return;
     if (el.value !== v) { el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }
-    try { el.focus({ preventScroll: true }); } catch (e) {}
+    // en el ordenador la casilla recupera el foco (para seguir con el tabulador); en el móvil NO: al enfocar una casilla de fecha,
+    // el iPhone y Android sacan su propio calendario encima (eran los «dos calendarios», 27-11-2026)
+    if (!tactil()) try { el.focus({ preventScroll: true }); } catch (e) {}
   }
   function pintar() {
     if (!pop) return;
@@ -174,6 +177,12 @@ input[type=date]:not([data-calendario=no]):not(:disabled):not([readonly]:not([da
     abrir(el);
     // en el ordenador se puede seguir escribiendo la fecha a mano
     if (el.dataset.calRo && !matchMedia("(pointer: coarse)").matches) setTimeout(() => { if (el.dataset.calRo) { el.readOnly = false; delete el.dataset.calRo; } }, 0);
+  }, true);
+  // en el móvil, si la casilla llega a coger el foco (Safari del iPhone a veces no hace caso del «solo lectura»), se le quita al
+  // momento: así el sistema no saca su rueda de fechas debajo del nuestro. El nuestro lo abre el «click» de arriba.
+  document.addEventListener("focusin", e => {
+    const el = e.target;
+    if (tactil() && el && el.tagName === "INPUT" && el.type === "date" && el.dataset.calendario !== "no" && !el.disabled) { try { el.blur(); } catch (x) {} }
   }, true);
   document.addEventListener("keydown", e => { if (pop && e.key === "Escape") { e.stopPropagation(); cerrar(); } }, true);
   window.addEventListener("resize", () => { if (pop) colocar(); });
