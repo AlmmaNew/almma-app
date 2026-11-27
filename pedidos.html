@@ -831,7 +831,7 @@ function pintarResumenOrden(o) {
   if (o.cierre_motivo) document.getElementById("d_head").style.setProperty("--est", "#6b7280");
   const badges = [];
   if (o.cierre_motivo) badges.push('<span class="ph-badge" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db" title="Cerrada sin montar el ' + (o.cierre_at ? new Date(o.cierre_at).toLocaleDateString("es-ES") : "") + '. Si se reabre (cambiando el estado), la marca se quita sola.">' +
-    ({ anulada: "Anulada", sustituida: "Sustituida por otra orden", antigua: "Antigua sin noticias", otro: "Cerrada" }[o.cierre_motivo] || "Cerrada") + " · ver observaciones</span>");
+    ({ anulada: "Anulada", sustituida: "Sustituida por otra orden", antigua: "Antigua sin noticias", montada_otra: "Montada con otra orden", otro: "Cerrada" }[o.cierre_motivo] || "Cerrada") + " · ver observaciones</span>");
   if (o.con_incidencia && estado !== "incidencia" && !conIncid) badges.push('<span class="ph-badge" style="background:#fee2e2;color:#b91c1c">⚠ Con incidencia</span>');
   if (o.facturada === "S") badges.push('<span class="ph-badge" style="background:#dcfce7;color:#166534">✔ Facturada</span>');
   else if (o.pendiente_facturar) badges.push('<span class="ph-badge" style="background:#fef3c7;color:#92400e">Pendiente de facturar</span>');
