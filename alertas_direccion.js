@@ -95,7 +95,11 @@
       if (b > 0 && (a - b) / b <= -U.caidaFacturacion)
         A.push({ nivel: "a", ico: "📉", titulo: "Este mes se ha facturado un " + Math.round((b - a) / b * 100) + " % menos que el año pasado a estas alturas", detalle: eur(a) + " frente a " + eur(b) + " (hasta el día " + HOY.getDate() + "). Puede ser solo facturación con retraso: mira «Montado sin facturar».", href: "direccion.html", clave: "caida" });
     }
-    // 6. Carga y capacidad (capacidad.js): bolsa grande, semanas con poca gente y órdenes viejas sin cerrar
+    // 6. Valoraciones de 1–2 estrellas que nadie ha mirado (SQL 151)
+    const malas = await seguro(todo(() => client.from("valoraciones").select("anyo, orden, puntuacion, comentario").lte("puntuacion", 2).eq("vista", false).not("respondido_at", "is", null).order("respondido_at")));
+    if (malas && malas.length)
+      A.push({ nivel: "r", ico: "⭐", titulo: malas.length + (malas.length === 1 ? " cliente ha valorado" : " clientes han valorado") + " el montaje con 1–2 estrellas", detalle: (malas[0].comentario ? "«" + esc(malas[0].comentario.slice(0, 90)) + (malas[0].comentario.length > 90 ? "…" : "") + "» · " : "") + "Conviene llamarle cuanto antes.", href: "valoraciones.html?tab=res", clave: "valmala" });
+    // 7. Carga y capacidad (capacidad.js): bolsa grande, semanas con poca gente y órdenes viejas sin cerrar
     if (window.calcularCapacidad) {
       const c = await seguro(calcularCapacidad(client));
       if (c) {

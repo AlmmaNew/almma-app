@@ -4,7 +4,7 @@
 // Si el SQL 114 aún no está ejecutado, solo enseña los mensajes de chat y no da error.
 (function () {
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const ICONO = { archivo: "📎", listo_agendar: "📅", orden_completa: "✅", chat: "💬" };
+  const ICONO = { archivo: "📎", listo_agendar: "📅", orden_completa: "✅", chat: "💬", valoracion_baja: "⭐" };
 
   window.iniciarCampana = function (client, rol) {
     if (document.getElementById("campana_btn")) return;
