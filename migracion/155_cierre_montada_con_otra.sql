@@ -19,3 +19,8 @@ alter table public.ordenes add constraint ordenes_cierre_motivo_check check (cie
 -- abiertas con la mercancía recibida (o creadas) hace más de 2 años y SIN ninguna pista (ni anulada, ni sustituida, ni cliente montado con otra orden).
 -- cierre_motivo = 'antigua'. Para deshacer: como en 153, con lote = 'revision-2026-11-27-2anyos'.
 -- Total cerradas por anulación tras los 5 lotes: 1.971. Quedan 255 abiertas de más de 90 días (50 del último año).
+
+-- CIERRE HECHO el 27-11-2026 (lote 'revision-2026-11-27-1anyo', a nombre de Arturo): 82 órdenes
+-- abiertas con la mercancía recibida (o creadas) hace entre 1 y 2 años y SIN ninguna pista. cierre_motivo = 'antigua'.
+-- Para deshacer: como en 153, con lote = 'revision-2026-11-27-1anyo'.
+-- Total cerradas por anulación tras los 6 lotes: 2.053. Quedan 173 abiertas de más de 90 días (128 con pista dudosa + 45 sin pista del último año).
