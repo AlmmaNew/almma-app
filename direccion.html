@@ -72,6 +72,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--primary);margin-top:8p
 <link rel="stylesheet" href="estilo_oficina.css">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALMMA"><script src="pwa.js" defer></script>
 <script src="volver.js" defer></script>
+<script src="alertas_direccion.js"></script>
 </head>
 <body>
 <div id="toolbar">
@@ -84,6 +85,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--primary);margin-top:8p
 </div>
 <main>
   <div id="bloqueo" class="tarjeta"><b>No tienes acceso al Panel de dirección.</b><br>Solo pueden verlo quienes tienen acceso a Contabilidad. <a href="inicio.html">Volver al inicio</a></div>
+  <div id="alertas_dir"></div>
   <div id="estado"></div>
   <div id="panel"></div>
 </main>
@@ -424,6 +426,7 @@ async function logout() { await client.auth.signOut(); location.href = "login.ht
   let st = null;
   try { st = (await client.from("staff").select("acceso_finanzas, solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle()).data; } catch (e) {}
   if (!st || !st.acceso_finanzas || st.solo_montajes || st.solo_deca) { $("bloqueo").style.display = "block"; document.querySelectorAll("#toolbar label, #toolbar button").forEach(e => e.style.display = "none"); return; }
+  alertasDireccion(client, $("alertas_dir"));
   $("f_mes").value = HOYS.slice(0, 7);
   try { const m = localStorage.getItem("dir_modo"); if (m) $("f_modo").value = m; $("f_prof").checked = localStorage.getItem("dir_prof") === "1"; } catch (e) {}
   $("f_mes").addEventListener("change", cargar);

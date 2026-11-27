@@ -6,6 +6,7 @@
 <title>ALMMA - Inicio</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="busqueda.js"></script>
+<script src="alertas_direccion.js"></script>
 <style>
 :root{--primary:#2563eb;--bg:#f5f6fa;--card:#fff;--border:#e2e4eb;--text:#1f2430;--muted:#6b7280;}
 *{box-sizing:border-box;}
@@ -34,7 +35,7 @@ a.boton .ico{font-size:28px;} a.boton b{display:block;font-size:16px;margin:6px 
 </head>
 <body>
 <header><div class="logo">ALMMA</div><div class="quien" id="quien"></div><button onclick="logout()">Salir</button></header>
-<main><h1>¿Qué quieres hacer?</h1><div id="botones"></div>
+<main><div id="alertas_dir"></div><h1>¿Qué quieres hacer?</h1><div id="botones"></div>
 <section id="buzon"><div class="cab"><h2>📘 Buzón de instrucciones</h2><a href="instrucciones.html?nuevo=1">⬆ Subir instrucciones</a><a class="sec" href="instrucciones.html">Ver todas</a></div>
 <input type="search" id="bz_q" placeholder="Buscar fabricante o modelo…" autocomplete="off"><div id="bz_lista"></div></section></main>
 <script>
@@ -78,6 +79,7 @@ async function init() {
     try {
       const { data: fz } = await client.from("staff").select("acceso_finanzas").eq("user_id", user.id).maybeSingle();
       if (fz && fz.acceso_finanzas) {
+        alertasDireccion(client, document.getElementById("alertas_dir"));   // avisos de dirección (alertas_direccion.js), solo con acceso a finanzas
         botones.push(B("📊", "Panel de dirección", "Facturación, montajes, cobros e incidencias de un vistazo", "direccion.html"));
         botones.push(B("📒", "Contabilidad", "Ingresos, gastos, cobros, IVA y libro mayor", "contabilidad.html"));
       }
