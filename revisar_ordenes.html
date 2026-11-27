@@ -115,10 +115,26 @@ function queHacer(r) {
   return "<b>Revisar</b>" + (r.ubicacion ? "Mirar en la nave (" + esc(r.ubicacion) + ") y " : "") + "preguntar a la tienda";
 }
 
+// Sesión perdida (cerrada en otra pestaña, caducada…): al login, y después de entrar se vuelve aquí.
+// Antes la petición salía como «anónimo» y la pantalla enseñaba «permission denied for function …».
+let yendoAlLogin = false;
+function irAlLogin() {
+  if (yendoAlLogin) return;
+  yendoAlLogin = true;
+  location.replace("login.html?volver=revisar_ordenes.html");
+}
+client.auth.onAuthStateChange((evento, sesion) => { if (evento === "SIGNED_OUT" || (!sesion && evento !== "INITIAL_SESSION")) irAlLogin(); });
+
 async function cargar() {
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) return irAlLogin();
   $("estado").textContent = "Buscando órdenes antiguas y sus pistas… (unos segundos)";
   const t0 = performance.now();
   const { data, error } = await client.rpc("revision_ordenes_viejas", { p_dias: +$("f_dias").value });
+  if (error && (error.code === "42501" || error.code === "PGRST301" || /JWT/i.test(error.message || ""))) {
+    const { data: { user } } = await client.auth.getUser();   // pregunta al servidor si la sesión sigue viva
+    if (!user) return irAlLogin();
+  }
   if (error) { $("estado").innerHTML = '<span style="color:#b91c1c">Error: ' + esc(error.message) + "</span>"; return; }
   filas = (data || []).map(r => ({ ...r, dias: dias(r.ref) })).map(r => ({ ...r, categoria: categoria(r) }));
   const ids = [...new Set(filas.map(r => r.tienda_id))];
@@ -165,7 +181,7 @@ function excel() {
 
 (async function init() {
   const { data: { user } } = await client.auth.getUser();
-  if (!user) { location.href = "login.html"; return; }
+  if (!user) return irAlLogin();
   const { data: st } = await client.from("staff").select("solo_montajes, solo_deca").eq("user_id", user.id).maybeSingle();
   if (!st || st.solo_montajes || st.solo_deca) { location.href = "inicio.html"; return; }
   let t = [];

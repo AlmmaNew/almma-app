@@ -66,7 +66,12 @@ button:disabled{opacity:.6;cursor:default;}
     // si se llega desde el QR de una factura, se vuelve a ella tras entrar (solo a páginas .html de esta web)
     const volverParam = new URLSearchParams(location.search).get("volver") || "";
     const volver = /^[A-Za-z0-9_-]+\.html(\?[A-Za-z0-9=,&_-]*)?$/.test(volverParam) ? volverParam : null;
-    if (volver) document.getElementById("aviso_factura").style.display = "block";
+    if (volver) {
+      const av = document.getElementById("aviso_factura");
+      // desde otra pantalla (no la factura del QR): la sesión se cerró y al entrar se vuelve a ella
+      if (!volver.startsWith("factura_imprimir.html")) av.textContent = "Se ha cerrado la sesión. Vuelve a entrar y seguirás en la pantalla donde estabas.";
+      av.style.display = "block";
+    }
     const destino = (porDefecto) => volver || porDefecto;
 
     const form = document.getElementById("loginForm");
