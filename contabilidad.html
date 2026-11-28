@@ -424,10 +424,72 @@ function vPend(){
   const b=[[0,30,'0–30 días'],[31,60,'31–60'],[61,90,'61–90'],[91,1e9,'más de 90']].map(([a,z,t])=>{const s=P.filter(f=>{const d=diasDesde(f.fecha);return d>=a&&d<=z;});return {t,n:s.length,imp:s.reduce((x,f)=>x+f.pend,0)};});
   const tot=P.reduce((s,f)=>s+f.pend,0);
   return cab('Facturas pendientes de cobro','Se actualiza sola: cualquier factura con importe pendiente aparece aquí. Las más recientes arriba.','Pendientes')+
-  `<div class="bar"><div><label class="l">Cliente</label><select id="pcli"><option value="">Todos los clientes (${clientes.length})</option>${clientes.map(c=>`<option ${V.pend.cli===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>${V.pend.cli?'<button class="sec" data-pquita="1">Ver todos</button>':''}</div>
+  `<div class="bar"><div><label class="l">Cliente</label><select id="pcli"><option value="">Todos los clientes (${clientes.length})</option>${clientes.map(c=>`<option ${V.pend.cli===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>${V.pend.cli?'<button class="sec" data-pquita="1">Ver todos</button><button data-ppdf="1" title="PDF con las facturas pendientes de este cliente, para mandárselo por correo o WhatsApp">📄 PDF para el cliente</button>':'<span class="sub" style="margin:0 0 6px">Elige un cliente para sacar el PDF de lo que tiene pendiente y mandárselo.</span>'}<span id="ppdf_est" class="sub" style="margin:0 0 6px"></span></div>
   <div class="cards"><div class="card warn"><div class="k">Total pendiente (${P.length} facturas)</div><div class="v">${eur0(tot)}</div></div>${b.map((x,i)=>`<div class="card ${i>=3&&x.imp>0?'bad':''}"><div class="k">${x.t}</div><div class="v" style="font-size:18px">${eur0(x.imp)}</div><div class="k">${x.n} facturas</div></div>`).join('')}</div>
   <div class="tw" style="max-height:62vh"><table><thead><tr><th>Cliente</th><th>Fecha</th><th>Nº factura</th><th class="n">Total</th><th class="n">Cobrado</th><th class="n">Pendiente</th><th class="n">Días desde factura</th><th></th></tr></thead><tbody>${P.map(f=>{const d=diasDesde(f.fecha);return `<tr><td class="clic" data-pfl="${esc(f.cli)}">${esc(f.cli)}</td><td>${fdate(f.fecha)}</td><td><b>${esc(fnum(f.num))}</b></td><td class="n">${eur(f.total)}</td><td class="n">${eur(f.cobrado)}</td><td class="n"><span class="chip ${f.pend<1?'w':'pd'}">${eur(f.pend)}</span></td><td class="n">${d}</td><td><button class="sec peq" data-cobrar="${esc(f.num)}" data-cli="${esc(f.cli)}">Cobrar</button></td></tr>`;}).join('')||'<tr><td colspan="8" class="vacio">Nada pendiente</td></tr>'}</tbody></table></div>
   <div class="nota">Hay facturas con pendientes de céntimos (amarillo, p. ej. 0,03 € o 0,40 €): suelen ser redondeos y mantienen la factura «abierta» para siempre. «Cobrar» las cierra con un clic.</div>`;
+}
+
+/* ---------- PDF de pendientes de un cliente (para mandarlo por correo o WhatsApp) ---------- */
+function cargarJsPDF(){
+  if(window.jspdf)return Promise.resolve();
+  return new Promise((ok,mal)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=ok;s.onerror=()=>mal(new Error('no se ha podido cargar el generador de PDF (¿sin conexión?)'));document.head.appendChild(s);});
+}
+async function pdfPendientes(cli){
+  const est=document.getElementById('ppdf_est'),di=t=>{if(est)est.textContent=t;};
+  const P=facturas().filter(f=>f.pend>0.005&&f.cli===cli).sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:a.id-b.id);
+  if(!P.length){di('Este cliente no tiene nada pendiente.');return;}
+  di('Preparando el PDF…');
+  try{
+    await cargarJsPDF();
+    let ser=[];try{const {data}=await client.from('series').select('*');ser=data||[];}catch(_){}
+    const sDe=c=>ser.find(s=>String(s.codigo)===String(c));
+    // un bloque por emisor: Arturo (series 1, 2 y 5) y José (serie 3); los datos del emisor salen de la tabla «series»
+    const grupos=[];
+    P.forEach(f=>{const k=f.socio;let g=grupos.find(x=>x.k===k);if(!g){const s=(k==='José'?sDe(3):(sDe(f.serie)&&sDe(f.serie).emisor_nombre?sDe(f.serie):sDe(1)))||{};g={k,em:s,F:[]};grupos.push(g);}g.F.push(f);});
+    const hayRet=P.some(f=>f.ret>0.005);
+    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',compress:true});
+    const W=210,X0=15,X1=195;let y=20;
+    const e2=x=>{const [e,d]=Math.abs(+x).toFixed(2).split('.');return (x<0?'-':'')+e.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+d+' €';};   // 1.210,50 € (toLocaleString no pone el punto en 4 cifras)
+    const salto=h=>{if(y+h>280){pdf.addPage();y=20;}};
+    pdf.setFont('helvetica','bold');pdf.setFontSize(16);pdf.text('Facturas pendientes de pago',X0,y);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.text('Fecha: '+fdate(HOYS),X1,y,{align:'right'});y+=9;
+    pdf.setFontSize(11);pdf.text('Cliente: ',X0,y);pdf.setFont('helvetica','bold');pdf.text(String(cli),X0+16,y);pdf.setFont('helvetica','normal');y+=6;
+    pdf.setFontSize(9.5);pdf.setTextColor(90);pdf.text(pdf.splitTextToSize('Le enviamos el detalle de las facturas que según nuestros registros están pendientes de pago. Si ya las ha pagado, no tenga en cuenta este aviso y, si puede, indíquenos la fecha del pago.',X1-X0),X0,y);pdf.setTextColor(0);y+=12;
+    const cols=hayRet?[['Nº factura',X0,'left'],['Fecha',X0+38,'left'],['Total',X0+92,'right'],['Retención',X0+118,'right'],['Pagado',X0+144,'right'],['Pendiente',X1,'right']]
+                     :[['Nº factura',X0,'left'],['Fecha',X0+45,'left'],['Total',X0+110,'right'],['Pagado',X0+145,'right'],['Pendiente',X1,'right']];
+    let totGen=0;
+    grupos.forEach(g=>{
+      salto(30);
+      const em=g.em||{};
+      pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.text(String(em.emisor_nombre||g.k),X0,y);pdf.setFont('helvetica','normal');pdf.setFontSize(9);
+      const lin=[em.emisor_nif?'NIF '+em.emisor_nif:'',[em.emisor_direccion,em.emisor_cp_localidad].filter(Boolean).join(' · ')].filter(Boolean).join(' · ');
+      if(lin){y+=4.5;pdf.text(lin,X0,y);}
+      y+=6;
+      pdf.setFillColor(238,242,255);pdf.rect(X0-2,y-4.2,X1-X0+4,6.2,'F');pdf.setFont('helvetica','bold');
+      cols.forEach(([t,x,al])=>pdf.text(t,x,y,{align:al}));pdf.setFont('helvetica','normal');y+=6.5;
+      let sub=0;
+      g.F.forEach(f=>{salto(7);const v=hayRet?[fnum(f.num),fdate(f.fecha),e2(f.total),f.ret?e2(f.ret):'',f.cobrado?e2(f.cobrado):'',e2(f.pend)]:[fnum(f.num),fdate(f.fecha),e2(f.total),f.cobrado?e2(f.cobrado):'',e2(f.pend)];
+        cols.forEach(([,x,al],i)=>pdf.text(v[i],x,y,{align:al}));pdf.setDrawColor(225);pdf.line(X0-2,y+1.8,X1+2,y+1.8);y+=6;sub+=f.pend;});
+      totGen+=sub;
+      salto(16);pdf.setFont('helvetica','bold');pdf.text('Pendiente'+(grupos.length>1?' con '+(em.emisor_nombre||g.k):''),X0,y+1);pdf.text(e2(sub),X1,y+1,{align:'right'});pdf.setFont('helvetica','normal');y+=6;
+      if(em.emisor_iban){pdf.text('Puede pagarlo por transferencia a la cuenta '+em.emisor_iban,X0,y);y+=5;}
+      y+=6;
+    });
+    salto(14);
+    pdf.setDrawColor(120);pdf.line(X0-2,y-3,X1+2,y-3);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(12);pdf.text('TOTAL PENDIENTE ('+P.length+(P.length===1?' factura':' facturas')+')',X0,y+3);pdf.text(e2(totGen),X1,y+3,{align:'right'});
+    if(hayRet){pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(90);pdf.text('La retención la ingresa usted en Hacienda: no forma parte de lo pendiente.',X0,y+9);pdf.setTextColor(0);}
+    const n=pdf.getNumberOfPages();for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(140);pdf.text('ALMMA almacén y montaje · Página '+i+' de '+n,W/2,290,{align:'center'});pdf.setTextColor(0);}
+    const nombre=('Pendientes '+cli+' '+HOYS).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w\-]+/g,'_')+'.pdf';
+    const blob=pdf.output('blob'),fichero=new File([blob],nombre,{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[fichero]})&&/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
+      try{await navigator.share({files:[fichero],title:nombre});di('PDF listo.');return;}
+      catch(e){if(e&&e.name==='AbortError'){di('');return;}}
+    }
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    di('PDF descargado: adjúntalo en el correo o en WhatsApp Web.');
+  }catch(e){di('No se ha podido crear el PDF: '+(e.message||e));}
 }
 
 /* ===================== POR CLIENTE ===================== */
@@ -592,6 +654,7 @@ document.addEventListener('click',async e=>{
   if(d.copynom){const act=S.trab.filter(w=>activoEnMes(w,V.mes)&&!S.nom.some(n=>n.mes===V.mes&&n.trabId===w.id));
     if(act.length&&await guardar(()=>dbIns('cont_nominas',act.map(w=>({anyo:ANYO,mes:V.mes,trabajador_id:w.id,base:w.base,extras:w.extras})))))render();return;}
   if(d.pquita){V.pend.cli='';return render();}
+  if(d.ppdf)return pdfPendientes(V.pend.cli);
   if(d.pfl!==undefined){V.pend.cli=d.pfl;return render();}
   if(d.addt!==undefined)return formTarifa(d.addt);
   if(d.addper!==undefined)return abrir(`<h3>Cambio de tarifa de ${esc(d.addper)}</h3><div class="fg"><div><label class="l">Vale desde el día</label><input id="pd" type="date" value="${(ANYO+1)}-01-01"></div><div><label class="l">% Montaje desde esa fecha</label><input id="pp" type="number" step="0.1" min="0" max="100" value="${r2(pctM(d.addper)*100)}"></div></div><div class="nota az">Hasta el día anterior sigue valiendo la tarifa que ya tiene. El % de almacén es lo que falta hasta 100.</div><div class="acc"><button class="sec" data-cerrar="1">Cancelar</button><button data-okper="${esc(d.addper)}">Guardar</button></div>`);
